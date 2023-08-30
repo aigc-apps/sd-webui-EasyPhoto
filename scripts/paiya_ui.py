@@ -1,25 +1,17 @@
 import os
-import platform
-import shutil
-import subprocess as sp
-import sys
 
 import gradio as gr
+import glob
+import requests
 
-from modules import call_queue, script_callbacks, shared, ui_postprocessing
-from modules.call_queue import wrap_gradio_gpu_call
-from modules.sd_samplers import samplers_for_img2img
-from modules.shared import opts
-from modules.ui import (create_override_settings_dropdown,
-                        create_sampler_and_steps_selection, create_seed_inputs,
-                        ordered_ui_categories)
-from modules.ui_common import plaintext_to_html
-from modules.ui_components import FormGroup, FormRow
-from scripts.paiya_process import paiya_process, paiya_forward
+from scripts.paiya_infer import paiya_infer_forward
 from scripts.paiya_config import paiya_outpath_samples
-from paiya_train import paiya_train
+from scripts.paiya_train import paiya_train_forward
+from modules import script_callbacks, shared
+from modules.paths import models_path
 
 gradio_compat = True
+
 try:
     from distutils.version import LooseVersion
 
@@ -29,9 +21,52 @@ try:
 except ImportError:
     pass
 
+def urldownload(url, filename):
+    """
+    下载文件到指定目录
+    :param url: 文件下载的url
+    :param filename: 要存放的目录及文件名，例如：./test.xls
+    :return:
+    """
+    down_res = requests.get(url)
+    with open(filename,'wb') as file:
+        file.write(down_res.content)
+
+def check_files_exists_and_download():
+    urls        = [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/4.jpg",
+    ]
+    filenames = [
+        os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
+        os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
+        os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
+        os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "w600k_r50.onnx"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "1.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "2.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "3.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "4.jpg"),
+    ]
+    for url, filename in zip(urls, filenames):
+        if os.path.exists(filename):
+            continue
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        urldownload(url, filename)
+
+def upload_file(files, current_files):
+    file_paths = [file_d['name'] for file_d in current_files] + [file.name for file in files]
+    return file_paths
+
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as skybox_tabs:
-        uuid = gr.Text(label="paiya", visible=True)
+        uuid = gr.Text(label="User_ID", value="paiya", visible=True)
         with gr.TabItem('数字分身训练(Train)'):
             dummy_component = gr.Label(visible=False)
             with gr.Blocks():
@@ -66,7 +101,7 @@ def on_ui_tabs():
                     ''')
                     output_message = gr.Markdown()
 
-                run_button.click(fn=paiya_train,
+                run_button.click(fn=paiya_train_forward,
                                 inputs=[
                                     dummy_component,
                                     uuid,
@@ -76,8 +111,8 @@ def on_ui_tabs():
 
         with gr.TabItem('艺术照生成(Inference)'):
             dummy_component = gr.Label(visible=False)
+            preset_template = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'templates/*.jpg'))
 
-            preset_template=glob(os.path.join('resources/inpaint_template/*.jpg'))
             with gr.Blocks() as demo:
                 # Initialize the GUI
                 with gr.Row():
@@ -95,17 +130,8 @@ def on_ui_tabs():
                             append_pos_prompt = gr.Textbox(
                                 label="Prompt",
                                 lines=3,
-                                value='masterpiece, smile, beauty',
+                                value='masterpiece, beauty',
                                 interactive=True
-                            )
-                            first_control_weight = gr.Slider(
-                                minimum=0.35, maximum=0.6, value=0.45,
-                                step=0.02, label='初始权重(Initial Control Weight)'
-                            )
-
-                            second_control_weight = gr.Slider(
-                                minimum=0.04, maximum=0.2, value=0.1,
-                                step=0.02, label='二次权重(Secondary Control Weight)'
                             )
                             final_fusion_ratio = gr.Slider(
                                 minimum=0.2, maximum=0.8, value=0.5,
@@ -135,21 +161,20 @@ def on_ui_tabs():
                     ).style(columns=3, rows=2, height=600, object_fit="contain")
                     
                 display_button.click(
-                    fn=paiya_forward,
-                    inputs=[uuid, selected_template_images, append_pos_prompt, first_control_weight, second_control_weight,
+                    fn=paiya_infer_forward,
+                    inputs=[uuid, selected_template_images, append_pos_prompt, 
                             final_fusion_ratio, use_fusion_before, use_fusion_after],
                     outputs=[infer_progress, output_images]
                 )
         
-    return [(skybox_tabs, "SkyBox", f"{id_part}_tabs")]
-
+    return [(skybox_tabs, "Paiya", f"paiya_tabs")]
 
 # 注册设置页的配置项
 def on_ui_settings():
-    section = ('skybox', "SkyBox")
+    section = ('paiya', "Paiya")
     shared.opts.add_option("paiya_outpath_samples", shared.OptionInfo(
-        paiya_outpath_samples, "SkyBox output path for image", section=section))  # 图片保存路径
+        paiya_outpath_samples, "Paiya output path for image", section=section))  # 图片保存路径
 
-
+check_files_exists_and_download()
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)

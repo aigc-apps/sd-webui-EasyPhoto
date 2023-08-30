@@ -14,57 +14,47 @@
 # limitations under the License.
 """Fine-tuning script for Stable Diffusion for text2image with support for LoRA."""
 import argparse
-import base64
-import json
 import logging
 import math
 import os
 import random
 import shutil
+from glob import glob
 from pathlib import Path
 from typing import Dict
 
 import cv2
 import datasets
 import diffusers
+import insightface
 import numpy as np
 import requests
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
+import utils.lora_utils as network_module
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
-from diffusers import (AutoencoderKL, ControlNetModel, DDPMScheduler,
-                       DiffusionPipeline, DPMSolverMultistepScheduler,
-                       StableDiffusionControlNetImg2ImgPipeline,
-                       StableDiffusionControlNetInpaintPipeline,
-                       UNet2DConditionModel)
+from diffusers import (DPMSolverMultistepScheduler, DDPMScheduler,
+                       StableDiffusionInpaintPipeline)
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 from huggingface_hub import create_repo, upload_folder
-from packaging import version
-from PIL import Image
-from torchvision import transforms
-from tqdm.auto import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer
-
-import utils.lora_utils as network_module
-from utils.face_id_utils import (eval_jpg_with_faceid,
-                                 eval_jpg_with_faceidremote)
-
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline as modelscope_pipeline
 from modelscope.utils.constant import Tasks
-
-try:
-    from controlnet_aux import OpenposeDetector
-except:
-    print("controlnet_aux is not installed. If local template is used, please install controlnet_aux")
-    pass
+from packaging import version
+from PIL import Image
+from skimage import transform
+from torchvision import transforms
+from tqdm.auto import tqdm
+from transformers import CLIPTextModel, CLIPTokenizer
+from utils.model_utils import load_models_from_stable_diffusion_checkpoint
+from collections import defaultdict
 
 if is_wandb_available():
     import wandb
@@ -74,65 +64,108 @@ check_min_version("0.18.0")
 
 logger = get_logger(__name__, log_level="INFO")
 
-# --------------------------------功能说明-------------------------------- #
-#   log_validation训练时的验证函数：
-#   当存在template_dir，结合controlnet生成证件照模板；
-#   当不存在template_dir时，根据验证提示词随机生成。
-#   图片文件保存在validation文件夹下，结果会写入tensorboard或者wandb中。
-# --------------------------------功能说明-------------------------------- #
-def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
-    if args.template_dir is not None:
-        # 当存在template_dir，结合controlnet生成证件照模板；
-        controlnet = [
-            ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float32, cache_dir="controlnet"),
-            ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float32, cache_dir="controlnet"),
-        ]
-        pipeline_type = StableDiffusionControlNetInpaintPipeline if args.template_mask else StableDiffusionControlNetImg2ImgPipeline
-        # create pipeline
-        pipeline = pipeline_type.from_pretrained(
-            args.pretrained_model_name_or_path,
-            controlnet = controlnet, # [c.to(accelerator.device, weight_dtype) for c in controlnet], 
-            unet=accelerator.unwrap_model(unet).to(accelerator.device, torch.float32),
-            text_encoder=accelerator.unwrap_model(text_encoder).to(accelerator.device, torch.float32),
-            vae=accelerator.unwrap_model(vae).to(accelerator.device, torch.float32),
-            revision=args.revision,
-            torch_dtype=torch.float32,
-        )
-        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
-    else:
-        # 当不存在template_dir时，根据验证提示词随机生成。
-        pipeline = DiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
-            unet=accelerator.unwrap_model(unet).to(accelerator.device, weight_dtype),
-            text_encoder=accelerator.unwrap_model(text_encoder).to(accelerator.device, weight_dtype),
-            vae=accelerator.unwrap_model(vae).to(accelerator.device, torch.float32),
-            revision=args.revision,
-            torch_dtype=weight_dtype,
-        )
+def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torch.float32):
+    """Merge state_dict in LoRANetwork to the pipeline in diffusers.
+    
+    Reference:
+    1. https://github.com/huggingface/diffusers/issues/3064#issuecomment-1512429695.
+    """
+    LORA_PREFIX_UNET = "lora_unet"
+    LORA_PREFIX_TEXT_ENCODER = "lora_te"
+    updates = defaultdict(dict)
+    for key, value in lora_state_dict.items():
+        layer, elem = key.split('.', 1)
+        updates[layer][elem] = value
+    for layer, elems in updates.items():
+        if "text" in layer:
+            layer_infos = layer.split(LORA_PREFIX_TEXT_ENCODER + "_")[-1].split("_")
+            curr_layer = pipeline.text_encoder
+        else:
+            layer_infos = layer.split(LORA_PREFIX_UNET + "_")[-1].split("_")
+            curr_layer = pipeline.unet
+        temp_name = layer_infos.pop(0)
+        while len(layer_infos) > -1:
+            try:
+                curr_layer = curr_layer.__getattr__(temp_name)
+                if len(layer_infos) > 0:
+                    temp_name = layer_infos.pop(0)
+                elif len(layer_infos) == 0:
+                    break
+            except Exception:
+                if len(layer_infos) == 0:
+                    print('Error loading layer')
+                if len(temp_name) > 0:
+                    temp_name += "_" + layer_infos.pop(0)
+                else:
+                    temp_name = layer_infos.pop(0)
+        weight_up = elems['lora_up.weight'].to(dtype)
+        weight_down = elems['lora_down.weight'].to(dtype)
+        if 'alpha' in elems.keys():
+            alpha = elems['alpha'].item() / weight_up.shape[1]
+        else:
+            alpha = 1.0
+        curr_layer.weight.data = curr_layer.weight.data.to(device)
+        if len(weight_up.shape) == 4:
+            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2),
+                                                                    weight_down.squeeze(3).squeeze(2)).unsqueeze(
+                2).unsqueeze(3)
+        else:
+            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
+    return pipeline
+
+def log_validation(network, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
+    """
+    This function, `log_validation`, serves as a validation step during training. 
+    It generates ID photo templates using controlnet if `template_dir` exists, otherwise, it creates random templates based on validation prompts. 
+    The resulting images are saved in the validation folder and logged in either TensorBoard or WandB.
+
+    Args:
+        model_dir (str): Directory path of the model.
+        vae: Variational Autoencoder model.
+        text_encoder: Text encoder model.
+        tokenizer: Tokenizer for text data.
+        unet: UNet model.
+        args: Command line arguments.
+        accelerator: Training accelerator.
+        weight_dtype: Data type for model weights.
+        epoch (int): Current training epoch.
+        global_step (int): Current global training step.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        None
+    """
+    # When template_dir doesn't exist, generate randomly based on validation prompts.
+    text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
+
+    pipeline = StableDiffusionInpaintPipeline.from_pretrained(
+        args.pretrained_model_name_or_path,
+        unet=unet.to(accelerator.device, weight_dtype),
+        text_encoder=text_encoder.to(accelerator.device, weight_dtype),
+        vae=vae.to(accelerator.device, weight_dtype),
+        torch_dtype=weight_dtype,
+    )
     pipeline = pipeline.to(accelerator.device)
+    pipeline.safety_checker = None
+    pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
     pipeline.set_progress_bar_config(disable=True)
+    
+    merge_lora(pipeline, network.state_dict(), 1, "cuda", torch.float16)
     generator = torch.Generator(device=accelerator.device)
+
     if args.seed is not None:
         generator = generator.manual_seed(args.seed)
 
-    # 开始前传预测
+    # Predictions before the start
     images = []
     if args.template_dir is not None:
-        # 遍历生成证件照
+        # Iteratively generate ID photos
         jpgs = os.listdir(args.template_dir)
-        for jpg, read_jpg, shape, read_control, read_mask in zip(jpgs, kwargs['input_images'], kwargs['input_images_shape'], kwargs['control_images'], kwargs['input_masks']):
-            if args.template_mask:
-                image = pipeline(
-                    args.validation_prompt, image=read_jpg, mask_image=read_mask, control_image=read_control, strength=0.70, negative_prompt=args.neg_prompt, 
-                    guidance_scale=args.guidance_scale, num_inference_steps=20, generator=generator, height=kwargs['new_size'][1], width=kwargs['new_size'][0], \
-                    controlnet_conditioning_scale=[0.50, 0.30]
-                ).images[0]
-            else:
-                image = pipeline(
-                    args.validation_prompt, image=read_jpg, control_image=read_control, strength=0.70, negative_prompt=args.neg_prompt, 
-                    guidance_scale=args.guidance_scale, num_inference_steps=20, generator=generator, height=kwargs['new_size'][1], width=kwargs['new_size'][0], \
-                    controlnet_conditioning_scale=[0.50, 0.30]
-                ).images[0]
+        for jpg, read_jpg, shape, read_mask in zip(jpgs, kwargs['input_images'], kwargs['input_images_shape'], kwargs['input_masks']):
+            image = pipeline(
+                args.validation_prompt, image=read_jpg, mask_image=read_mask, strength=0.65, negative_prompt=args.neg_prompt, 
+                guidance_scale=args.guidance_scale, num_inference_steps=20, generator=generator, height=kwargs['new_size'][1], width=kwargs['new_size'][0],
+            ).images[0]
 
             images.append(image)
 
@@ -142,7 +175,7 @@ def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight
             image.save(os.path.join(args.output_dir, "validation", f"global_step_{save_name}_{global_step}_0.jpg"))
 
     else:
-        # 随机生成
+        # Random Generate
         for _ in range(args.num_validation_images):
             images.append(
                 pipeline(args.validation_prompt, negative_prompt=args.neg_prompt, guidance_scale=args.guidance_scale, \
@@ -153,7 +186,7 @@ def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight
                 os.makedirs(os.path.join(args.output_dir, "validation"))
             image.save(os.path.join(args.output_dir, "validation", f"global_step_{global_step}_" + str(index) + ".jpg"))
 
-    # 写入wandb或者tensorboard
+    # Wandb or tensorboard if we have
     for tracker in accelerator.trackers:
         if tracker.name == "tensorboard":
             for index, image in enumerate(images):
@@ -171,6 +204,94 @@ def log_validation(vae, text_encoder, tokenizer, unet, args, accelerator, weight
     del pipeline
     torch.cuda.empty_cache()
     vae.to(accelerator.device, dtype=weight_dtype)
+
+def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, mask_type):
+    '''
+    Inputs:
+        image                   输入图片；
+        retinaface_result       retinaface的检测结果；
+        crop_ratio              人脸部分裁剪扩充比例；
+        face_seg                人脸分割模型；
+        mask_type               人脸分割的方式，一个是crop，一个是skin，人脸分割结果是人脸皮肤或者人脸框
+    
+    Outputs:
+        retinaface_box          扩增后相对于原图的box
+        retinaface_keypoints    相对于原图的keypoints
+        retinaface_mask_pil     人脸分割结果
+    '''
+    h, w, c = np.shape(image)
+    if len(retinaface_result['boxes']) != 0:
+        # 获得retinaface的box并且做一手扩增
+        retinaface_box      = np.array(retinaface_result['boxes'][0])
+        face_width          = retinaface_box[2] - retinaface_box[0]
+        face_height         = retinaface_box[3] - retinaface_box[1]
+        retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
+        retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0, h - 1)
+        retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
+        retinaface_box[3]   = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0, h - 1)
+        retinaface_box      = np.array(retinaface_box, np.int32)
+
+        # 检测关键点
+        retinaface_keypoints = np.reshape(retinaface_result['keypoints'][0], [5, 2])
+        retinaface_keypoints = np.array(retinaface_keypoints, np.float32)
+
+        # mask部分
+        retinaface_crop     = image.crop(np.int32(retinaface_box))
+        retinaface_mask     = np.zeros_like(np.array(image, np.uint8))
+        if mask_type == "skin":
+            retinaface_sub_mask = face_seg(retinaface_crop)
+            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
+        else:
+            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+        retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
+    else:
+        retinaface_box          = np.array([])
+        retinaface_keypoints    = np.array([])
+        retinaface_mask         = np.zeros_like(np.array(image, np.uint8))
+        retinaface_mask_pil     = Image.fromarray(np.uint8(retinaface_mask))
+        
+    return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
+def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Point, Target_Five_Point, Source_box):
+    '''
+    Inputs:
+        Source_image            原图像；
+        Source_image_mask       原图像人脸的mask比例；
+        Target_image            目标模板图像；
+        Source_Five_Point       原图像五个人脸关键点；
+        Target_Five_Point       目标图像五个人脸关键点；
+        Source_box              原图像人脸的坐标；
+    
+    Outputs:
+        output                  贴脸后的人像
+    '''
+    Source_Five_Point = np.reshape(Source_Five_Point, [5, 2]) - np.array(Source_box[:2])
+    Target_Five_Point = np.reshape(Target_Five_Point, [5, 2])
+
+    Crop_Source_image                       = Source_image.crop(np.int32(Source_box))
+    Crop_Source_image_mask                  = Source_image_mask.crop(np.int32(Source_box))
+    Source_Five_Point, Target_Five_Point    = np.array(Source_Five_Point), np.array(Target_Five_Point)
+
+    tform = transform.SimilarityTransform()
+    # 程序直接估算出转换矩阵M
+    tform.estimate(Source_Five_Point, Target_Five_Point)
+    M = tform.params[0:2, :]
+
+    warped      = cv2.warpAffine(np.array(Crop_Source_image), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
+    warped_mask = cv2.warpAffine(np.array(Crop_Source_image_mask), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
+
+    mask        = np.float32(warped_mask == 0)
+    output      = mask * np.float32(Target_image) + (1 - mask) * np.float32(warped)
+    return output
+
+def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
+    # retinaface检测部分
+    # 检测人脸框
+    retinaface_result                                           = retinaface_detection(image) 
+    # 获取mask与关键点
+    retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
+
+    return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
 def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     """
@@ -190,10 +311,14 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         - Calculate the average feature of real human images.
         - Select top_merge weights for merging based on generated validation images.
     """
+    # embedding
+    providers           = ["CPUExecutionProvider"]
+    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", "models"), "w600k_r50.onnx"), providers=providers)
+    face_recognition.prepare(ctx_id=0)
+    
+    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
+    face_analyser.prepare(ctx_id=0, det_size=(640, 640))
 
-    # Create a face_recognition model
-
-    face_recognition    = modelscope_pipeline(Tasks.face_recognition, model='damo/cv_ir101_facerecognition_cfglint')
     # get ID list
     face_image_list     = glob(os.path.join(pivot_dir, '*.jpg')) + glob(os.path.join(pivot_dir, '*.JPG')) + \
                           glob(os.path.join(pivot_dir, '*.png')) + glob(os.path.join(pivot_dir, '*.PNG'))
@@ -201,7 +326,10 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     #  vstack all embedding
     embedding_list = []
     for img in face_image_list:
-        embedding_list.append(face_recognition(img)[OutputKeys.IMG_EMBEDDING])
+        image = Image.open(img)
+        embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
+        embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+        embedding_list.append(embedding)
     embedding_array = np.vstack(embedding_list)
     
     #  mean, get pivot
@@ -227,8 +355,11 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         for img in img_list:
             try:
                 # a average above all
-                emb1 = face_recognition(img)[OutputKeys.IMG_EMBEDDING]
-                res = np.mean(np.dot(emb1, top10_embedding_array))
+                image = Image.open(img)
+                embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
+                embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+
+                res = np.mean(np.dot(embedding, top10_embedding_array))
                 result_list.append([res, img])
                 result_list = sorted(result_list, key = lambda a : -a[0])
             except:
@@ -240,10 +371,44 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     scores  = [i[0] for i in result_list][:top_merge]
     return t_result_list, tlist, scores
 
+def merge_from_name_and_index(name, index_list, output_dir='output_dir/'):
+    loras_load_path = [os.path.join(output_dir, f'checkpoint-{i}/pytorch_model.bin') for i in index_list]
+    os.mkdir(os.path.join(output_dir, 'ensemble'))
+    lora_save_path  = os.path.join(output_dir, 'ensemble', f'{name}.bin')
+    for l in loras_load_path:
+        # print('fuck : ', l)
+        assert os.path.exists(l)==True
+    merge_different_loras(loras_load_path, lora_save_path)
+    return lora_save_path
+
+def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
+    if ratios is None:
+        ratios = [1 / float(len(loras_load_path)) for _ in loras_load_path]
+
+    state_dict = {}
+    for lora_load, ratio in zip(loras_load_path, ratios):
+        weights_sd = torch.load(lora_load, map_location="cpu")
+
+        for key in weights_sd.keys():
+            if key not in state_dict.keys():
+                state_dict[key] = weights_sd[key] * ratio
+            else:
+                state_dict[key] += weights_sd[key] * ratio
+
+        torch.save(state_dict, lora_save_path)
+    return 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
     parser.add_argument(
         "--pretrained_model_name_or_path",
+        type=str,
+        default=None,
+        required=True,
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument(
+        "--pretrained_model_ckpt",
         type=str,
         default=None,
         required=True,
@@ -672,13 +837,7 @@ def main():
     tokenizer = CLIPTokenizer.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
     )
-    text_encoder = CLIPTextModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision
-    )
-    vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision)
-    unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision
-    )
+    text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
@@ -969,37 +1128,13 @@ def main():
     progress_bar = tqdm(range(global_step, args.max_train_steps), disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
 
-    def decode_image_from_base64jpeg(base64_image):
-        if base64_image == "":
-            return None
-        image_bytes = base64.b64decode(base64_image)
-        np_arr = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        return image
-    
-    def call_face_crop(encoded_image, crop_ratio):
-        datas = json.dumps({
-            'image': encoded_image,
-            'threshold': 0, # 0 means not remove background
-            'mask_type': "crop", # skin for skin only, crop for box get by retinafce
-            'crop_ratio': crop_ratio # crop face and resize to 2x
-        })
-        r = requests.post(args.mask_post_url, data=datas, timeout=1500)
-        data = json.loads(r.content.decode('utf-8'))
-        for key in data.keys():
-            if 'retinaface_mask' in key:
-                retinaface_mask = decode_image_from_base64jpeg(data[key])
-                cv2.imwrite("_tmp.jpg", retinaface_mask)
-
-        return retinaface_mask
-
     if args.template_dir is not None:
         input_images        = []
         input_images_shape  = []
         control_images      = []
         input_masks         = []
-        openpose            = OpenposeDetector.from_pretrained("lllyasviel/ControlNet", cache_dir="controlnet_detector")
-        jpgs                = os.listdir(args.template_dir)
+        retinaface_detection = modelscope_pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
+        jpgs                = os.listdir(args.template_dir)[:4]
         for jpg in jpgs:
             read_jpg        = os.path.join(args.template_dir, jpg)
             read_jpg        = Image.open(read_jpg)
@@ -1010,23 +1145,13 @@ def main():
             new_size    = (int(read_jpg.width//resize) // 64 * 64, int(read_jpg.height//resize) // 64 * 64)
             read_jpg    = read_jpg.resize(new_size)
 
-            if args.template_mask:
-                if args.template_mask_dir is not None:
-                    input_mask      = Image.open(os.path.join(args.template_mask_dir, jpg))
-                else:
-                    read_jpg.save("_tmp.jpg")
-                    result          = call_face_crop(base64.b64encode(open("_tmp.jpg", 'rb').read()).decode('utf-8'), crop_ratio=1.3)
-                    input_mask      = Image.fromarray(np.uint8(result))
-
-            openpose_image  = openpose(read_jpg)
-            canny_image     = cv2.Canny(np.array(read_jpg, np.uint8), 100, 200)[:, :, None]
-            canny_image     = Image.fromarray(np.concatenate([canny_image, canny_image, canny_image], axis=2))
+            _, _, input_mask = call_face_crop(retinaface_detection, read_jpg, crop_ratio=1.3)
 
             # append into list
             input_images.append(read_jpg)
             input_images_shape.append(shape)
             input_masks.append(input_mask if args.template_mask else None)
-            control_images.append([openpose_image, canny_image])
+            control_images.append(None)
     else:
         new_size = None
         input_images = None
@@ -1171,6 +1296,7 @@ def main():
                             f" {args.validation_prompt}."
                         )
                         log_validation(
+                            network,
                             vae,
                             text_encoder,
                             tokenizer,
@@ -1194,6 +1320,7 @@ def main():
                     f" {args.validation_prompt}."
                 )
                 log_validation(
+                    network,
                     vae,
                     text_encoder,
                     tokenizer,
@@ -1219,6 +1346,7 @@ def main():
             accelerator.save_state(accelerator_save_path)
 
         log_validation(
+            network,
             vae,
             text_encoder,
             tokenizer,
@@ -1237,10 +1365,7 @@ def main():
         if args.merge_best_lora_based_face_id:
             pivot_dir = os.path.join(args.train_data_dir, 'train')
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
-            if args.faceid_post_url is not None:
-                t_result_list, tlist, scores = eval_jpg_with_faceidremote(pivot_dir, os.path.join(args.output_dir, "validation"), args.faceid_post_url)
-            else:
-                t_result_list, tlist, scores = eval_jpg_with_faceid(pivot_dir, os.path.join(args.output_dir, "validation"))
+            t_result_list, tlist, scores = eval_jpg_with_faceid(pivot_dir, os.path.join(args.output_dir, "validation"))
 
             for index, line in enumerate(zip(tlist, scores)):
                 print(f"Top-{str(index)}: {str(line)}")
