@@ -5,9 +5,9 @@ if not launch.is_installed("cv2"):
     print('Installing requirements for paiya-webui')
     launch.run_pip("install opencv-python", "requirements for opencv")
 
-if not launch.is_installed("tensorflow"):
+if not launch.is_installed("tensorflow-cpu"):
     print('Installing requirements for paiya-webui')
-    launch.run_pip("install tensorflow", "requirements for tensorflow")
+    launch.run_pip("install tensorflow-cpu", "requirements for tensorflow")
 
 if not launch.is_installed("onnxruntime-gpu"):
     print('Installing requirements for paiya-webui')

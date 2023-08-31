@@ -13,10 +13,6 @@ from PIL import Image
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
-# save中间图片
-if not os.path.exists(output_pic_dir):
-    os.makedirs(output_pic_dir)
-
 InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
 

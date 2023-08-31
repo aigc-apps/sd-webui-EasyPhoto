@@ -150,7 +150,7 @@ def inpaint_only(
     )
     return image
 
-def paiya_infer_forward(user_id, selected_template_images, init_image, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, args): 
+def paiya_infer_forward(user_id, selected_template_images, init_image, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
@@ -173,9 +173,7 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
     face_id_image           = Image.open(face_id_image_path).convert("RGB")
     roop_image              = Image.open(roop_image_path).convert("RGB")
 
-    # get template
-    tabs = gr.Tabs.update(selected=1)
-    if tabs == 101:
+    if tabs == 0:
         template_images = eval(selected_template_images)
     else:
         template_images = [init_image]
@@ -186,7 +184,7 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
     outputs                 = []
     for template_image in template_images:
         # open the template image
-        if tabs == 101:
+        if tabs == 0:
             template_image = Image.open(template_image).convert("RGB")
         else:
             template_image = Image.fromarray(template_image)
@@ -260,4 +258,4 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         
         outputs.append(origin_image)
 
-    return "SUCCESS", outputs, tabs
+    return "SUCCESS", outputs
