@@ -1,77 +1,20 @@
 import argparse
 import json
+import math
 import os
 import sys
-import math
 
+import torch
+import insightface
 import numpy as np
-from tqdm import tqdm
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
-from paiya_utils import *
+from scripts.face_process_utils import call_face_crop
+from tqdm import tqdm
+from shutil import copyfile
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Simple example of a training script.")
-    parser.add_argument(
-        "--validation_prompt",
-        type=str,
-        default=None,
-        help=(
-            "The validation_prompt of the user."
-        ),
-    )
-    parser.add_argument(
-        "--ref_image_path",
-        type=str,
-        default=None,
-        help=(
-            "The ref_image_path."
-        ),
-    )
-    parser.add_argument(
-        "--images_save_path",
-        type=str,
-        default=None,
-        help=(
-            "The images_save_path."
-        ),
-    )
-    parser.add_argument(
-        "--json_save_path",
-        type=str,
-        default=None,
-        help=(
-            "The json_save_path."
-        ),
-    )
-    parser.add_argument(
-        "--inputs_dir",
-        type=str,
-        default=None,
-        help=(
-            "The inputs dir of the data for preprocessing."
-        ),
-    )
-    parser.add_argument(
-        "--crop_ratio",
-        type=int,
-        default=3,
-        help=(
-            "The expand ratio for input data to crop."
-        ),
-    )
-    parser.add_argument(
-        "--model_cache_dir",
-        type=str,
-        default='./',
-        help=(
-            "The expand ratio for input data to crop."
-        ),
-    )
-    args = parser.parse_args()
-    return args
 
 def compare_jpg_with_face_id(embedding_list):
     embedding_array = np.vstack(embedding_list)
@@ -83,28 +26,26 @@ def compare_jpg_with_face_id(embedding_list):
     scores = [np.dot(emb, pivot_feature)[0][0] for emb in embedding_list]
     return scores
 
-if __name__ == "__main__":
-    args        = parse_args()
+def l2_norm(x):
+    return np.sqrt(np.sum(np.square(x)))
 
-    # 创建输出文件夹
-    images_save_path    = args.images_save_path
-    json_save_path      = args.json_save_path
-    validation_prompt   = args.validation_prompt
-
-    # 人脸评分
-    face_quality_func       = pipeline(Tasks.face_quality_assessment, 'damo/cv_manual_face-quality-assessment_fqa')
+def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
     # embedding
-    face_recognition        = pipeline(Tasks.face_recognition, model='damo/cv_ir101_facerecognition_cfglint')
+    providers           = ["CPUExecutionProvider"]
+    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "w600k_r50.onnx"), providers=providers)
+    face_recognition.prepare(ctx_id=0)
+    
+    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
+    face_analyser.prepare(ctx_id=0, det_size=(640, 640))
     # 人脸检测
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     # 显著性检测
-    salient_detect          = pipeline(Tasks.semantic_segmentation, model='damo/cv_u2net_salient-detection')
+    salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection')
     
     # 获得jpg列表
-    jpgs            = os.listdir(args.inputs_dir)
+    jpgs            = os.listdir(inputs_dir)
     # ---------------------------人脸得分计算-------------------------- #
     face_id_scores  = []
-    quality_scores  = []
     face_angles     = []
     copy_jpgs       = []
     selected_paths  = []
@@ -112,7 +53,7 @@ if __name__ == "__main__":
         try:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
                 continue
-            _image_path = os.path.join(args.inputs_dir, jpg)
+            _image_path = os.path.join(inputs_dir, jpg)
             image       = Image.open(_image_path)
             h, w, c     = np.shape(image)
 
@@ -132,12 +73,10 @@ if __name__ == "__main__":
 
             sub_image = image.crop(retinaface_box)
 
-            embedding   = np.array(face_recognition(sub_image)[OutputKeys.IMG_EMBEDDING])
-            score       = face_quality_func(sub_image)[OutputKeys.SCORES]
-            score       = 0 if score is None else score[0]
+            embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
+            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
 
             face_id_scores.append(embedding)
-            quality_scores.append(score)
             face_angles.append(angle)
 
             copy_jpgs.append(jpg)
@@ -147,43 +86,38 @@ if __name__ == "__main__":
 
     # 根据得分进行参考人脸的筛选，考虑质量分，相似分与角度分
     face_id_scores      = compare_jpg_with_face_id(face_id_scores)
-    ref_total_scores    = np.array(face_id_scores) * np.array(quality_scores) * np.array(face_angles)
+    ref_total_scores    = np.array(face_angles) * np.array(face_id_scores)
     ref_indexes         = np.argsort(ref_total_scores)[::-1]
     for index in ref_indexes:
-        print("selected paths:", selected_paths[index], "total scores: ", ref_total_scores[index], "face id score", face_id_scores[index], "face angles", face_angles[index])
-    os.system(f"cp -rf {selected_paths[ref_indexes[0]]} {args.ref_image_path}")
-    
+        print("selected paths:", selected_paths[index], "total scores: ", ref_total_scores[index], "face angles", face_angles[index])
+    copyfile(selected_paths[ref_indexes[0]], ref_image_path)
+             
     # 根据得分进行训练人脸的筛选，考虑相似分
-    total_scores    = np.array(face_id_scores) # np.array(face_id_scores) * np.array(scores)
+    total_scores    = np.array(face_id_scores)
     indexes         = np.argsort(total_scores)[::-1][:15]
     
     selected_jpgs   = []
-    selected_scores = []
     for index in indexes:
         selected_jpgs.append(copy_jpgs[index])
-        selected_scores.append(quality_scores[index])
-        print("jpg:", copy_jpgs[index], "face_id_scores", face_id_scores[index])
+        print("jpg:", copy_jpgs[index], "face_id_scores", ref_total_scores[index])
                              
     images              = []
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
         if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
             continue
-        try:
-            _image_path             = os.path.join(args.inputs_dir, jpg)
-            image                   = Image.open(_image_path)
-            retinaface_box, _, _    = call_face_crop(retinaface_detection, image, args.crop_ratio, prefix="tmp")
-            sub_image               = image.crop(retinaface_box)
+        _image_path             = os.path.join(inputs_dir, jpg)
+        image                   = Image.open(_image_path)
+        retinaface_box, _, _    = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+        sub_image               = image.crop(retinaface_box)
 
-            # 显著性检测，合并人脸mask
-            result      = salient_detect(sub_image)[OutputKeys.MASKS]
-            mask        = np.float32(np.expand_dims(result > 128, -1))
-            # 获得mask后的图像
-            mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
-            mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
-            if np.sum(np.array(mask)) != 0:
-                images.append(mask_sub_image)
-        except:
-            pass
+        # 显著性检测，合并人脸mask
+        result      = salient_detect(sub_image)[OutputKeys.MASKS]
+        mask        = np.float32(np.expand_dims(result > 128, -1))
+        # 获得mask后的图像
+        mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
+        mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
+        if np.sum(np.array(mask)) != 0:
+            images.append(mask_sub_image)
 
     # 写入结果
     for index, base64_pilimage in enumerate(images):
@@ -209,3 +143,7 @@ if __name__ == "__main__":
                         }
                         f.write(json.dumps(eval(str(a))))
                         f.write("\n")
+
+    del retinaface_detection
+    del salient_detect
+    torch.cuda.empty_cache()

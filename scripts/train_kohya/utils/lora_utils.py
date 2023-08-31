@@ -16,11 +16,52 @@ import torch
 from diffusers import AutoencoderKL
 from transformers import CLIPTextModel
 
-from .utils import precalculate_safetensors_hashes
-
 RE_UPDOWN = re.compile(r"(up|down)_blocks_(\d+)_(resnets|upsamplers|downsamplers|attentions)_(\d+)_")
 
 RE_UPDOWN = re.compile(r"(up|down)_blocks_(\d+)_(resnets|upsamplers|downsamplers|attentions)_(\d+)_")
+
+
+def precalculate_safetensors_hashes(tensors, metadata):
+    """Precalculate the model hashes needed by sd-webui-additional-networks to
+    save time on indexing the model later."""
+
+    # Because writing user metadata to the file can change the result of
+    # sd_models.model_hash(), only retain the training metadata for purposes of
+    # calculating the hash, as they are meant to be immutable
+    metadata = {k: v for k, v in metadata.items() if k.startswith("ss_")}
+
+    bytes = safetensors.torch.save(tensors, metadata)
+    b = BytesIO(bytes)
+
+    model_hash = addnet_hash_safetensors(b)
+    legacy_hash = addnet_hash_legacy(b)
+    return model_hash, legacy_hash
+        
+
+def addnet_hash_legacy(b):
+    """Old model hash used by sd-webui-additional-networks for .safetensors format files"""
+    m = hashlib.sha256()
+
+    b.seek(0x100000)
+    m.update(b.read(0x10000))
+    return m.hexdigest()[0:8]
+
+
+def addnet_hash_safetensors(b):
+    """New model hash used by sd-webui-additional-networks for .safetensors format files"""
+    hash_sha256 = hashlib.sha256()
+    blksize = 1024 * 1024
+
+    b.seek(0)
+    header = b.read(8)
+    n = int.from_bytes(header, "little")
+
+    offset = n + 8
+    b.seek(offset)
+    for chunk in iter(lambda: b.read(blksize), b""):
+        hash_sha256.update(chunk)
+
+    return hash_sha256.hexdigest()
 
 
 class LoRAModule(torch.nn.Module):
@@ -71,7 +112,7 @@ class LoRAModule(torch.nn.Module):
             alpha = alpha.detach().float().numpy()  # without casting, bf16 causes error
         alpha = self.lora_dim if alpha is None or alpha == 0 else alpha
         self.scale = alpha / self.lora_dim
-        self.register_buffer("alpha", torch.tensor(alpha))  # 定数として扱える
+        self.register_buffer("alpha", torch.tensor(alpha))
 
         # same as microsoft's
         torch.nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
@@ -112,7 +153,6 @@ class LoRAModule(torch.nn.Module):
             lx = lx * mask
 
             # scaling for rank dropout: treat as if the rank is changed
-            # maskから計算することも考えられるが、augmentation的な効果を期待してrank_dropoutを用いる
             scale = self.scale * (1.0 / (1.0 - self.rank_dropout))  # redundant for readability
         else:
             scale = self.scale
@@ -135,7 +175,7 @@ class LoRAInfModule(LoRAModule):
         # no dropout for inference
         super().__init__(lora_name, org_module, multiplier, lora_dim, alpha)
 
-        self.org_module_ref = [org_module]  # 後から参照できるように
+        self.org_module_ref = [org_module]
         self.enabled = True
 
         # check regional or not by lora_name
@@ -159,7 +199,6 @@ class LoRAInfModule(LoRAModule):
     def set_network(self, network):
         self.network = network
 
-    # freezeしてマージする
     def merge_to(self, sd, dtype, device):
         # get up/down weight
         up_weight = sd["lora_up.weight"].to(torch.float).to(device)
@@ -191,7 +230,6 @@ class LoRAInfModule(LoRAModule):
         org_sd["weight"] = weight.to(dtype)
         self.org_module.load_state_dict(org_sd)
 
-    # 復元できるマージのため、このモジュールのweightを返す
     def get_weight(self, multiplier=None):
         if multiplier is None:
             multiplier = self.multiplier
@@ -362,7 +400,6 @@ class LoRAInfModule(LoRAModule):
         mask = torch.cat(masks)
         mask_sum = torch.sum(mask, dim=0) + 1e-4
         for i in range(self.network.batch_size):
-            # 1枚の画像ごとに処理する
             lx1 = lx[i * self.network.num_sub_prompts : (i + 1) * self.network.num_sub_prompts]
             lx1 = lx1 * mask
             lx1 = torch.sum(lx1, dim=0)
@@ -385,7 +422,6 @@ def parse_block_lr_kwargs(nw_kwargs):
     mid_lr_weight = nw_kwargs.get("mid_lr_weight", None)
     up_lr_weight = nw_kwargs.get("up_lr_weight", None)
 
-    # 以上のいずれにも設定がない場合は無効としてNoneを返す
     if down_lr_weight is None and mid_lr_weight is None and up_lr_weight is None:
         return None, None, None
 
@@ -438,7 +474,6 @@ def create_network(
     block_dims = kwargs.get("block_dims", None)
     down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
 
-    # 以上のいずれかに指定があればblockごとのdim(rank)を有効にする
     if block_dims is not None or down_lr_weight is not None or mid_lr_weight is not None or up_lr_weight is not None:
         block_alphas = kwargs.get("block_alphas", None)
         conv_block_dims = kwargs.get("conv_block_dims", None)
@@ -466,7 +501,6 @@ def create_network(
     if module_dropout is not None:
         module_dropout = float(module_dropout)
 
-    # すごく引数が多いな ( ^ω^)･･･
     network = LoRANetwork(
         text_encoder,
         unet,
@@ -490,11 +524,6 @@ def create_network(
 
     return network
 
-
-# このメソッドは外部から呼び出される可能性を考慮しておく
-# network_dim, network_alpha にはデフォルト値が入っている。
-# block_dims, block_alphas は両方ともNoneまたは両方とも値が入っている
-# conv_dim, conv_alpha は両方ともNoneまたは両方とも値が入っている
 def get_block_dims_and_alphas(
     block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
 ):
@@ -506,7 +535,6 @@ def get_block_dims_and_alphas(
     def parse_floats(s):
         return [float(i) for i in s.split(",")]
 
-    # block_dimsとblock_alphasをパースする。必ず値が入る
     if block_dims is not None:
         block_dims = parse_ints(block_dims)
         assert (
@@ -527,7 +555,6 @@ def get_block_dims_and_alphas(
         )
         block_alphas = [network_alpha] * num_total_blocks
 
-    # conv_block_dimsとconv_block_alphasを、指定がある場合のみパースする。指定がなければconv_dimとconv_alphaを使う
     if conv_block_dims is not None:
         conv_block_dims = parse_ints(conv_block_dims)
         assert (
@@ -560,15 +587,13 @@ def get_block_dims_and_alphas(
     return block_dims, block_alphas, conv_block_dims, conv_block_alphas
 
 
-# 層別学習率用に層ごとの学習率に対する倍率を定義する、外部から呼び出される可能性を考慮しておく
 def get_block_lr_weight(
     down_lr_weight, mid_lr_weight, up_lr_weight, zero_threshold
 ) -> Tuple[List[float], List[float], List[float]]:
-    # パラメータ未指定時は何もせず、今までと同じ動作とする
     if up_lr_weight is None and mid_lr_weight is None and down_lr_weight is None:
         return None, None, None
 
-    max_len = LoRANetwork.NUM_OF_BLOCKS  # フルモデル相当でのup,downの層の数
+    max_len = LoRANetwork.NUM_OF_BLOCKS 
 
     def get_list(name_with_suffix) -> List[float]:
         import math
@@ -637,7 +662,6 @@ def get_block_lr_weight(
     return down_lr_weight, mid_lr_weight, up_lr_weight
 
 
-# lr_weightが0のblockをblock_dimsから除外する、外部から呼び出す可能性を考慮しておく
 def remove_block_dims_and_alphas(
     block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
 ):
@@ -663,7 +687,6 @@ def remove_block_dims_and_alphas(
     return block_dims, block_alphas, conv_block_dims, conv_block_alphas
 
 
-# 外部から呼び出す可能性を考慮しておく
 def get_block_index(lora_name: str) -> int:
     block_idx = -1  # invalid lora name
 
@@ -680,7 +703,7 @@ def get_block_index(lora_name: str) -> int:
             idx = 3 * i + 2
 
         if g[0] == "down":
-            block_idx = 1 + idx  # 0に該当するLoRAは存在しない
+            block_idx = 1 + idx
         elif g[0] == "up":
             block_idx = LoRANetwork.NUM_OF_BLOCKS + 1 + idx
 
@@ -735,7 +758,7 @@ def create_network_from_weights(multiplier, file, vae, text_encoder, unet, weigh
 
 
 class LoRANetwork(torch.nn.Module):
-    NUM_OF_BLOCKS = 12  # フルモデル相当でのup,downの層の数
+    NUM_OF_BLOCKS = 12 
 
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"]
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
@@ -768,14 +791,6 @@ class LoRANetwork(torch.nn.Module):
         module_class: Type[object] = LoRAModule,
         varbose: Optional[bool] = False,
     ) -> None:
-        """
-        LoRA network: すごく引数が多いが、パターンは以下の通り
-        1. lora_dimとalphaを指定
-        2. lora_dim、alpha、conv_lora_dim、conv_alphaを指定
-        3. block_dimsとblock_alphasを指定 :  Conv2d3x3には適用しない
-        4. block_dims、block_alphas、conv_block_dims、conv_block_alphasを指定 : Conv2d3x3にも適用する
-        5. modules_dimとmodules_alphaを指定 (推論用)
-        """
         super().__init__()
         self.multiplier = multiplier
 
@@ -836,12 +851,10 @@ class LoRANetwork(torch.nn.Module):
                             alpha = None
 
                             if modules_dim is not None:
-                                # モジュール指定あり
                                 if lora_name in modules_dim:
                                     dim = modules_dim[lora_name]
                                     alpha = modules_alpha[lora_name]
                             elif is_unet and block_dims is not None:
-                                # U-Netでblock_dims指定あり
                                 block_idx = get_block_index(lora_name)
                                 if is_linear or is_conv2d_1x1:
                                     dim = block_dims[block_idx]
@@ -850,7 +863,6 @@ class LoRANetwork(torch.nn.Module):
                                     dim = conv_block_dims[block_idx]
                                     alpha = conv_block_alphas[block_idx]
                             else:
-                                # 通常、すべて対象とする
                                 if is_linear or is_conv2d_1x1:
                                     dim = self.lora_dim
                                     alpha = self.alpha
@@ -859,7 +871,6 @@ class LoRANetwork(torch.nn.Module):
                                     alpha = self.conv_alpha
 
                             if dim is None or dim == 0:
-                                # skipした情報を出力
                                 if is_linear or is_conv2d_1x1 or (self.conv_lora_dim is not None or conv_block_dims is not None):
                                     skipped.append(lora_name)
                                 continue
@@ -879,8 +890,6 @@ class LoRANetwork(torch.nn.Module):
 
         text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
 
-        # create LoRA for text encoder
-        # 毎回すべてのモジュールを作るのは無駄なので要検討
         self.text_encoder_loras = []
         skipped_te = []
         for i, text_encoder in enumerate(text_encoders):
@@ -953,7 +962,6 @@ class LoRANetwork(torch.nn.Module):
             lora.apply_to()
             self.add_module(lora.lora_name, lora)
 
-    # マージできるかどうかを返す
     def is_mergeable(self):
         return True
 
@@ -985,7 +993,6 @@ class LoRANetwork(torch.nn.Module):
 
         print(f"weights are merged")
 
-    # 層別学習率用に層ごとの学習率に対する倍率を定義する　引数の順番が逆だがとりあえず気にしない
     def set_block_lr_weight(
         self,
         up_lr_weight: List[float] = None,
@@ -1015,7 +1022,6 @@ class LoRANetwork(torch.nn.Module):
 
         return lr_weight
 
-    # 二つのText Encoderに別々の学習率を設定できるようにするといいかも
     def prepare_optimizer_params(self, text_encoder_lr, unet_lr, default_lr):
         self.requires_grad_(True)
         all_params = []
@@ -1034,7 +1040,6 @@ class LoRANetwork(torch.nn.Module):
 
         if self.unet_loras:
             if self.block_lr:
-                # 学習率のグラフをblockごとにしたいので、blockごとにloraを分類
                 block_idx_to_lora = {}
                 for lora in self.unet_loras:
                     idx = get_block_index(lora.lora_name)
@@ -1042,7 +1047,6 @@ class LoRANetwork(torch.nn.Module):
                         block_idx_to_lora[idx] = []
                     block_idx_to_lora[idx].append(lora)
 
-                # blockごとにパラメータを設定する
                 for idx, block_loras in block_idx_to_lora.items():
                     param_data = {"params": enumerate_params(block_loras)}
 
@@ -1145,7 +1149,6 @@ class LoRANetwork(torch.nn.Module):
         self.mask_dic = mask_dic
 
     def backup_weights(self):
-        # 重みのバックアップを行う
         loras: List[LoRAInfModule] = self.text_encoder_loras + self.unet_loras
         for lora in loras:
             org_module = lora.org_module_ref[0]
@@ -1155,7 +1158,6 @@ class LoRANetwork(torch.nn.Module):
                 org_module._lora_restored = True
 
     def restore_weights(self):
-        # 重みのリストアを行う
         loras: List[LoRAInfModule] = self.text_encoder_loras + self.unet_loras
         for lora in loras:
             org_module = lora.org_module_ref[0]
@@ -1166,7 +1168,6 @@ class LoRANetwork(torch.nn.Module):
                 org_module._lora_restored = True
 
     def pre_calculation(self):
-        # 事前計算を行う
         loras: List[LoRAInfModule] = self.text_encoder_loras + self.unet_loras
         for lora in loras:
             org_module = lora.org_module_ref[0]
@@ -1225,49 +1226,6 @@ class LoRANetwork(torch.nn.Module):
         return keys_scaled, sum(norms) / len(norms), max(norms)
 
 
-def precalculate_safetensors_hashes(tensors, metadata):
-    """Precalculate the model hashes needed by sd-webui-additional-networks to
-    save time on indexing the model later."""
-
-    # Because writing user metadata to the file can change the result of
-    # sd_models.model_hash(), only retain the training metadata for purposes of
-    # calculating the hash, as they are meant to be immutable
-    metadata = {k: v for k, v in metadata.items() if k.startswith("ss_")}
-
-    bytes = safetensors.torch.save(tensors, metadata)
-    b = BytesIO(bytes)
-
-    model_hash = addnet_hash_safetensors(b)
-    legacy_hash = addnet_hash_legacy(b)
-    return model_hash, legacy_hash
-        
-
-def addnet_hash_legacy(b):
-    """Old model hash used by sd-webui-additional-networks for .safetensors format files"""
-    m = hashlib.sha256()
-
-    b.seek(0x100000)
-    m.update(b.read(0x10000))
-    return m.hexdigest()[0:8]
-
-
-def addnet_hash_safetensors(b):
-    """New model hash used by sd-webui-additional-networks for .safetensors format files"""
-    hash_sha256 = hashlib.sha256()
-    blksize = 1024 * 1024
-
-    b.seek(0)
-    header = b.read(8)
-    n = int.from_bytes(header, "little")
-
-    offset = n + 8
-    b.seek(offset)
-    for chunk in iter(lambda: b.read(blksize), b""):
-        hash_sha256.update(chunk)
-
-    return hash_sha256.hexdigest()
-
-
 def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
     if ratios is None:
         ratios = [1 / float(len(loras_load_path)) for _ in loras_load_path]
@@ -1304,7 +1262,6 @@ def merge_from_name_and_index(name, index_list, output_dir='output_dir/'):
     loras_load_path = [os.path.join(output_dir, f'checkpoint-{i}.safetensors') for i in index_list]
     lora_save_path  = os.path.join(output_dir,f'{name}.safetensors')
     for l in loras_load_path:
-        # print('fuck : ', l)
         assert os.path.exists(l)==True
     merge_different_loras(loras_load_path, lora_save_path)
     return lora_save_path
