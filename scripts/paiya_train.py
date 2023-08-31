@@ -62,8 +62,19 @@ def paiya_train_forward(
 ):  
     if user_id == "":
         return "User id不能为空。"
+    
+    if os.path.exists(id_path):
+        with open(id_path, "r") as f:
+            ids = f.readlines()
+        ids = [_id.strip() for _id in ids]
+    else:
+        ids = []
+    if user_id in ids:
+        return "User id 不能重复。"
+
     with open(id_path, "a") as f:
         f.write(f"{user_id}\n")
+
     check_files_exists_and_download()
     # 模板的地址
     templates_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates")

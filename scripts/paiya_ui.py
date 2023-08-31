@@ -143,15 +143,16 @@ def on_ui_tabs():
                                 ],
                                 outputs=[output_message])
 
-        with gr.TabItem('艺术照生成(Inference)') as sub_tabs:
+        with gr.TabItem('艺术照生成(Inference)'):
             dummy_component = gr.Label(visible=False)
             preset_template = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'templates/*.jpg'))
 
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
+                        model_selected_tab = gr.State(0)
                         # Initialize the GUI
-                        with gr.TabItem("template images", id=101):
+                        with gr.TabItem("template images") as template_images_tab:
                             template_gallery_list = [(i, i) for i in preset_template]
                             gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
                             # new inplementation with gr.select callback function
@@ -160,9 +161,14 @@ def on_ui_tabs():
                             # selected_template_images = []
                             selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
                             gallery.select(select_function, None, selected_template_images)
-                        with gr.TabItem("upload image", id=202):
+                            
+                        with gr.TabItem("upload image") as upload_image_tab:
                             init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
-                        
+                            
+                        model_selected_tabs = [template_images_tab, upload_image_tab]
+                        for i, tab in enumerate(model_selected_tabs):
+                            tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
+
                         with gr.Row():
                             def select_function():
                                 if os.path.exists(id_path):
@@ -226,10 +232,10 @@ def on_ui_tabs():
                 display_button.click(
                     fn=paiya_infer_forward,
                     inputs=[uuid, selected_template_images, init_image, append_pos_prompt, 
-                            final_fusion_ratio, use_fusion_before, use_fusion_after],
-                    outputs=[infer_progress, output_images, sub_tabs]
+                            final_fusion_ratio, use_fusion_before, use_fusion_after, model_selected_tab],
+                    outputs=[infer_progress, output_images]
                 )
-        
+            
     return [(paiya_tabs, "Paiya", f"paiya_tabs")]
 
 # 注册设置页的配置项
