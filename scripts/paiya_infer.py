@@ -5,6 +5,7 @@ import os
 import random
 import sys
 
+import gradio as gr
 import cv2
 import numpy as np
 from modelscope.pipelines import pipeline
@@ -149,7 +150,7 @@ def inpaint_only(
     )
     return image
 
-def paiya_infer_forward(user_id, selected_template_images, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, args): 
+def paiya_infer_forward(user_id, selected_template_images, init_image, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
@@ -173,7 +174,11 @@ def paiya_infer_forward(user_id, selected_template_images, append_pos_prompt, fi
     roop_image              = Image.open(roop_image_path).convert("RGB")
 
     # get template
-    template_images         = eval(selected_template_images)
+    tabs = gr.Tabs.update(selected=1)
+    if tabs == 101:
+        template_images = eval(selected_template_images)
+    else:
+        template_images = [init_image]
 
     # Crop user images to obtain portrait boxes, facial keypoints, and masks
     roop_face_retinaface_box, roop_face_retinaface_keypoints, roop_face_retinaface_mask = call_face_crop(retinaface_detection, face_id_image, 1.5, "roop")
@@ -181,7 +186,10 @@ def paiya_infer_forward(user_id, selected_template_images, append_pos_prompt, fi
     outputs                 = []
     for template_image in template_images:
         # open the template image
-        template_image = Image.open(template_image).convert("RGB")
+        if tabs == 101:
+            template_image = Image.open(template_image).convert("RGB")
+        else:
+            template_image = Image.fromarray(template_image)
 
         # Crop the template image to retain only the portion of the portrait
         if crop_face_preprocess:
@@ -252,4 +260,4 @@ def paiya_infer_forward(user_id, selected_template_images, append_pos_prompt, fi
         
         outputs.append(origin_image)
 
-    return "SUCCESS", outputs
+    return "SUCCESS", outputs, tabs
