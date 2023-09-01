@@ -112,6 +112,8 @@ def easyphoto_train_forward(
     # 训练权重保存
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
+
+    sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors")
 
     os.makedirs(original_backup_path, exist_ok=True)
@@ -139,24 +141,24 @@ def easyphoto_train_forward(
     print(train_kohya_path)
     if platform.system() == 'Windows':
         command = [
-            'accelerate', 'launch', '--mixed_precision="fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            '--pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5"', 
+            'accelerate', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            f'--pretrained_model_name_or_path="{sd15_save_path}"', 
             f'--pretrained_model_ckpt="{webui_load_path}"', 
-            f'--train_data_dir="{user_path}" ', 
+            f'--train_data_dir="{user_path}"',
             '--caption_column="text"', 
-            f'--resolution={resolution} ', 
-            '--random_flip ', 
-            f'--train_batch_size={train_batch_size} ', 
-            f'--gradient_accumulation_steps={gradient_accumulation_steps} ', 
+            f'--resolution={resolution}',
+            '--random_flip',
+            f'--train_batch_size={train_batch_size}',
+            f'--gradient_accumulation_steps={gradient_accumulation_steps}',
             f'--dataloader_num_workers={dataloader_num_workers}', 
-            f'--max_train_steps={max_train_steps} ', 
+            f'--max_train_steps={max_train_steps}',
             f'--checkpointing_steps={val_and_checkpointing_steps}', 
-            f'--learning_rate={learning_rate} ', 
-            '--lr_scheduler="constant" ', 
+            f'--learning_rate={learning_rate}',
+            '--lr_scheduler="constant"',
             '--lr_warmup_steps=0', 
             '--train_text_encoder', 
             '--seed=42', 
-            f'--rank={rank} ', 
+            f'--rank={rank}',
             f'--network_alpha={network_alpha}', 
             f'--validation_prompt="{validation_prompt}"', 
             f'--validation_steps={val_and_checkpointing_steps}', 
@@ -178,7 +180,7 @@ def easyphoto_train_forward(
         os.system(
             f'''
             accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-            --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
+            --pretrained_model_name_or_path={sd15_save_path} \
             --pretrained_model_ckpt="{webui_load_path}" \
             --train_data_dir="{user_path}" --caption_column="text" \
             --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
