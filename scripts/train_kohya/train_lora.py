@@ -113,7 +113,7 @@ def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torc
             curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
     return pipeline
 
-def log_validation(network, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
+def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
     """
     This function, `log_validation`, serves as a validation step during training. 
     It generates ID photo templates using controlnet if `template_dir` exists, otherwise, it creates random templates based on validation prompts. 
@@ -138,12 +138,14 @@ def log_validation(network, vae, text_encoder, tokenizer, unet, args, accelerato
     # When template_dir doesn't exist, generate randomly based on validation prompts.
     text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
 
-    pipeline = StableDiffusionInpaintPipeline.from_pretrained(
-        args.pretrained_model_name_or_path,
+    pipeline = StableDiffusionInpaintPipeline(
+        tokenizer=tokenizer,
+        scheduler=noise_scheduler,
         unet=unet.to(accelerator.device, weight_dtype),
         text_encoder=text_encoder.to(accelerator.device, weight_dtype),
         vae=vae.to(accelerator.device, weight_dtype),
         torch_dtype=weight_dtype,
+        safety_checker=None,
     )
     pipeline = pipeline.to(accelerator.device)
     pipeline.safety_checker = None
@@ -1297,6 +1299,7 @@ def main():
                         )
                         log_validation(
                             network,
+                            noise_scheduler,
                             vae,
                             text_encoder,
                             tokenizer,
@@ -1321,6 +1324,7 @@ def main():
                 )
                 log_validation(
                     network,
+                    noise_scheduler,
                     vae,
                     text_encoder,
                     tokenizer,
@@ -1347,6 +1351,7 @@ def main():
 
         log_validation(
             network,
+            noise_scheduler,
             vae,
             text_encoder,
             tokenizer,
