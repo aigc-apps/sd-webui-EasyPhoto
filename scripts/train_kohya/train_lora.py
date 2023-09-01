@@ -144,8 +144,8 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
         unet=unet.to(accelerator.device, weight_dtype),
         text_encoder=text_encoder.to(accelerator.device, weight_dtype),
         vae=vae.to(accelerator.device, weight_dtype),
-        torch_dtype=weight_dtype,
         safety_checker=None,
+        feature_extractor=None
     )
     pipeline = pipeline.to(accelerator.device)
     pipeline.safety_checker = None
