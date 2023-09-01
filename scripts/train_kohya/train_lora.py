@@ -22,6 +22,7 @@ import shutil
 from glob import glob
 from pathlib import Path
 from typing import Dict
+from shutil import copyfile
 
 import cv2
 import datasets
@@ -1382,8 +1383,8 @@ def main():
             best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
             os.makedirs(best_outputs_dir, exist_ok=True)
             for result in t_result_list[:1]:
-                os.system(f"cp {result} {best_outputs_dir}")
-            os.system(f"cp {lora_save_path} {best_outputs_dir}")
+                copyfile(result, os.path.join(best_outputs_dir, os.path.basename(result)))
+            copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
 
 
     accelerator.end_training()
