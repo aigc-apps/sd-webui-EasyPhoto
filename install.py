@@ -19,7 +19,7 @@ if not launch.is_installed("ifnude"):
 
 if not launch.is_installed("insightface"):
     print('Installing requirements for paiya-webui')
-    launch.run_pip("install insightface", "requirements for insightface")
+    launch.run_pip("install insightface==0.7", "requirements for insightface")
 
 if not launch.is_installed("modelscope"):
     print('Installing requirements for paiya-webui')
