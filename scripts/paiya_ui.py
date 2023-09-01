@@ -43,7 +43,7 @@ def on_ui_tabs():
             dummy_component = gr.Label(visible=False)
             with gr.Blocks():
                 with gr.Row():
-                    uuid = gr.Text(label="User_ID", value="paiya", visible=False)
+                    uuid = gr.Text(label="User_ID", value="", visible=False)
 
                     with gr.Column():
                         gr.Markdown('训练图片(Training photos)')
@@ -54,7 +54,7 @@ def on_ui_tabs():
                             upload_button = gr.UploadButton(
                                 "选择图片进行上传", file_types=["image"], file_count="multiple"
                             )
-                            clear_button = gr.Button("清空图片(Clear photos)")
+                            clear_button = gr.Button("清空图片")
                         clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)

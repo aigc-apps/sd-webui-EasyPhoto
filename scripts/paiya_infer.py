@@ -25,6 +25,25 @@ log_level = os.environ.get('LOG_LEVEL', 'INFO')
 logging.getLogger().setLevel(log_level)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')  
 
+def resize_image(input_image, resolution, nearest = False, crop264 = True):
+    H, W, C = input_image.shape
+    H = float(H)
+    W = float(W)
+    k = float(resolution) / min(H, W)
+    H *= k
+    W *= k
+    if crop264:
+        H = int(np.round(H / 64.0)) * 64
+        W = int(np.round(W / 64.0)) * 64
+    else:
+        H = int(H)
+        W = int(W)
+    if not nearest:
+        img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
+    else:
+        img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_NEAREST)
+    return img
+
 def inpaint_with_mask_face(
     input_image: Image.Image,
     select_mask_input: Image.Image,
@@ -65,6 +84,26 @@ def inpaint_with_mask_face(
                 model='control_v11p_sd15_openpose [cab727d4]'
             )
         )
+
+    if 1:
+        blur_ratio      = 24
+        h, w, c         = np.shape(input_image)
+        color_image     = np.array(input_image, np.uint8)
+
+        color_image     = resize_image(color_image, 1024)
+        now_h, now_w    = color_image.shape[:2]
+
+        color_image = cv2.resize(color_image, (int(now_w//blur_ratio), int(now_h//blur_ratio)), interpolation=cv2.INTER_CUBIC)  
+        color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
+        color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
+        color_image = Image.fromarray(np.uint8(color_image))
+
+        control_unit_canny = ControlNetUnit(input_image=color_image, module='none',
+                                            weight=0.85,
+                                            guidance_end=1,
+                                            resize_mode='Just Resize',
+                                            model='control_sd15_random_color')
+        controlnet_units_list.append(control_unit_canny)
 
     positive = f'{input_prompt}, {default_positive_prompt}'
     negative = f'{default_negative_prompt}'
@@ -137,7 +176,7 @@ def inpaint_only(
         images=[input_image], 
         mask_image=input_mask, 
         inpainting_fill=1, 
-        denoising_strength=0.10, 
+        denoising_strength=0.20, 
         inpainting_mask_invert=0, 
         width=int(hr_scale * w), 
         height=int(hr_scale * h), 
@@ -232,8 +271,9 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         # First diffusion, facial reconstruction
         output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
 
+        origin_input_mask = copy.deepcopy(input_mask)
         # Obtain the mask of the area around the face
-        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(input_mask), np.ones((16, 16), np.uint8), iterations=1)))
+        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
         # Second diffusion
         if roop_image is not None and use_fusion_after:
@@ -248,10 +288,23 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
 
         # If it is a large template for cutting, paste the reconstructed image back
         if crop_face_preprocess:
-            origin_image    = np.array(copy.deepcopy(template_image))
+            origin_image        = np.array(copy.deepcopy(template_image))
+            origin_input_mask   = np.zeros_like(origin_image)
+
             x1,y1,x2,y2     = crop_safe_box
             generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
-            origin_image[y1:y2,x1:x2] = np.array(generate_image)
+
+            # border smooth
+            mask_y1 = y1 + 25
+            mask_y2 = y2 - 25
+            mask_x1 = x1 + 25
+            mask_x2 = x2 - 25
+            origin_input_mask[mask_y1:mask_y2, mask_x1:mask_x2] = 255
+            origin_input_mask = cv2.blur(origin_input_mask, [25, 25], cv2.BORDER_DEFAULT)  
+            origin_input_mask = np.array(origin_input_mask, np.float32) / 255
+
+            origin_image[y1:y2,x1:x2] = np.clip(np.array(generate_image, np.float32) * origin_input_mask[y1:y2, x1:x2] + (1 - origin_input_mask[y1:y2, x1:x2]) * np.array(generate_image, np.float32), 0, 255)
+
             origin_image    = Image.fromarray(np.uint8(origin_image))
         else:
             origin_image    = generate_image
