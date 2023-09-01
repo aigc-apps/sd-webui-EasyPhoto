@@ -35,7 +35,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "w600k_r50.onnx"), providers=providers)
     face_recognition.prepare(ctx_id=0)
     
-    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
+    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", root=os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), providers=providers)
     face_analyser.prepare(ctx_id=0, det_size=(640, 640))
     # 人脸检测
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')

@@ -1,14 +1,20 @@
 
 import os
+import platform
+import subprocess
 import threading
 from shutil import copyfile
 
-from modules import shared
-from PIL import Image
-from scripts.paiya_config import user_id_outpath_samples, validation_prompt, id_path
-from scripts.preprocess import preprocess_images
-from modules.paths import models_path
 import requests
+from PIL import Image
+from tqdm import tqdm
+
+from modules import shared
+from modules.paths import models_path
+from scripts.paiya_config import (id_path, user_id_outpath_samples,
+                                  validation_prompt)
+from scripts.preprocess import preprocess_images
+
 
 def urldownload(url, filename):
     """
@@ -44,9 +50,11 @@ def check_files_exists_and_download():
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "3.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "4.jpg"),
     ]
-    for url, filename in zip(urls, filenames):
+    print("Start Downloading weights")
+    for url, filename in tqdm(zip(urls, filenames)):
         if os.path.exists(filename):
             continue
+        print(f"Start Downloading weights")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         urldownload(url, filename)
 
@@ -109,30 +117,69 @@ def paiya_train_forward(
     sub_threading.join()
 
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
-    os.system(
-        f'''
-        accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-        --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
-        --pretrained_model_ckpt="{webui_load_path}" \
-        --train_data_dir="{user_path}" --caption_column="text" \
-        --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
-        --max_train_steps={max_train_steps} --checkpointing_steps={val_and_checkpointing_steps} \
-        --learning_rate={learning_rate} --lr_scheduler="constant" --lr_warmup_steps=0 \
-        --train_text_encoder \
-        --seed=42 \
-        --rank={rank} --network_alpha={network_alpha} \
-        --validation_prompt="{validation_prompt}" \
-        --validation_steps={val_and_checkpointing_steps} \
-        --output_dir="{weights_save_path}" \
-        --logging_dir="{weights_save_path}" \
-        --enable_xformers_memory_efficient_attention \
-        --mixed_precision='fp16' \
-        --template_dir="{templates_path}" \
-        --template_mask \
-        --merge_best_lora_based_face_id \
-        --merge_best_lora_name="{user_id}"
-        '''
-    )
+    print(train_kohya_path)
+    if platform.system() == 'Windows':
+        command = [
+            'accelerate', 'launch', '--mixed_precision="fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            '--pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5"', 
+            '--pretrained_model_ckpt="{webui_load_path}"', 
+            '--train_data_dir="{user_path}" ', 
+            '--caption_column="text"', 
+            '--resolution={resolution} ', 
+            '--random_flip ', 
+            '--train_batch_size={train_batch_size} ', 
+            '--gradient_accumulation_steps={gradient_accumulation_steps} ', 
+            '--dataloader_num_workers={dataloader_num_workers}', 
+            '--max_train_steps={max_train_steps} ', 
+            '--checkpointing_steps={val_and_checkpointing_steps}', 
+            '--learning_rate={learning_rate} ', 
+            '--lr_scheduler="constant" ', 
+            '--lr_warmup_steps=0', 
+            '--train_text_encoder', 
+            '--seed=42', 
+            '--rank={rank} ', 
+            '--network_alpha={network_alpha}', 
+            '--validation_prompt="{validation_prompt}"', 
+            '--validation_steps={val_and_checkpointing_steps}', 
+            '--output_dir="{weights_save_path}"', 
+            '--logging_dir="{weights_save_path}"', 
+            '--enable_xformers_memory_efficient_attention', 
+            '--mixed_precision='fp16'', 
+            '--template_dir="{templates_path}"', 
+            '--template_mask', 
+            '--merge_best_lora_based_face_id', 
+            '--merge_best_lora_name="{user_id}"', 
+        ]
+
+        try:
+            subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing the command: {e}")
+    else:
+        os.system(
+            f'''
+            accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
+            --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
+            --pretrained_model_ckpt="{webui_load_path}" \
+            --train_data_dir="{user_path}" --caption_column="text" \
+            --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
+            --max_train_steps={max_train_steps} --checkpointing_steps={val_and_checkpointing_steps} \
+            --learning_rate={learning_rate} --lr_scheduler="constant" --lr_warmup_steps=0 \
+            --train_text_encoder \
+            --seed=42 \
+            --rank={rank} --network_alpha={network_alpha} \
+            --validation_prompt="{validation_prompt}" \
+            --validation_steps={val_and_checkpointing_steps} \
+            --output_dir="{weights_save_path}" \
+            --logging_dir="{weights_save_path}" \
+            --enable_xformers_memory_efficient_attention \
+            --mixed_precision='fp16' \
+            --template_dir="{templates_path}" \
+            --template_mask \
+            --merge_best_lora_based_face_id \
+            --merge_best_lora_name="{user_id}"
+            '''
+        )
     
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     copyfile(best_weight_path, webui_save_path)
