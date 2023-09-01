@@ -121,6 +121,11 @@ def on_ui_tabs():
                             1. Upload 5 to 10 daily photos of the training required. 
                             2. Click on the Start Training button below to start the training process, approximately 25 minutes.
                             3. Switch to Inference and generate photos based on the template. 
+
+                            Parameter parsing:
+                            - **max steps per photo** represents the maximum number of training steps per photo.
+                            - **max train steps** represents the maximum training step.
+                            - Final training step = Min(photo_num * max_steps_per_photos, max_train_steps)
                             '''
                         )
 
@@ -229,6 +234,7 @@ def on_ui_tabs():
                             with gr.Box():
                                 gr.Markdown(
                                     '''
+                                    Parameter parsing:
                                     1. **After Face Fusion Ratio** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
                                     2. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
                                     3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
