@@ -74,7 +74,6 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                 continue
 
             sub_image = image.crop(retinaface_box)
-            sub_image = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
 
             embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
             embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
@@ -112,6 +111,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         image                   = Image.open(_image_path)
         retinaface_box, _, _    = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
         sub_image               = image.crop(retinaface_box)
+        sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
 
         # 显著性检测，合并人脸mask
         result      = salient_detect(sub_image)[OutputKeys.MASKS]
