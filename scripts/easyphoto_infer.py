@@ -12,7 +12,7 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
 from scripts.face_process_utils import call_face_crop, crop_and_paste
-from scripts.paiya_config import user_id_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
+from scripts.easyphoto_config import user_id_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
 
@@ -189,7 +189,7 @@ def inpaint_only(
     )
     return image
 
-def paiya_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
+def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')

@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from modules import shared
 from modules.paths import models_path
-from scripts.paiya_config import (id_path, user_id_outpath_samples,
+from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
@@ -75,7 +75,7 @@ def check_files_exists_and_download():
         urldownload_progressbar(url, filename)
 
 # Attention! Output of js is str or list, not float or int
-def paiya_train_forward(
+def easyphoto_train_forward(
     id_task: str,
     user_id: str,
     resolution: int, val_and_checkpointing_steps: int, max_train_steps: int, steps_per_photos: int,

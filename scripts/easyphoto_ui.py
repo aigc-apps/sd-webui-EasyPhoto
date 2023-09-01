@@ -4,9 +4,9 @@ import gradio as gr
 import glob
 import requests
 
-from scripts.paiya_infer import paiya_infer_forward
-from scripts.paiya_config import paiya_outpath_samples, id_path
-from scripts.paiya_train import paiya_train_forward
+from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_config import easyphoto_outpath_samples, id_path
+from scripts.easyphoto_train import easyphoto_train_forward
 from modules import script_callbacks, shared
 from modules.paths import models_path
 
@@ -38,7 +38,7 @@ def upload_file(files, current_files):
     return file_paths
 
 def on_ui_tabs():
-    with gr.Blocks(analytics_enabled=False) as paiya_tabs:
+    with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
         with gr.TabItem('Train'):
             dummy_component = gr.Label(visible=False)
             with gr.Blocks():
@@ -140,7 +140,7 @@ def on_ui_tabs():
                     )
                     output_message = gr.Markdown()
             
-                run_button.click(fn=paiya_train_forward,
+                run_button.click(fn=easyphoto_train_forward,
                                 _js="ask_for_style_name",
                                 inputs=[
                                     dummy_component,
@@ -258,19 +258,19 @@ def on_ui_tabs():
                         )
                     
                 display_button.click(
-                    fn=paiya_infer_forward,
+                    fn=easyphoto_infer_forward,
                     inputs=[uuid, selected_template_images, init_image, additional_prompt, 
                             after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
                     outputs=[infer_progress, output_images]
                 )
             
-    return [(paiya_tabs, "Paiya", f"paiya_tabs")]
+    return [(easyphoto_tabs, "easyphoto", f"easyphoto_tabs")]
 
 # 注册设置页的配置项
 def on_ui_settings():
-    section = ('paiya', "Paiya")
-    shared.opts.add_option("paiya_outpath_samples", shared.OptionInfo(
-        paiya_outpath_samples, "Paiya output path for image", section=section))  # 图片保存路径
+    section = ('easyphoto', "easyphoto")
+    shared.opts.add_option("easyphoto_outpath_samples", shared.OptionInfo(
+        easyphoto_outpath_samples, "easyphoto output path for image", section=section))  # 图片保存路径
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)
