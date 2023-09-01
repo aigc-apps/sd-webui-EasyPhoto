@@ -144,7 +144,7 @@ def paiya_train_forward(
             '--output_dir="{weights_save_path}"', 
             '--logging_dir="{weights_save_path}"', 
             '--enable_xformers_memory_efficient_attention', 
-            '--mixed_precision='fp16'', 
+            '--mixed_precision="fp16"', 
             '--template_dir="{templates_path}"', 
             '--template_mask', 
             '--merge_best_lora_based_face_id', 
