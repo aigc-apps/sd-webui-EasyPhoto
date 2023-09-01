@@ -196,6 +196,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
+    skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
 
     # get prompt
     input_prompt            = f"{validation_prompt}, <lora:{user_id}:1>" + additional_prompt
@@ -307,6 +308,11 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         else:
             origin_image    = generate_image
         
+        try:
+            origin_image    = Image.fromarray(cv2.cvtColor(skin_retouching(origin_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+        except:
+            logging.info("Skin Retouching error, but pass.")
+
         outputs.append(origin_image)
 
         save_image(origin_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
