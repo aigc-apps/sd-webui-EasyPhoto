@@ -102,7 +102,7 @@ def inpaint_with_mask_face(
         color_image = Image.fromarray(np.uint8(color_image))
 
         control_unit_canny = ControlNetUnit(input_image=color_image, module='none',
-                                            weight=0.60,
+                                            weight=0.75,
                                             guidance_end=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
