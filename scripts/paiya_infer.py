@@ -99,7 +99,7 @@ def inpaint_with_mask_face(
         color_image = Image.fromarray(np.uint8(color_image))
 
         control_unit_canny = ControlNetUnit(input_image=color_image, module='none',
-                                            weight=0.85,
+                                            weight=0.60,
                                             guidance_end=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
@@ -189,17 +189,13 @@ def inpaint_only(
     )
     return image
 
-def paiya_infer_forward(user_id, selected_template_images, init_image, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, tabs, args): 
+def paiya_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
 
-    # Whether to perform reconstruction after cropping the image, suit for large image with small people
-    crop_face_preprocess    = True
-    # random seed TODO: show in ui
-    seed                    = random.randint(0, 10000)
     # get prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_id}:1>" + append_pos_prompt
+    input_prompt            = f"{validation_prompt}, <lora:{user_id}:1>" + additional_prompt
     
     # get best image after training
     best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -240,7 +236,6 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         resize      = float(short_side / 512.0)
         new_size    = (int(input_image.width//resize), int(input_image.height//resize))
         input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
-
         if crop_face_preprocess:
             new_width   = int(np.shape(input_image)[1] // 32 * 32)
             new_height  = int(np.shape(input_image)[0] // 32 * 32)
@@ -254,7 +249,7 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
         
         # Fusion of user reference images and input images as canny input
-        if roop_image is not None and use_fusion_before:
+        if roop_image is not None and apply_face_fusion_before:
             input_image = image_face_fusion(dict(template=input_image, user=roop_image))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
 
@@ -276,12 +271,12 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
         # Second diffusion
-        if roop_image is not None and use_fusion_after:
+        if roop_image is not None and apply_face_fusion_after:
             # Fusion of facial photos with user photos
             fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
-            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * final_fusion_ratio + np.array(fusion_image, np.float32) * (1 - final_fusion_ratio))))
-
+            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * after_face_fusion_ratio + np.array(fusion_image, np.float32) * (1 - after_face_fusion_ratio))))
+            
             generate_image = inpaint_only(output_image, input_mask, input_prompt, fusion_image=fusion_image, hr_scale=1.5)
         else:
             generate_image = inpaint_only(output_image, input_mask, input_prompt, hr_scale=1.5)

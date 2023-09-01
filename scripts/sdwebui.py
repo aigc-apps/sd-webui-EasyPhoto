@@ -271,8 +271,13 @@ def i2i_inpaint_call(
     update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
     # 处理图片
     processed = processing.process_images(p_img2img)
-    if mask_image is None:
-        gen_image = processed.images[0]
-    else:
+
+    # get the generate image!
+    h_0, w_0, c_0 = np.shape(processed.images[0])
+    h_1, w_1, c_1 = np.shape(processed.images[1])
+
+    if w_1 != w_0:
         gen_image = processed.images[1]
+    else:
+        gen_image = processed.images[0]
     return gen_image
