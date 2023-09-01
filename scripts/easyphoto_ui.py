@@ -5,7 +5,7 @@ import glob
 import requests
 
 from scripts.easyphoto_infer import easyphoto_infer_forward
-from scripts.easyphoto_config import easyphoto_outpath_samples, id_path
+from scripts.easyphoto_config import easyphoto_outpath_samples, id_path, user_id_outpath_samples
 from scripts.easyphoto_train import easyphoto_train_forward
 from modules import script_callbacks, shared
 from modules.paths import models_path
@@ -270,7 +270,9 @@ def on_ui_tabs():
 def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
-        easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))  # 图片保存路径
+        easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
+    shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
+        user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)

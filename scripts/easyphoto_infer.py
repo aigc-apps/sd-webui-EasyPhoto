@@ -12,9 +12,12 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
 from scripts.face_process_utils import call_face_crop, crop_and_paste
-from scripts.easyphoto_config import user_id_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
+from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
+
+from modules.images import save_image
+from modules.shared import opts, state
 
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
@@ -305,5 +308,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
             origin_image    = generate_image
         
         outputs.append(origin_image)
+
+        save_image(origin_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
     return "SUCCESS", outputs

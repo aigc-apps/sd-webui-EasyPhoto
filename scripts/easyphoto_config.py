@@ -5,7 +5,6 @@ from modules.paths import data_path
 data_dir                        = data_path
 easyphoto_outpath_samples       = os.path.join(data_dir, 'outputs/easyphoto-outputs')
 user_id_outpath_samples         = os.path.join(data_dir, 'outputs/easyphoto-user-id-infos')
-processed_image_outpath_samples = os.path.join(data_dir, 'outputs/easyphoto-processed-images')
 
 # prompts 
 validation_prompt   = "easyphoto_face, easyphoto, 1person"
