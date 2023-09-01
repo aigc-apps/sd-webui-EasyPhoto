@@ -264,13 +264,13 @@ def on_ui_tabs():
                     outputs=[infer_progress, output_images]
                 )
             
-    return [(easyphoto_tabs, "easyphoto", f"easyphoto_tabs")]
+    return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 # 注册设置页的配置项
 def on_ui_settings():
-    section = ('easyphoto', "easyphoto")
-    shared.opts.add_option("easyphoto_outpath_samples", shared.OptionInfo(
-        easyphoto_outpath_samples, "easyphoto output path for image", section=section))  # 图片保存路径
+    section = ('EasyPhoto', "EasyPhoto")
+    shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
+        easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))  # 图片保存路径
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)
