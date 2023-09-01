@@ -4,9 +4,9 @@ import gradio as gr
 import glob
 import requests
 
-from scripts.paiya_infer import paiya_infer_forward
-from scripts.paiya_config import paiya_outpath_samples, id_path
-from scripts.paiya_train import paiya_train_forward
+from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_config import easyphoto_outpath_samples, id_path, user_id_outpath_samples
+from scripts.easyphoto_train import easyphoto_train_forward
 from modules import script_callbacks, shared
 from modules.paths import models_path
 
@@ -38,29 +38,29 @@ def upload_file(files, current_files):
     return file_paths
 
 def on_ui_tabs():
-    with gr.Blocks(analytics_enabled=False) as paiya_tabs:
-        with gr.TabItem('数字分身训练(Train)'):
+    with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
+        with gr.TabItem('Train'):
             dummy_component = gr.Label(visible=False)
             with gr.Blocks():
                 with gr.Row():
                     uuid = gr.Text(label="User_ID", value="", visible=False)
 
                     with gr.Column():
-                        gr.Markdown('训练图片(Training photos)')
+                        gr.Markdown('Training photos')
 
                         instance_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                         with gr.Row():
                             upload_button = gr.UploadButton(
-                                "选择图片进行上传", file_types=["image"], file_count="multiple"
+                                "Upload Photos", file_types=["image"], file_count="multiple"
                             )
-                            clear_button = gr.Button("清空图片")
+                            clear_button = gr.Button("Clear Photos")
                         clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)
                         
                     with gr.Column():
-                        gr.Markdown('参数设置(Params Setting)')
+                        gr.Markdown('Params Setting')
                         with gr.Accordion("Advanced Options", open=True):
                             with gr.Row():
                                 resolution = gr.Textbox(
@@ -116,25 +116,31 @@ def on_ui_tabs():
                                     value=64,
                                     interactive=True
                                 )
-                        gr.Markdown('''
-                            - 步骤1、上传需要训练的图片，5～10张日常照片。
-                            - 步骤2、点击下方的 开始训练 按钮 ，启动训练流程，约20分钟。
-                            - 步骤3、切换至 艺术照生成(Inference)，根据生模板成照片。
-                            ''')
+                        gr.Markdown(
+                            '''
+                            1. Upload 5 to 10 daily photos of the training required. 
+                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
+                            3. Switch to Inference and generate photos based on the template. 
+
+                            Parameter parsing:
+                            - **max steps per photo** represents the maximum number of training steps per photo.
+                            - **max train steps** represents the maximum training step.
+                            - Final training step = Min(photo_num * max_steps_per_photos, max_train_steps)
+                            '''
+                        )
 
                 with gr.Column():
-                    run_button = gr.Button('开始训练'
-                                        'Start training')
+                    run_button = gr.Button('Start Training')
 
                 with gr.Box():
-                    gr.Markdown('''
-                    请等待训练完成
-                    
-                    Please wait for the training to complete.
-                    ''')
+                    gr.Markdown(
+                        '''
+                        We need to train first to predict, please wait for the training to complete, thank you for your patience.
+                        '''
+                    )
                     output_message = gr.Markdown()
             
-                run_button.click(fn=paiya_train_forward,
+                run_button.click(fn=easyphoto_train_forward,
                                 _js="ask_for_style_name",
                                 inputs=[
                                     dummy_component,
@@ -143,22 +149,24 @@ def on_ui_tabs():
                                 ],
                                 outputs=[output_message])
 
-        with gr.TabItem('艺术照生成(Inference)'):
+        with gr.TabItem('Inference'):
             dummy_component = gr.Label(visible=False)
-            preset_template = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'templates/*.jpg'))
+            training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
+            infer_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates/*.jpg'))
+            preset_template = list(training_templates) + list(infer_templates)
 
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
                         model_selected_tab = gr.State(0)
-                        # Initialize the GUI
+
                         with gr.TabItem("template images") as template_images_tab:
                             template_gallery_list = [(i, i) for i in preset_template]
                             gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
-                            # new inplementation with gr.select callback function
+                            
                             def select_function(evt: gr.SelectData):
                                 return [preset_template[evt.index]]
-                            # selected_template_images = []
+
                             selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
                             gallery.select(select_function, None, selected_template_images)
                             
@@ -195,54 +203,94 @@ def on_ui_tabs():
                             )
 
                         with gr.Accordion("Advanced Options", open=False):
-                            append_pos_prompt = gr.Textbox(
-                                label="Prompt",
+                            additional_prompt = gr.Textbox(
+                                label="Additional Prompt",
                                 lines=3,
                                 value='masterpiece, beauty',
                                 interactive=True
                             )
-                            final_fusion_ratio = gr.Slider(
-                                minimum=0.2, maximum=0.8, value=0.5,
-                                step=0.1, label='融合系数(Final Fusion Ratio)'
+                            seed = gr.Textbox(
+                                label="Seed", 
+                                value=12345,
                             )
-                            use_fusion_before = gr.Radio(
-                                label="前融合(Apply Fusion Before)", type="value", choices=[True, False],
-                                value=True
+                            after_face_fusion_ratio = gr.Slider(
+                                minimum=0.2, maximum=0.8, value=0.50,
+                                step=0.05, label='After Face Fusion Ratio'
                             )
-                            use_fusion_after = gr.Radio(
-                                label="后融合(Apply Fusion After)", type="value", choices=[True, False],
-                                value=True
-                            )
-                        
+                            with gr.Row():
+                                first_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=50,
+                                    step=1, label='First Diffusion steps'
+                                )
+                                first_denoising_strength = gr.Slider(
+                                    minimum=0.30, maximum=0.60, value=0.45,
+                                    step=0.05, label='First Diffusion denoising strength'
+                                )
+                            with gr.Row():
+                                second_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=20,
+                                    step=1, label='Second Diffusion steps'
+                                )
+                                second_denoising_strength = gr.Slider(
+                                    minimum=0.20, maximum=0.40, value=0.30,
+                                    step=0.05, label='Second Diffusion denoising strength'
+                                )
+                            with gr.Row():
+                                crop_face_preprocess = gr.Checkbox(
+                                    label="Crop Face Preprocess",  
+                                    value=True
+                                )
+                                apply_face_fusion_before = gr.Checkbox(
+                                    label="Apply Face Fusion Before", 
+                                    value=True
+                                )
+                                apply_face_fusion_after = gr.Checkbox(
+                                    label="Apply Face Fusion After",  
+                                    value=True
+                                )
+
+                            with gr.Box():
+                                gr.Markdown(
+                                    '''
+                                    Parameter parsing:
+                                    1. **After Face Fusion Ratio** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
+                                    2. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
+                                    3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
+                                    4. **Apply Face Fusion After** represents whether to perform the second facial fusion.  
+                                    '''
+                                )
+                            
                         display_button = gr.Button('Start Generation')
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
 
                         output_images = gr.Gallery(
-                            label='输出(Output)',
+                            label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
                         infer_progress = gr.Textbox(
-                            label="生成(Generation Progress)",
+                            label="Generation Progress",
                             value="No task currently",
                             interactive=False
                         )
                     
                 display_button.click(
-                    fn=paiya_infer_forward,
-                    inputs=[uuid, selected_template_images, init_image, append_pos_prompt, 
-                            final_fusion_ratio, use_fusion_before, use_fusion_after, model_selected_tab],
+                    fn=easyphoto_infer_forward,
+                    inputs=[uuid, selected_template_images, init_image, additional_prompt, 
+                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
                     outputs=[infer_progress, output_images]
                 )
             
-    return [(paiya_tabs, "Paiya", f"paiya_tabs")]
+    return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 # 注册设置页的配置项
 def on_ui_settings():
-    section = ('paiya', "Paiya")
-    shared.opts.add_option("paiya_outpath_samples", shared.OptionInfo(
-        paiya_outpath_samples, "Paiya output path for image", section=section))  # 图片保存路径
+    section = ('EasyPhoto', "EasyPhoto")
+    shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
+        easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
+    shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
+        user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)

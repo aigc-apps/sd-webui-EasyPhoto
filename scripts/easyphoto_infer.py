@@ -12,9 +12,12 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
 from scripts.face_process_utils import call_face_crop, crop_and_paste
-from scripts.paiya_config import user_id_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
+from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE, easyphoto_img2img_samples
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
+
+from modules.images import save_image
+from modules.shared import opts, state
 
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
@@ -48,6 +51,8 @@ def inpaint_with_mask_face(
     input_image: Image.Image,
     select_mask_input: Image.Image,
     replaced_input_image: Image.Image,
+    diffusion_steps = 50,
+    denoising_strength = 0.45,
     input_prompt = '1girl',
     hr_scale: float = 1.0,
     default_positive_prompt = DEFAULT_POSITIVE,
@@ -99,7 +104,7 @@ def inpaint_with_mask_face(
         color_image = Image.fromarray(np.uint8(color_image))
 
         control_unit_canny = ControlNetUnit(input_image=color_image, module='none',
-                                            weight=0.85,
+                                            weight=0.75,
                                             guidance_end=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
@@ -112,18 +117,19 @@ def inpaint_with_mask_face(
         images=[input_image],
         mask_image=select_mask_input,
         inpainting_fill=1, 
-        denoising_strength=0.45,
+        steps=diffusion_steps,
+        denoising_strength=denoising_strength,
         cfg_scale=7,
         inpainting_mask_invert=0,
         width=int(w*hr_scale),
         height=int(h*hr_scale),
         inpaint_full_res=False,
         seed=seed,
-        steps=50,
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
         sd_model_checkpoint=sd_model_checkpoint,
+        outpath_samples=easyphoto_img2img_samples,
     )
 
     return image
@@ -133,6 +139,8 @@ def inpaint_only(
     input_mask: Image.Image,
     input_prompt = '1girl',
     fusion_image = None,
+    diffusion_steps = 50,
+    denoising_strength = 0.2, 
     hr_scale: float = 1.0,
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
@@ -176,7 +184,8 @@ def inpaint_only(
         images=[input_image], 
         mask_image=input_mask, 
         inpainting_fill=1, 
-        denoising_strength=0.20, 
+        steps=diffusion_steps,
+        denoising_strength=denoising_strength, 
         inpainting_mask_invert=0, 
         width=int(hr_scale * w), 
         height=int(hr_scale * h), 
@@ -186,20 +195,20 @@ def inpaint_only(
         negative_prompt=negative, 
         controlnet_units=controlnet_units_list, 
         sd_model_checkpoint=sd_model_checkpoint, 
+        outpath_samples=easyphoto_img2img_samples,
     )
     return image
 
-def paiya_infer_forward(user_id, selected_template_images, init_image, append_pos_prompt, final_fusion_ratio, use_fusion_before, use_fusion_after, tabs, args): 
+def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
+    skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
 
-    # Whether to perform reconstruction after cropping the image, suit for large image with small people
-    crop_face_preprocess    = True
-    # random seed TODO: show in ui
-    seed                    = random.randint(0, 10000)
     # get prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_id}:1>" + append_pos_prompt
+    input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + additional_prompt
+    if int(seed) == -1:
+        seed = np.random.randint(0, 65536)
     
     # get best image after training
     best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -240,7 +249,6 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         resize      = float(short_side / 512.0)
         new_size    = (int(input_image.width//resize), int(input_image.height//resize))
         input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
-
         if crop_face_preprocess:
             new_width   = int(np.shape(input_image)[1] // 32 * 32)
             new_height  = int(np.shape(input_image)[0] // 32 * 32)
@@ -248,13 +256,14 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         
         # Detect the box where the face of the template image is located and obtain its corresponding small mask
         retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
+        origin_input_mask = copy.deepcopy(input_mask)
 
         # Paste user images onto template images
         replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
         replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
         
         # Fusion of user reference images and input images as canny input
-        if roop_image is not None and use_fusion_before:
+        if roop_image is not None and apply_face_fusion_before:
             input_image = image_face_fusion(dict(template=input_image, user=roop_image))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
 
@@ -269,46 +278,41 @@ def paiya_infer_forward(user_id, selected_template_images, init_image, append_po
         input_mask          = Image.fromarray(np.uint8(input_mask))
         
         # First diffusion, facial reconstruction
-        output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
+        output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
 
-        origin_input_mask = copy.deepcopy(input_mask)
         # Obtain the mask of the area around the face
-        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
         # Second diffusion
-        if roop_image is not None and use_fusion_after:
+        if roop_image is not None and apply_face_fusion_after:
             # Fusion of facial photos with user photos
             fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
-            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * final_fusion_ratio + np.array(fusion_image, np.float32) * (1 - final_fusion_ratio))))
+            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
 
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, fusion_image=fusion_image, hr_scale=1.5)
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
         else:
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, hr_scale=1.5)
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
 
         # If it is a large template for cutting, paste the reconstructed image back
         if crop_face_preprocess:
-            origin_image        = np.array(copy.deepcopy(template_image))
-            origin_input_mask   = np.zeros_like(origin_image)
+            origin_image    = np.array(copy.deepcopy(template_image))
 
             x1,y1,x2,y2     = crop_safe_box
             generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
-
-            # border smooth
-            mask_y1 = y1 + 25
-            mask_y2 = y2 - 25
-            mask_x1 = x1 + 25
-            mask_x2 = x2 - 25
-            origin_input_mask[mask_y1:mask_y2, mask_x1:mask_x2] = 255
-            origin_input_mask = cv2.blur(origin_input_mask, [25, 25], cv2.BORDER_DEFAULT)  
-            origin_input_mask = np.array(origin_input_mask, np.float32) / 255
-
-            origin_image[y1:y2,x1:x2] = np.clip(np.array(generate_image, np.float32) * origin_input_mask[y1:y2, x1:x2] + (1 - origin_input_mask[y1:y2, x1:x2]) * np.array(generate_image, np.float32), 0, 255)
+            origin_image[y1:y2,x1:x2] = np.array(generate_image) 
 
             origin_image    = Image.fromarray(np.uint8(origin_image))
         else:
             origin_image    = generate_image
         
+        try:
+            origin_image    = Image.fromarray(cv2.cvtColor(skin_retouching(origin_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+        except:
+            logging.info("Skin Retouching error, but pass.")
+
         outputs.append(origin_image)
+
+        save_image(origin_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
     return "SUCCESS", outputs

@@ -3,10 +3,11 @@ import json
 import math
 import os
 import sys
-
+import cv2
 import torch
 import insightface
 import numpy as np
+import platform
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
@@ -41,6 +42,8 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     # 显著性检测
     salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection')
+    # 人像美肤
+    skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
     
     # 获得jpg列表
     jpgs            = os.listdir(inputs_dir)
@@ -109,6 +112,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         image                   = Image.open(_image_path)
         retinaface_box, _, _    = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
         sub_image               = image.crop(retinaface_box)
+        sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
 
         # 显著性检测，合并人脸mask
         result      = salient_detect(sub_image)[OutputKeys.MASKS]
@@ -135,6 +139,8 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                     txt_path = ".".join(path.split(".")[:-1]) + ".txt"
                     if os.path.exists(txt_path):
                         prompt          = open(txt_path, 'r').readline().strip()
+                        if platform.system() == 'Windows':
+                            path = path.replace('\\', '/')
                         jpg_path_split  = path.split("/")
                         file_name = os.path.join(*jpg_path_split[-2:])
                         a = {
