@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from modules import shared
 from modules.paths import models_path
-from scripts.paiya_config import (id_path, user_id_outpath_samples,
+from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
@@ -44,6 +44,10 @@ def check_files_exists_and_download():
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/w600k_r50.onnx",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2d106det.onnx",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/det_10g.onnx",
@@ -58,13 +62,17 @@ def check_files_exists_and_download():
         os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
         os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
         os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
+        os.path.join(models_path, f"annotator/body_pose_model.pth"),
+        os.path.join(models_path, f"annotator/facenet.pth"),
+        os.path.join(models_path, f"annotator/hand_pose_model.pth"),
+        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "2d106det.onnx"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "det_10g.onnx"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "1.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "2.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "3.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "4.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
     ]
     print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
@@ -75,7 +83,7 @@ def check_files_exists_and_download():
         urldownload_progressbar(url, filename)
 
 # Attention! Output of js is str or list, not float or int
-def paiya_train_forward(
+def easyphoto_train_forward(
     id_task: str,
     user_id: str,
     resolution: int, val_and_checkpointing_steps: int, max_train_steps: int, steps_per_photos: int,
@@ -98,7 +106,7 @@ def paiya_train_forward(
 
     check_files_exists_and_download()
     # 模板的地址
-    templates_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates")
+    training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
     # 原始数据备份
     original_backup_path    = os.path.join(user_id_outpath_samples, user_id, "original_backup")
     # 人脸的参考备份
@@ -113,7 +121,8 @@ def paiya_train_forward(
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors")
-
+    sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    
     os.makedirs(original_backup_path, exist_ok=True)
     os.makedirs(user_path, exist_ok=True)
     os.makedirs(images_save_path, exist_ok=True)
@@ -130,7 +139,7 @@ def paiya_train_forward(
     sub_threading.join()
 
     train_images = glob(os.path.join(images_save_path, "*.jpg"))
-    if len(images_save_path) == 0:
+    if len(train_images) == 0:
         return "未能获得预处理后的图片，请检查训练过程。"
     if not os.path.exists(json_save_path):
         return "未能获得预处理后的metadata.jsonl，请检查训练过程。"
@@ -138,38 +147,39 @@ def paiya_train_forward(
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     print(train_kohya_path)
     if platform.system() == 'Windows':
+        pwd = os.getcwd()
+        dataloader_num_workers = 0 # for solve multi process bug
         command = [
-            'accelerate', 'launch', '--mixed_precision="fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            '--pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5"', 
-            f'--pretrained_model_ckpt="{webui_load_path}"', 
-            f'--train_data_dir="{user_path}" ', 
-            '--caption_column="text"', 
-            f'--resolution={resolution} ', 
-            '--random_flip ', 
-            f'--train_batch_size={train_batch_size} ', 
-            f'--gradient_accumulation_steps={gradient_accumulation_steps} ', 
+            'accelerate', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}', 
+            f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
+            f'--train_data_dir={os.path.relpath(user_path, pwd)}',
+            '--caption_column=text', 
+            f'--resolution={resolution}',
+            '--random_flip',
+            f'--train_batch_size={train_batch_size}',
+            f'--gradient_accumulation_steps={gradient_accumulation_steps}',
             f'--dataloader_num_workers={dataloader_num_workers}', 
-            f'--max_train_steps={max_train_steps} ', 
+            f'--max_train_steps={max_train_steps}',
             f'--checkpointing_steps={val_and_checkpointing_steps}', 
-            f'--learning_rate={learning_rate} ', 
-            '--lr_scheduler="constant" ', 
+            f'--learning_rate={learning_rate}',
+            '--lr_scheduler=constant',
             '--lr_warmup_steps=0', 
             '--train_text_encoder', 
             '--seed=42', 
-            f'--rank={rank} ', 
+            f'--rank={rank}',
             f'--network_alpha={network_alpha}', 
-            f'--validation_prompt="{validation_prompt}"', 
+            f'--validation_prompt={validation_prompt}', 
             f'--validation_steps={val_and_checkpointing_steps}', 
-            f'--output_dir="{weights_save_path}"', 
-            f'--logging_dir="{weights_save_path}"', 
+            f'--output_dir={os.path.relpath(weights_save_path, pwd)}', 
+            f'--logging_dir={os.path.relpath(weights_save_path, pwd)}', 
             '--enable_xformers_memory_efficient_attention', 
-            '--mixed_precision="fp16"', 
-            f'--template_dir="{templates_path}"', 
+            '--mixed_precision=fp16', 
+            f'--template_dir={os.path.relpath(training_templates_path, pwd)}', 
             '--template_mask', 
             '--merge_best_lora_based_face_id', 
-            f'--merge_best_lora_name="{user_id}"', 
+            f'--merge_best_lora_name={user_id}', 
         ]
-
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
@@ -178,7 +188,7 @@ def paiya_train_forward(
         os.system(
             f'''
             accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-            --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
+            --pretrained_model_name_or_path="{sd15_save_path}" \
             --pretrained_model_ckpt="{webui_load_path}" \
             --train_data_dir="{user_path}" --caption_column="text" \
             --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
@@ -193,7 +203,7 @@ def paiya_train_forward(
             --logging_dir="{weights_save_path}" \
             --enable_xformers_memory_efficient_attention \
             --mixed_precision='fp16' \
-            --template_dir="{templates_path}" \
+            --template_dir="{training_templates_path}" \
             --template_mask \
             --merge_best_lora_based_face_id \
             --merge_best_lora_name="{user_id}"

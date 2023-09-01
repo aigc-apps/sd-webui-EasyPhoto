@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import gradio as gr
 import modules.scripts as scripts
 import numpy as np
+import modules
 from modules import processing, scripts, sd_samplers, shared
 from modules.api.models import *
 from modules.processing import StableDiffusionProcessingImg2Img
@@ -267,12 +268,24 @@ def i2i_inpaint_call(
 
     p_img2img.scripts = scripts.scripts_img2img
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
-    p_img2img.script_args = {"enabled": True}
-    update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
+    p_img2img.script_args = init_default_script_args(p_img2img.scripts)
+
+    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+        if alwayson_scripts.name is None:
+            continue
+        if alwayson_scripts.name=='controlnet':
+            p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+    # update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
+    
     # 处理图片
     processed = processing.process_images(p_img2img)
-    if mask_image is None:
-        gen_image = processed.images[0]
-    else:
+
+    # get the generate image!
+    h_0, w_0, c_0 = np.shape(processed.images[0])
+    h_1, w_1, c_1 = np.shape(processed.images[1])
+
+    if w_1 != w_0 and len(processed.images) > 1:
         gen_image = processed.images[1]
+    else:
+        gen_image = processed.images[0]
     return gen_image
