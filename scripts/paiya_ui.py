@@ -146,7 +146,9 @@ def on_ui_tabs():
 
         with gr.TabItem('Inference'):
             dummy_component = gr.Label(visible=False)
-            preset_template = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'templates/*.jpg'))
+            training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
+            infer_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates/*.jpg'))
+            preset_template = list(training_templates) + list(infer_templates)
 
             with gr.Blocks() as demo:
                 with gr.Row():

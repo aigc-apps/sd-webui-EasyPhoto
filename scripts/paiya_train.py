@@ -61,10 +61,10 @@ def check_files_exists_and_download():
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "2d106det.onnx"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "det_10g.onnx"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "1.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "2.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "3.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates", "4.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
     ]
     print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
@@ -98,7 +98,7 @@ def paiya_train_forward(
 
     check_files_exists_and_download()
     # 模板的地址
-    templates_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "templates")
+    training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
     # 原始数据备份
     original_backup_path    = os.path.join(user_id_outpath_samples, user_id, "original_backup")
     # 人脸的参考备份
@@ -164,7 +164,7 @@ def paiya_train_forward(
             f'--logging_dir="{weights_save_path}"', 
             '--enable_xformers_memory_efficient_attention', 
             '--mixed_precision="fp16"', 
-            f'--template_dir="{templates_path}"', 
+            f'--template_dir="{training_templates_path}"', 
             '--template_mask', 
             '--merge_best_lora_based_face_id', 
             f'--merge_best_lora_name="{user_id}"', 
@@ -193,7 +193,7 @@ def paiya_train_forward(
             --logging_dir="{weights_save_path}" \
             --enable_xformers_memory_efficient_attention \
             --mixed_precision='fp16' \
-            --template_dir="{templates_path}" \
+            --template_dir="{training_templates_path}" \
             --template_mask \
             --merge_best_lora_based_face_id \
             --merge_best_lora_name="{user_id}"

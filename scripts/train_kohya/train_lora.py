@@ -162,6 +162,8 @@ def log_validation(network, vae, text_encoder, tokenizer, unet, args, accelerato
         # Iteratively generate ID photos
         jpgs = os.listdir(args.template_dir)
         for jpg, read_jpg, shape, read_mask in zip(jpgs, kwargs['input_images'], kwargs['input_images_shape'], kwargs['input_masks']):
+            if not img.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
+                continue
             image = pipeline(
                 args.validation_prompt, image=read_jpg, mask_image=read_mask, strength=0.65, negative_prompt=args.neg_prompt, 
                 guidance_scale=args.guidance_scale, num_inference_steps=20, generator=generator, height=kwargs['new_size'][1], width=kwargs['new_size'][0],
