@@ -313,10 +313,10 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     """
     # embedding
     providers           = ["CPUExecutionProvider"]
-    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", "models"), "w600k_r50.onnx"), providers=providers)
+    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"), providers=providers)
     face_recognition.prepare(ctx_id=0)
     
-    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
+    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", root=os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", ""), providers=providers)
     face_analyser.prepare(ctx_id=0, det_size=(640, 640))
 
     # get ID list
