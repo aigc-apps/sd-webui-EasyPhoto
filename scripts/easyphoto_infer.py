@@ -12,7 +12,7 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
 from scripts.face_process_utils import call_face_crop, crop_and_paste
-from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE
+from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE, easyphoto_img2img_samples
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
 
@@ -127,6 +127,7 @@ def inpaint_with_mask_face(
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
         sd_model_checkpoint=sd_model_checkpoint,
+        outpath_samples=easyphoto_img2img_samples,
     )
 
     return image
@@ -189,6 +190,7 @@ def inpaint_only(
         negative_prompt=negative, 
         controlnet_units=controlnet_units_list, 
         sd_model_checkpoint=sd_model_checkpoint, 
+        outpath_samples=easyphoto_img2img_samples,
     )
     return image
 
@@ -199,7 +201,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
     skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
 
     # get prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_id}:1>" + additional_prompt
+    input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + additional_prompt
     
     # get best image after training
     best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))

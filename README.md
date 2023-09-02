@@ -1,4 +1,4 @@
-# EasyPhoto | Your Smart AI Photo Generator.
+# 📷 EasyPhoto | Your Smart AI Photo Generator.
 
 # Introduction
 
@@ -6,11 +6,15 @@ English | [简体中文](./README_zh-CN.md)
 
 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos and do not wear glasses. Also, we tried a minimum of 2 portrait images for training, and the results were pretty good. After the training is done, we can generate it in the Inference section. We support using preset template images vs. uploading your own images for Inference.
 
+These are our generated results:
+![results_1](images/results_1.jpg)
+![results_2](images/results_2.jpg)
+
 Our ui interface is as follows:  
 **train part:**
-![train_ui](images/train_ui.png)
+![train_ui](images/train_ui.jpg)
 **inference part:**
-![infer_ui](images/infer_ui.png)
+![infer_ui](images/infer_ui.jpg)
 
 # What's New
 - Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
@@ -50,7 +54,7 @@ We need about 60GB available on disk (for saving weights and datasets process), 
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
 In addition, we need at least three Controlnets for inference. So you need to set the **Multi ControlNet: Max models amount (requires restart)** in Setting.
-![Alt text](images/controlnet_num.png)
+![controlnet_num](images/controlnet_num.png)
 
 #### b. Other Dependencies.
 We are mutually compatible with the existing stable-diffusion-webui environment, and the relevant repositories are installed when starting stable-diffusion-webui.
@@ -62,13 +66,15 @@ Now we support installing EasyPhoto from git. The url of our Repository is https
 
 We will support installing EasyPhoto from **Available** in the future.
 
-![Alt text](images/install.png)
+![install](images/install.png)
 
 # Algorithm Detailed
 
 ### 1.Architectural Overview
 
 In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference. 
+
+![overview](images/overview.png)
 
 ### 2.Training Detailed
 

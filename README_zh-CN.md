@@ -6,6 +6,10 @@
 
 EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。建议使用 5 到 20 张肖像图片进行训练，最好是半身照片且不要佩戴眼镜（少量可以接受）。此外，我们也尝试过至少使用 2 张肖像图片进行训练，效果还不错。训练完成后，我们可以在推理部分生成图像。我们支持使用预设模板图片与上传自己的图片进行推理。
 
+这些是我们的生成结果:
+![results_1](images/results_1.jpg)
+![results_2](images/results_2.jpg)
+
 我们的ui界面如下:  
 **训练部分:**
 ![train_ui](images/train_ui.png)
@@ -50,7 +54,7 @@ Linux 的详细信息：
 我们需要使用 Controlnet 进行推理。相关软件源是[Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet)。在使用 EasyPhoto 之前，您需要安装这个软件源。
 
 此外，我们至少需要三个 Controlnets 用于推理。因此，您需要设置 **Multi ControlNet: Max models amount (requires restart)**。
-![Alt text](images/controlnet_num.png)
+![controlnet_num](images/controlnet_num.png)
 
 #### b. 其他依赖关系。
 我们与现有的 stable-diffusion-webui 环境相互兼容，启动 stable-diffusion-webui 时会安装相关软件源。
@@ -62,13 +66,15 @@ Linux 的详细信息：
 
 今后，我们将支持从 **Available** 安装 EasyPhoto。
 
-![Alt text](images/install.png)
+![install](images/install.png)
 
 # 算法详细信息
 
 #### 1.架构概述
 
 在人工智能肖像领域，我们希望模型生成的图像逼真且与用户相似，而传统方法会引入不真实的光照（如人脸融合或roop）。为了解决这种不真实的问题，我们引入了稳定扩散模型的图像到图像功能。生成完美的个人肖像需要考虑所需的生成场景和用户的数字二重身。我们使用一个预先准备好的模板作为所需的生成场景，并使用一个在线训练的人脸 LoRA 模型作为用户的数字二重身，这是一种流行的稳定扩散微调模型。我们使用少量用户图像来训练用户的稳定数字二重身，并在推理过程中根据人脸 LoRA 模型和预期生成场景生成个人肖像图像。
+
+![overview](images/overview.png)
 
 ### 训练细节
 
