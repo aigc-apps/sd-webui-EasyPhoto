@@ -25,6 +25,6 @@ if not launch.is_installed("modelscope"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install modelscope", "requirements for modelscope")
 
-if not launch.is_installed("diffusers"):
+if not launch.is_installed("diffusers==0.18.2"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
