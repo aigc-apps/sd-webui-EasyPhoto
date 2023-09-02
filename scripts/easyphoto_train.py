@@ -120,10 +120,9 @@ def easyphoto_train_forward(
     # 训练权重保存
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
-
-    sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors")
-
+    sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    
     os.makedirs(original_backup_path, exist_ok=True)
     os.makedirs(user_path, exist_ok=True)
     os.makedirs(images_save_path, exist_ok=True)
@@ -140,7 +139,7 @@ def easyphoto_train_forward(
     sub_threading.join()
 
     train_images = glob(os.path.join(images_save_path, "*.jpg"))
-    if len(images_save_path) == 0:
+    if len(train_images) == 0:
         return "未能获得预处理后的图片，请检查训练过程。"
     if not os.path.exists(json_save_path):
         return "未能获得预处理后的metadata.jsonl，请检查训练过程。"
@@ -148,12 +147,14 @@ def easyphoto_train_forward(
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     print(train_kohya_path)
     if platform.system() == 'Windows':
+        pwd = os.getcwd()
+        dataloader_num_workers = 0 # for solve multi process bug
         command = [
             'accelerate', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            f'--pretrained_model_name_or_path="{sd15_save_path}"', 
-            f'--pretrained_model_ckpt="{webui_load_path}"', 
-            f'--train_data_dir="{user_path}"',
-            '--caption_column="text"', 
+            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}', 
+            f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
+            f'--train_data_dir={os.path.relpath(user_path, pwd)}',
+            '--caption_column=text', 
             f'--resolution={resolution}',
             '--random_flip',
             f'--train_batch_size={train_batch_size}',
@@ -162,24 +163,23 @@ def easyphoto_train_forward(
             f'--max_train_steps={max_train_steps}',
             f'--checkpointing_steps={val_and_checkpointing_steps}', 
             f'--learning_rate={learning_rate}',
-            '--lr_scheduler="constant"',
+            '--lr_scheduler=constant',
             '--lr_warmup_steps=0', 
             '--train_text_encoder', 
             '--seed=42', 
             f'--rank={rank}',
             f'--network_alpha={network_alpha}', 
-            f'--validation_prompt="{validation_prompt}"', 
+            f'--validation_prompt={validation_prompt}', 
             f'--validation_steps={val_and_checkpointing_steps}', 
-            f'--output_dir="{weights_save_path}"', 
-            f'--logging_dir="{weights_save_path}"', 
+            f'--output_dir={os.path.relpath(weights_save_path, pwd)}', 
+            f'--logging_dir={os.path.relpath(weights_save_path, pwd)}', 
             '--enable_xformers_memory_efficient_attention', 
-            '--mixed_precision="fp16"', 
-            f'--template_dir="{training_templates_path}"', 
+            '--mixed_precision=fp16', 
+            f'--template_dir={os.path.relpath(training_templates_path, pwd)}', 
             '--template_mask', 
             '--merge_best_lora_based_face_id', 
-            f'--merge_best_lora_name="{user_id}"', 
+            f'--merge_best_lora_name={user_id}', 
         ]
-
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
@@ -188,7 +188,7 @@ def easyphoto_train_forward(
         os.system(
             f'''
             accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-            --pretrained_model_name_or_path={sd15_save_path} \
+            --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
             --pretrained_model_ckpt="{webui_load_path}" \
             --train_data_dir="{user_path}" --caption_column="text" \
             --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \

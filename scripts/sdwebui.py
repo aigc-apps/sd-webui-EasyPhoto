@@ -267,8 +267,9 @@ def i2i_inpaint_call(
 
     p_img2img.scripts = scripts.scripts_img2img
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
-    p_img2img.script_args = {"enabled": True}
+    p_img2img.script_args = init_default_script_args(p_img2img.scripts)
     update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
+
     # 处理图片
     processed = processing.process_images(p_img2img)
 
@@ -276,7 +277,7 @@ def i2i_inpaint_call(
     h_0, w_0, c_0 = np.shape(processed.images[0])
     h_1, w_1, c_1 = np.shape(processed.images[1])
 
-    if w_1 != w_0:
+    if w_1 != w_0 and len(processed.images) > 1:
         gen_image = processed.images[1]
     else:
         gen_image = processed.images[0]

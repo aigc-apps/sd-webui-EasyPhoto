@@ -7,6 +7,7 @@ import cv2
 import torch
 import insightface
 import numpy as np
+import platform
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
@@ -138,6 +139,8 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                     txt_path = ".".join(path.split(".")[:-1]) + ".txt"
                     if os.path.exists(txt_path):
                         prompt          = open(txt_path, 'r').readline().strip()
+                        if platform.system() == 'Windows':
+                            path = path.replace('\\', '/')
                         jpg_path_split  = path.split("/")
                         file_name = os.path.join(*jpg_path_split[-2:])
                         a = {
