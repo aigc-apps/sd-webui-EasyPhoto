@@ -188,7 +188,7 @@ def easyphoto_train_forward(
         os.system(
             f'''
             accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-            --pretrained_model_name_or_path="runwayml/stable-diffusion-v1-5" \
+            --pretrained_model_name_or_path="{sd15_save_path}" \
             --pretrained_model_ckpt="{webui_load_path}" \
             --train_data_dir="{user_path}" --caption_column="text" \
             --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
