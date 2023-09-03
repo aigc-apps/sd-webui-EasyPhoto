@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import gradio as gr
 import modules.scripts as scripts
 import numpy as np
+import modules
 from modules import processing, scripts, sd_samplers, shared
 from modules.api.models import *
 from modules.processing import StableDiffusionProcessingImg2Img
@@ -268,8 +269,14 @@ def i2i_inpaint_call(
     p_img2img.scripts = scripts.scripts_img2img
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
-    update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
 
+    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+        if alwayson_scripts.name is None:
+            continue
+        if alwayson_scripts.name=='controlnet':
+            p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+    # update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
+    
     # 处理图片
     processed = processing.process_images(p_img2img)
 
