@@ -214,8 +214,8 @@ def on_ui_tabs():
                                 value=-1,
                             )
                             after_face_fusion_ratio = gr.Slider(
-                                minimum=0.2, maximum=0.8, value=0.5,
-                                step=0.1, label='After Face Fusion Ratio'
+                                minimum=0.2, maximum=0.8, value=0.65,
+                                step=0.05, label='After Face Fusion Ratio'
                             )
                             with gr.Row():
                                 crop_face_preprocess = gr.Checkbox(

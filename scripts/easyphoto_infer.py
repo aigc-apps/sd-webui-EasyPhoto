@@ -202,6 +202,8 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
 
     # get prompt
     input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + additional_prompt
+    if int(seed) == -1:
+        seed = np.random.randint(0, 65536)
     
     # get best image after training
     best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -281,7 +283,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
             # Fusion of facial photos with user photos
             fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
-            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * after_face_fusion_ratio + np.array(fusion_image, np.float32) * (1 - after_face_fusion_ratio))))
+            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
             
             generate_image = inpaint_only(output_image, input_mask, input_prompt, fusion_image=fusion_image, hr_scale=1.5)
         else:
