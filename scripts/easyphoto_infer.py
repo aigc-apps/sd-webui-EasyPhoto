@@ -51,6 +51,8 @@ def inpaint_with_mask_face(
     input_image: Image.Image,
     select_mask_input: Image.Image,
     replaced_input_image: Image.Image,
+    diffusion_steps = 50,
+    denoising_strength = 0.45,
     input_prompt = '1girl',
     hr_scale: float = 1.0,
     default_positive_prompt = DEFAULT_POSITIVE,
@@ -115,14 +117,14 @@ def inpaint_with_mask_face(
         images=[input_image],
         mask_image=select_mask_input,
         inpainting_fill=1, 
-        denoising_strength=0.45,
+        steps=diffusion_steps,
+        denoising_strength=denoising_strength,
         cfg_scale=7,
         inpainting_mask_invert=0,
         width=int(w*hr_scale),
         height=int(h*hr_scale),
         inpaint_full_res=False,
         seed=seed,
-        steps=50,
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
@@ -137,6 +139,8 @@ def inpaint_only(
     input_mask: Image.Image,
     input_prompt = '1girl',
     fusion_image = None,
+    diffusion_steps = 50,
+    denoising_strength = 0.2, 
     hr_scale: float = 1.0,
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
@@ -180,7 +184,8 @@ def inpaint_only(
         images=[input_image], 
         mask_image=input_mask, 
         inpainting_fill=1, 
-        denoising_strength=0.20, 
+        steps=diffusion_steps,
+        denoising_strength=denoising_strength, 
         inpainting_mask_invert=0, 
         width=int(hr_scale * w), 
         height=int(hr_scale * h), 
@@ -194,7 +199,7 @@ def inpaint_only(
     )
     return image
 
-def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
+def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
@@ -251,6 +256,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         
         # Detect the box where the face of the template image is located and obtain its corresponding small mask
         retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
+        origin_input_mask = copy.deepcopy(input_mask)
 
         # Paste user images onto template images
         replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
@@ -272,11 +278,10 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         input_mask          = Image.fromarray(np.uint8(input_mask))
         
         # First diffusion, facial reconstruction
-        output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
+        output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
 
-        origin_input_mask = copy.deepcopy(input_mask)
         # Obtain the mask of the area around the face
-        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
         # Second diffusion
         if roop_image is not None and apply_face_fusion_after:
@@ -284,29 +289,18 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
             fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
             output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
-            
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, fusion_image=fusion_image, hr_scale=1.5)
+
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
         else:
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, hr_scale=1.5)
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
 
         # If it is a large template for cutting, paste the reconstructed image back
         if crop_face_preprocess:
-            origin_image        = np.array(copy.deepcopy(template_image))
-            origin_input_mask   = np.zeros_like(origin_image)
+            origin_image    = np.array(copy.deepcopy(template_image))
 
             x1,y1,x2,y2     = crop_safe_box
             generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
-
-            # border smooth
-            mask_y1 = y1 + 25
-            mask_y2 = y2 - 25
-            mask_x1 = x1 + 25
-            mask_x2 = x2 - 25
-            origin_input_mask[mask_y1:mask_y2, mask_x1:mask_x2] = 255
-            origin_input_mask = cv2.blur(origin_input_mask, [25, 25], cv2.BORDER_DEFAULT)  
-            origin_input_mask = np.array(origin_input_mask, np.float32) / 255
-
-            origin_image[y1:y2,x1:x2] = np.clip(np.array(generate_image, np.float32) * origin_input_mask[y1:y2, x1:x2] + (1 - origin_input_mask[y1:y2, x1:x2]) * np.array(generate_image, np.float32), 0, 255)
+            origin_image[y1:y2,x1:x2] = np.array(generate_image) 
 
             origin_image    = Image.fromarray(np.uint8(origin_image))
         else:

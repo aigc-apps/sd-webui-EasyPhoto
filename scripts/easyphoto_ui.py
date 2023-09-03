@@ -218,6 +218,24 @@ def on_ui_tabs():
                                 step=0.05, label='After Face Fusion Ratio'
                             )
                             with gr.Row():
+                                first_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=20,
+                                    step=1, label='First Diffusion steps'
+                                )
+                                first_denoising_strength = gr.Slider(
+                                    minimum=0.30, maximum=0.60, value=0.45,
+                                    step=0.05, label='First Diffusion denoising strength'
+                                )
+                            with gr.Row():
+                                second_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=20,
+                                    step=1, label='Second Diffusion steps'
+                                )
+                                second_denoising_strength = gr.Slider(
+                                    minimum=0.20, maximum=0.5, value=0.35,
+                                    step=0.05, label='Second Diffusion denoising strength'
+                                )
+                            with gr.Row():
                                 crop_face_preprocess = gr.Checkbox(
                                     label="Crop Face Preprocess",  
                                     value=True
@@ -260,7 +278,7 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[uuid, selected_template_images, init_image, additional_prompt, 
-                            after_face_fusion_ratio, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
+                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
                     outputs=[infer_progress, output_images]
                 )
             
