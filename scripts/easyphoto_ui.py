@@ -211,7 +211,7 @@ def on_ui_tabs():
                             )
                             seed = gr.Textbox(
                                 label="Seed", 
-                                value=-1,
+                                value=12345,
                             )
                             after_face_fusion_ratio = gr.Slider(
                                 minimum=0.2, maximum=0.8, value=0.50,
@@ -219,7 +219,7 @@ def on_ui_tabs():
                             )
                             with gr.Row():
                                 first_diffusion_steps = gr.Slider(
-                                    minimum=15, maximum=50, value=20,
+                                    minimum=15, maximum=50, value=50,
                                     step=1, label='First Diffusion steps'
                                 )
                                 first_denoising_strength = gr.Slider(
@@ -232,7 +232,7 @@ def on_ui_tabs():
                                     step=1, label='Second Diffusion steps'
                                 )
                                 second_denoising_strength = gr.Slider(
-                                    minimum=0.20, maximum=0.5, value=0.35,
+                                    minimum=0.20, maximum=0.40, value=0.30,
                                     step=0.05, label='Second Diffusion denoising strength'
                                 )
                             with gr.Row():
