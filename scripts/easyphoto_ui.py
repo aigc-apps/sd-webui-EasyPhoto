@@ -217,6 +217,7 @@ def on_ui_tabs():
                                 minimum=0.2, maximum=0.8, value=0.50,
                                 step=0.05, label='After Face Fusion Ratio'
                             )
+
                             with gr.Row():
                                 first_diffusion_steps = gr.Slider(
                                     minimum=15, maximum=50, value=50,
@@ -246,6 +247,14 @@ def on_ui_tabs():
                                 )
                                 apply_face_fusion_after = gr.Checkbox(
                                     label="Apply Face Fusion After",  
+                                    value=True
+                                )
+                                color_shift_middle = gr.Checkbox(
+                                    label="Apply color shift first",  
+                                    value=True
+                                )
+                                color_shift_last = gr.Checkbox(
+                                    label="Apply color shift last",  
                                     value=True
                                 )
 
@@ -278,7 +287,7 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[uuid, selected_template_images, init_image, additional_prompt, 
-                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
+                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, model_selected_tab],
                     outputs=[infer_progress, output_images]
                 )
             

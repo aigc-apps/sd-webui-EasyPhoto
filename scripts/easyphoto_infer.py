@@ -11,7 +11,7 @@ import numpy as np
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
-from scripts.face_process_utils import call_face_crop, crop_and_paste
+from scripts.face_process_utils import call_face_crop, crop_and_paste, color_transfer
 from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE, easyphoto_img2img_samples
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
@@ -199,7 +199,7 @@ def inpaint_only(
     )
     return image
 
-def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
+def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, tabs, args): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
@@ -257,6 +257,9 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         # Detect the box where the face of the template image is located and obtain its corresponding small mask
         retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
         origin_input_mask = copy.deepcopy(input_mask)
+        
+        # backup input template
+        original_input_template = copy.deepcopy(input_image)
 
         # Paste user images onto template images
         replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
@@ -277,31 +280,52 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         input_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
         input_mask          = Image.fromarray(np.uint8(input_mask))
         
+        # here we get the retinaface_box, we should use this Input box and face pixel to refine the output face pixel colors
+        template_image_original_face_area = np.array(original_input_template)[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] 
+        
         # First diffusion, facial reconstruction
         output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
 
         # Obtain the mask of the area around the face
         input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
+        # Before second diffusion, we trans the image's face color according to template_image_original_face_area
+        # use original template face area to shift generated face color in the middle
+        if color_shift_middle:
+            output_image_face_area = np.array(copy.deepcopy(output_image))[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] 
+            # color_transfer(target_to_trans, shift_reference)
+            output_image_face_area = color_transfer(output_image_face_area,template_image_original_face_area)
+            output_image = np.array(output_image)
+            output_image[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] = output_image_face_area
+            output_image = Image.fromarray(output_image)
+
         # Second diffusion
+        default_hr_scale = 1.5
         if roop_image is not None and apply_face_fusion_after:
             # Fusion of facial photos with user photos
             fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
             fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
             output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
-
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale)
         else:
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
+            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale)
+
+        # use original template face area to shift generated face color at last
+        if color_shift_last:
+            rescale_retinaface_box = [int(i * default_hr_scale) for i in retinaface_box]
+            output_image_face_area = np.array(copy.deepcopy(generate_image))[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] 
+            output_image_face_area = color_transfer(output_image_face_area,template_image_original_face_area)
+            generate_image = np.array(generate_image)
+            generate_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = output_image_face_area
+            generate_image = Image.fromarray(generate_image)
+
 
         # If it is a large template for cutting, paste the reconstructed image back
         if crop_face_preprocess:
             origin_image    = np.array(copy.deepcopy(template_image))
-
             x1,y1,x2,y2     = crop_safe_box
             generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
             origin_image[y1:y2,x1:x2] = np.array(generate_image) 
-
             origin_image    = Image.fromarray(np.uint8(origin_image))
         else:
             origin_image    = generate_image
