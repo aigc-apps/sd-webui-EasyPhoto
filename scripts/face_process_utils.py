@@ -134,3 +134,31 @@ def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
+def color_transfer(sc, dc):
+    """
+    Transfer color distribution from of sc, referred to dc.
+    
+    Args:
+        sc (numpy.ndarray): input image to be transfered.
+        dc (numpy.ndarray): reference image 
+
+    Returns:
+        numpy.ndarray: Transferred color distribution on the sc.
+    """
+
+    def get_mean_and_std(img):
+        x_mean, x_std = cv2.meanStdDev(img)
+        x_mean = np.hstack(np.around(x_mean, 2))
+        x_std = np.hstack(np.around(x_std, 2))
+        return x_mean, x_std
+
+    sc = cv2.cvtColor(sc, cv2.COLOR_BGR2LAB)
+    s_mean, s_std = get_mean_and_std(sc)
+    dc = cv2.cvtColor(dc, cv2.COLOR_BGR2LAB)
+    t_mean, t_std = get_mean_and_std(dc)
+    img_n = ((sc-s_mean)*(t_std/s_std))+t_mean
+    np.putmask(img_n, img_n > 255, 255)
+    np.putmask(img_n, img_n < 0, 0)
+    dst = cv2.cvtColor(cv2.convertScaleAbs(img_n), cv2.COLOR_LAB2BGR)
+    return dst
