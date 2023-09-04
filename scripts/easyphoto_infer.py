@@ -199,35 +199,80 @@ def inpaint_only(
     )
     return image
 
-def easyphoto_infer_forward(user_id, selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, args): 
+def easyphoto_infer_forward(selected_template_images, init_image, additional_prompt, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, tabs, *user_ids): 
     # create modelscope model
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
     image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
     skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
 
-    # get prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
     if int(seed) == -1:
         seed = np.random.randint(0, 65536)
-    
-    # get best image after training
-    best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
-    if len(best_outputs_paths) > 0:
-        face_id_image_path  = best_outputs_paths[0]
-    else:
-        face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
-    roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
-
-    face_id_image           = Image.open(face_id_image_path).convert("RGB")
-    roop_image              = Image.open(roop_image_path).convert("RGB")
 
     if tabs == 0:
         template_images = eval(selected_template_images)
     else:
         template_images = [init_image]
+    
+    _user_ids = []
+    for user_id in user_ids:
+        if user_id != "none":
+            _user_ids.append(user_id)
+    user_ids = _user_ids
+    if len(user_ids) == 0:
+        return "Please choose a user id.", []
 
-    # Crop user images to obtain portrait boxes, facial keypoints, and masks
-    roop_face_retinaface_box, roop_face_retinaface_keypoints, roop_face_retinaface_mask = call_face_crop(retinaface_detection, face_id_image, 1.5, "roop")
+    if len(user_ids) == 1:
+        user_id                 = user_ids[0]
+        # get prompt
+        input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+        
+        # get best image after training
+        best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
+        if len(best_outputs_paths) > 0:
+            face_id_image_path  = best_outputs_paths[0]
+        else:
+            face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
+        roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+
+        face_id_image           = Image.open(face_id_image_path).convert("RGB")
+        roop_image              = Image.open(roop_image_path).convert("RGB")
+
+        # Crop user images to obtain portrait boxes, facial keypoints, and masks
+        roop_face_retinaface_box, roop_face_retinaface_keypoints, roop_face_retinaface_mask = call_face_crop(retinaface_detection, face_id_image, 1.5, "roop")
+    else:
+        input_prompt_without_lora       = f"{validation_prompt}" + additional_prompt
+
+        input_prompts                   = []
+        face_id_images                  = []
+        roop_images                     = []
+        roop_face_retinaface_boxs       = []
+        roop_face_retinaface_keypoints  = []
+        roop_face_retinaface_masks      = []
+        
+        for user_id in user_ids:
+            # get prompt
+            input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            
+            # get best image after training
+            best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
+            if len(best_outputs_paths) > 0:
+                face_id_image_path  = best_outputs_paths[0]
+            else:
+                face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
+            roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+
+            face_id_image           = Image.open(face_id_image_path).convert("RGB")
+            roop_image              = Image.open(roop_image_path).convert("RGB")
+
+            # Crop user images to obtain portrait boxes, facial keypoints, and masks
+            roop_face_retinaface_box, roop_face_retinaface_keypoint, roop_face_retinaface_mask = call_face_crop(retinaface_detection, face_id_image, 1.5, "roop")
+
+            input_prompts.append(input_prompt)
+            face_id_images.append(face_id_image)
+            roop_images.append(roop_image)
+            roop_face_retinaface_boxs.append(roop_face_retinaface_box)
+            roop_face_retinaface_keypoints.append(roop_face_retinaface_keypoint)
+            roop_face_retinaface_masks.append(roop_face_retinaface_mask)
 
     outputs                 = []
     for template_image in template_images:
@@ -237,79 +282,179 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         else:
             template_image = Image.fromarray(template_image)
 
-        # Crop the template image to retain only the portion of the portrait
-        if crop_face_preprocess:
-            crop_safe_box, _, _ = call_face_crop(retinaface_detection, template_image, 3, "crop")
-            input_image = copy.deepcopy(template_image).crop(crop_safe_box)
+        if len(user_ids) == 1:
+            # Crop the template image to retain only the portion of the portrait
+            if crop_face_preprocess:
+                crop_safe_box, _, _ = call_face_crop(retinaface_detection, template_image, 3, "crop")
+                input_image = copy.deepcopy(template_image).crop(crop_safe_box)
+            else:
+                input_image = copy.deepcopy(template_image)
+
+            # Resize the template image with short edges on 512
+            short_side  = min(input_image.width, input_image.height)
+            resize      = float(short_side / 512.0)
+            new_size    = (int(input_image.width//resize), int(input_image.height//resize))
+            input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
+            if crop_face_preprocess:
+                new_width   = int(np.shape(input_image)[1] // 32 * 32)
+                new_height  = int(np.shape(input_image)[0] // 32 * 32)
+                input_image = input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
+            
+            # Detect the box where the face of the template image is located and obtain its corresponding small mask
+            retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
+            origin_input_mask = copy.deepcopy(input_mask)
+
+            # Paste user images onto template images
+            replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
+            replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
+            
+            # Fusion of user reference images and input images as canny input
+            if roop_image is not None and apply_face_fusion_before:
+                input_image = image_face_fusion(dict(template=input_image, user=roop_image))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
+
+            # Expand the template image in the x-axis direction to include the ears.
+            h, w, c             = np.shape(input_mask)
+            retinaface_box      = np.int32(retinaface_box)
+            face_width          = retinaface_box[2] - retinaface_box[0]
+            retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * 0.15, 0, w - 1)
+            retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * 0.15, 0, w - 1)
+            input_mask          = np.zeros_like(np.array(input_mask, np.uint8))
+            input_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+            input_mask          = Image.fromarray(np.uint8(input_mask))
+            
+            # First diffusion, facial reconstruction
+            output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
+
+            # Obtain the mask of the area around the face
+            input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+
+            # Second diffusion
+            if roop_image is not None and apply_face_fusion_after:
+                # Fusion of facial photos with user photos
+                fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
+                output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
+
+                generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
+            else:
+                generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
+
+            # If it is a large template for cutting, paste the reconstructed image back
+            if crop_face_preprocess:
+                origin_image    = np.array(copy.deepcopy(template_image))
+
+                x1,y1,x2,y2     = crop_safe_box
+                generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
+                origin_image[y1:y2,x1:x2] = np.array(generate_image) 
+
+                origin_image    = Image.fromarray(np.uint8(origin_image))
+            else:
+                origin_image    = generate_image
+            
+            try:
+                origin_image    = Image.fromarray(cv2.cvtColor(skin_retouching(origin_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            except:
+                logging.info("Skin Retouching error, but pass.")
         else:
-            input_image = copy.deepcopy(template_image)
+            crop_safe_box, _, _ = call_face_crop(retinaface_detection, template_image, 1.10, "crop")
 
-        # Resize the template image with short edges on 512
-        short_side  = min(input_image.width, input_image.height)
-        resize      = float(short_side / 512.0)
-        new_size    = (int(input_image.width//resize), int(input_image.height//resize))
-        input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
-        if crop_face_preprocess:
-            new_width   = int(np.shape(input_image)[1] // 32 * 32)
-            new_height  = int(np.shape(input_image)[0] // 32 * 32)
-            input_image = input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
-        
-        # Detect the box where the face of the template image is located and obtain its corresponding small mask
-        retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
-        origin_input_mask = copy.deepcopy(input_mask)
+            output_image = copy.deepcopy(template_image)
+            output_image = np.array(output_image)
+            output_mask = np.ones_like(output_image)
+            for index in range(len(crop_safe_box)):
+                retinaface_box = crop_safe_box[index]
+                output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+            output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
-        # Paste user images onto template images
-        replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
-        replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
-        
-        # Fusion of user reference images and input images as canny input
-        if roop_image is not None and apply_face_fusion_before:
-            input_image = image_face_fusion(dict(template=input_image, user=roop_image))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
-            input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
+            for index in range(len(crop_safe_box)):
+                _template_image = copy.deepcopy(template_image)
+                _template_image = np.array(_template_image)
 
-        # Expand the template image in the x-axis direction to include the ears.
-        h, w, c             = np.shape(input_mask)
-        retinaface_box      = np.int32(retinaface_box)
-        face_width          = retinaface_box[2] - retinaface_box[0]
-        retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * 0.15, 0, w - 1)
-        retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * 0.15, 0, w - 1)
-        input_mask          = np.zeros_like(np.array(input_mask, np.uint8))
-        input_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
-        input_mask          = Image.fromarray(np.uint8(input_mask))
-        
-        # First diffusion, facial reconstruction
-        output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed))
+                for sub_index in range(len(crop_safe_box)):
+                    if index != sub_index:
+                        retinaface_box = crop_safe_box[sub_index]
+                        _template_image[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+                _template_image = Image.fromarray(np.uint8(_template_image))
 
-        # Obtain the mask of the area around the face
-        input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+                # Crop the template image to retain only the portion of the portrait
+                if crop_face_preprocess:
+                    _crop_safe_box, _, _ = call_face_crop(retinaface_detection, _template_image, 2, "crop")
+                    input_image = copy.deepcopy(_template_image).crop(_crop_safe_box)
+                else:
+                    input_image = copy.deepcopy(_template_image)
 
-        # Second diffusion
-        if roop_image is not None and apply_face_fusion_after:
-            # Fusion of facial photos with user photos
-            fusion_image = image_face_fusion(dict(template=output_image, user=roop_image))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
-            fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
-            output_image = Image.fromarray(np.uint8((np.array(output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
+                # Resize the template image with short edges on 512
+                short_side  = min(input_image.width, input_image.height)
+                resize      = float(short_side / 512.0)
+                new_size    = (int(input_image.width//resize), int(input_image.height//resize))
+                input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
+                if crop_face_preprocess:
+                    new_width   = int(np.shape(input_image)[1] // 32 * 32)
+                    new_height  = int(np.shape(input_image)[0] // 32 * 32)
+                    input_image = input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
+                
+                # Detect the box where the face of the template image is located and obtain its corresponding small mask
+                retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
+                origin_input_mask = copy.deepcopy(input_mask)
 
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
-        else:
-            generate_image = inpaint_only(output_image, input_mask, input_prompt, diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
+                # Paste user images onto template images
+                replaced_input_image = crop_and_paste(face_id_images[index], roop_face_retinaface_masks[index], input_image, roop_face_retinaface_keypoints[index], retinaface_keypoints, roop_face_retinaface_boxs[index])
+                replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
+                
+                # Fusion of user reference images and input images as canny input
+                if roop_images[index] is not None and apply_face_fusion_before:
+                    input_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                    input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
 
-        # If it is a large template for cutting, paste the reconstructed image back
-        if crop_face_preprocess:
-            origin_image    = np.array(copy.deepcopy(template_image))
+                # Expand the template image in the x-axis direction to include the ears.
+                h, w, c             = np.shape(input_mask)
+                retinaface_box      = np.int32(retinaface_box)
+                face_width          = retinaface_box[2] - retinaface_box[0]
+                retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * 0.15, 0, w - 1)
+                retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * 0.15, 0, w - 1)
+                input_mask          = np.zeros_like(np.array(input_mask, np.uint8))
+                input_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+                input_mask          = Image.fromarray(np.uint8(input_mask))
+                
+                # First diffusion, facial reconstruction
+                _output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
 
-            x1,y1,x2,y2     = crop_safe_box
-            generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
-            origin_image[y1:y2,x1:x2] = np.array(generate_image) 
+                # Obtain the mask of the area around the face
+                input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
 
-            origin_image    = Image.fromarray(np.uint8(origin_image))
-        else:
-            origin_image    = generate_image
-        
-        try:
-            origin_image    = Image.fromarray(cv2.cvtColor(skin_retouching(origin_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        except:
-            logging.info("Skin Retouching error, but pass.")
+                # Second diffusion
+                if roop_images[index] is not None and apply_face_fusion_after:
+                    # Fusion of facial photos with user photos
+                    fusion_image = image_face_fusion(dict(template=_output_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                    fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
+                    _output_image = Image.fromarray(np.uint8((np.array(_output_image, np.float32) * (1 - after_face_fusion_ratio) + np.array(fusion_image, np.float32) * after_face_fusion_ratio)))
+
+                    generate_image = inpaint_only(_output_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=1.5)
+                else:
+                    generate_image = inpaint_only(_output_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=1.5)
+
+                # If it is a large template for cutting, paste the reconstructed image back
+                if crop_face_preprocess:
+                    origin_image    = np.array(copy.deepcopy(_template_image))
+
+                    x1,y1,x2,y2     = _crop_safe_box
+                    generate_image  = generate_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)
+                    origin_image[y1:y2,x1:x2] = np.array(generate_image) 
+
+                    origin_image    = Image.fromarray(np.uint8(origin_image))
+                else:
+                    origin_image    = generate_image
+                
+                retinaface_box = crop_safe_box[index]
+                output_image[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = np.array(origin_image, np.float32)[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]]
+            
+            output_image    = Image.fromarray(np.uint8(output_image))
+            short_side      = min(output_image.width, output_image.height)
+            resize          = float(short_side / 768.0)
+            new_size        = (int(output_image.width//resize), int(output_image.height//resize))
+            output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
+            origin_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20, denoising_strength=0.3, hr_scale=1)
 
         outputs.append(origin_image)
 

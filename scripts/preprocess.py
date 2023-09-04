@@ -114,9 +114,21 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         sub_image               = image.crop(retinaface_box)
         sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
 
+        # 对人脸的mask区域进行修正
+        sub_box, _, sub_mask = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
+        h, w, c     = np.shape(sub_mask)
+        face_width  = sub_box[2] - sub_box[0]
+        face_height = sub_box[3] - sub_box[1]
+        sub_box[0]  = np.clip(np.array(sub_box[0], np.int32) - face_width * 0.3, 1, w - 1)
+        sub_box[2]  = np.clip(np.array(sub_box[2], np.int32) + face_width * 0.3, 1, w - 1)
+        sub_box[1]  = np.clip(np.array(sub_box[1], np.int32) + face_height * 0.15, 1, h - 1)
+        sub_box[3]  = np.clip(np.array(sub_box[3], np.int32) + face_height * 0.15, 1, h - 1)
+        sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
+        sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
+
         # 显著性检测，合并人脸mask
         result      = salient_detect(sub_image)[OutputKeys.MASKS]
-        mask        = np.float32(np.expand_dims(result > 128, -1))
+        mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
         # 获得mask后的图像
         mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
         mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))

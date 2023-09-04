@@ -94,8 +94,10 @@ def easyphoto_train_forward(
     instance_images: list,
     *args
 ):  
-    if user_id == "":
-        return "User id不能为空。"
+    if user_id == "" or user_id is None:
+        return "User id cannot be set to empty。"
+    if user_id == "none" :
+        return "User id cannot be set to none"
     
     if os.path.exists(id_path):
         with open(id_path, "r") as f:

@@ -185,7 +185,7 @@ def on_ui_tabs():
                                     ids = [_id.strip() for _id in ids]
                                 else:
                                     ids = []
-                                return gr.update(choices=ids)
+                                return gr.update(choices=["none"] + ids)
 
                             if os.path.exists(id_path):
                                 with open(id_path, "r") as f:
@@ -193,14 +193,24 @@ def on_ui_tabs():
                                 ids = [_id.strip() for _id in ids]
                             else:
                                 ids = []
-                            uuid    = gr.Dropdown(value=ids[0] if len(ids) > 0 else "none", choices=ids, label="Used id (The User id you provide while training)", visible=True)
 
+                            uuids           = []
+                            num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
+                            for i in range(int(num_of_faceid)):
+                                if int(num_of_faceid) > 1:
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"Used{i} id", visible=True)
+                                else:
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="Used id (The User id you provide while training)", visible=True)
+
+                                uuids.append(uuid)
+                            
                             refresh = ToolButton(value="\U0001f504")
-                            refresh.click(
-                                fn=select_function,
-                                inputs=[],
-                                outputs=[uuid]
-                            )
+                            for i in range(int(num_of_faceid)):
+                                refresh.click(
+                                    fn=select_function,
+                                    inputs=[],
+                                    outputs=[uuids[i]]
+                                )
 
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
@@ -277,8 +287,9 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[uuid, selected_template_images, init_image, additional_prompt, 
-                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab],
+                    inputs=[selected_template_images, init_image, additional_prompt, \
+                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]
                 )
             
@@ -289,6 +300,8 @@ def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
         easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
+    shared.opts.add_option("num_of_faceid", shared.OptionInfo(
+        1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
     shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
         user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 
