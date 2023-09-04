@@ -11,7 +11,7 @@ import numpy as np
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
-from scripts.face_process_utils import call_face_crop, crop_and_paste
+from scripts.face_process_utils import call_face_crop, crop_and_paste, color_transfer
 from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE, easyphoto_img2img_samples
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
@@ -257,6 +257,9 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
         # Detect the box where the face of the template image is located and obtain its corresponding small mask
         retinaface_box, retinaface_keypoints, input_mask = call_face_crop(retinaface_detection, input_image, 1.1, "template")
         origin_input_mask = copy.deepcopy(input_mask)
+        
+        # here we get the original retinaface_box, we should use this Input box and face pixel to refine the output face pixel colors
+        template_image_original_face_area = np.array(copy.deepcopy(input_image))[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] 
 
         # Paste user images onto template images
         replaced_input_image = crop_and_paste(face_id_image, roop_face_retinaface_mask, input_image, roop_face_retinaface_keypoints, retinaface_keypoints, roop_face_retinaface_box)
@@ -282,6 +285,14 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
 
         # Obtain the mask of the area around the face
         input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+
+        # Before second diffusion, we trans the image's face color according to template_image_original_face_area
+        if 1 :
+            output_image_face_area = np.array(copy.deepcopy(output_image))[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] 
+            output_image_face_area = color_transfer(template_image_original_face_area, output_image_face_area)
+            output_image = np.array(output_image)
+            output_image[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2],:] = output_image_face_area
+            output_image = Image.fromarray(output_image)
 
         # Second diffusion
         if roop_image is not None and apply_face_fusion_after:
