@@ -206,7 +206,7 @@ def easyphoto_infer_forward(user_id, selected_template_images, init_image, addit
     skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
 
     # get prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + additional_prompt
+    input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
     if int(seed) == -1:
         seed = np.random.randint(0, 65536)
     
