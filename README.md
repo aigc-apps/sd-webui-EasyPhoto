@@ -80,7 +80,7 @@ In the field of AI portraits, we expect model-generated images to be realistic a
 
 ### 2.Training Detailed
 
-![overview](images/train_detail.png)
+![overview](images/train_detail.jpg)
 
 First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.   
 
