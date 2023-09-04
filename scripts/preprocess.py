@@ -44,6 +44,8 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection')
     # 人像美肤
     skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
+    # 
+    portrait_enhancement    = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
     
     # 获得jpg列表
     jpgs            = os.listdir(inputs_dir)
@@ -100,11 +102,15 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     indexes         = np.argsort(total_scores)[::-1][:15]
     
     selected_jpgs   = []
+    selected_scores = []
     for index in indexes:
         selected_jpgs.append(copy_jpgs[index])
+        selected_scores.append(ref_total_scores[index])
         print("jpg:", copy_jpgs[index], "face_id_scores", ref_total_scores[index])
                              
     images              = []
+    codeformer_num      = 0
+    max_codeformer_num  = len(selected_jpgs) // 2
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
         if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
             continue
@@ -113,6 +119,11 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         retinaface_box, _, _    = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
         sub_image               = image.crop(retinaface_box)
         sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+
+        # 根据质量得分、图像大小去判断哪些图片进行codeformer
+        if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and codeformer_num < max_codeformer_num:
+            sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            codeformer_num += 1
 
         # 对人脸的mask区域进行修正
         sub_box, _, sub_mask = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
