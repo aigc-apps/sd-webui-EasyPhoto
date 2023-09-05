@@ -198,7 +198,7 @@ def on_ui_tabs():
                             num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
                             for i in range(int(num_of_faceid)):
                                 if int(num_of_faceid) > 1:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"Used{i} id", visible=True)
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"Used_{i} id", visible=True)
                                 else:
                                     uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="Used id (The User id you provide while training)", visible=True)
 
@@ -259,6 +259,7 @@ def on_ui_tabs():
                                     label="Apply Face Fusion After",  
                                     value=True
                                 )
+                            with gr.Row():
                                 color_shift_middle = gr.Checkbox(
                                     label="Apply color shift first",  
                                     value=True
@@ -296,7 +297,7 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[uuid, selected_template_images, init_image, additional_prompt, 
+                    inputs=[selected_template_images, init_image, additional_prompt, 
                             after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]
@@ -309,8 +310,10 @@ def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
         easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
+
     shared.opts.add_option("num_of_faceid", shared.OptionInfo(
         1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
+        
     shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
         user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 

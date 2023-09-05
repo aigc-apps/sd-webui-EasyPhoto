@@ -20,34 +20,7 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_mask_pil     人脸分割结果
     '''
     h, w, c = np.shape(image)
-    if len(retinaface_result['boxes']) == 1:
-        # 获得retinaface的box并且做一手扩增
-        retinaface_box      = np.array(retinaface_result['boxes'][0])
-        face_width          = retinaface_box[2] - retinaface_box[0]
-        face_height         = retinaface_box[3] - retinaface_box[1]
-        retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
-        retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0, h - 1)
-        retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
-        retinaface_box[3]   = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0, h - 1)
-        retinaface_box      = np.array(retinaface_box, np.int32)
-
-        # 检测关键点
-        retinaface_keypoints = np.reshape(retinaface_result['keypoints'][0], [5, 2])
-        retinaface_keypoints = np.array(retinaface_keypoints, np.float32)
-
-        # mask部分
-        retinaface_crop     = image.crop(np.int32(retinaface_box))
-        retinaface_mask     = np.zeros_like(np.array(image, np.uint8))
-        if mask_type == "skin":
-            retinaface_sub_mask = face_seg(retinaface_crop)
-            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
-        else:
-            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
-        retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
-
-        return retinaface_box, retinaface_keypoints, retinaface_mask_pil
-    
-    elif len(retinaface_result['boxes']) > 1:
+    if len(retinaface_result['boxes']) != 0:
         retinaface_boxs = []
         retinaface_keypoints = []
         retinaface_mask_pils = []
@@ -79,11 +52,11 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
             retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
             retinaface_mask_pils.append(retinaface_mask_pil)
 
-        retinaface_boxs = np.array(retinaface_boxs)
-        argindex = np.argsort(retinaface_boxs[:, 0])
-        retinaface_boxs = retinaface_boxs[argindex]
-        retinaface_boxs = retinaface_boxs[argindex]
-        retinaface_boxs = retinaface_boxs[argindex]
+        retinaface_boxs         = np.array(retinaface_boxs)
+        argindex                = np.argsort(retinaface_boxs[:, 0])
+        retinaface_boxs         = [retinaface_boxs[index] for index in argindex]
+        retinaface_keypoints    = [retinaface_keypoints[index] for index in argindex]
+        retinaface_mask_pils    = [retinaface_mask_pils[index] for index in argindex]
         return retinaface_boxs, retinaface_keypoints, retinaface_mask_pils
         
     else:
@@ -127,10 +100,9 @@ def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Po
     return output
 
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
-    # retinaface检测部分
-    # 检测人脸框
+    # retinaface detect 
     retinaface_result                                           = retinaface_detection(image) 
-    # 获取mask与关键点
+    # get mask and keypoints
     retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil

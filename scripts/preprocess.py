@@ -13,41 +13,46 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
 from scripts.face_process_utils import call_face_crop
+from scripts.easyphoto_utils import logging
 from tqdm import tqdm
 from shutil import copyfile
 
 
 def compare_jpg_with_face_id(embedding_list):
     embedding_array = np.vstack(embedding_list)
-    # 然后对真人图片取mean，获取真人图片的平均特征
+    # Take mean from the user image to obtain the average features of the real person image
     pivot_feature   = np.mean(embedding_array, axis=0)
     pivot_feature   = np.reshape(pivot_feature, [512, 1])
 
-    # 计算一个文件夹中，和中位值最接近的图片排序
+    # Sort the images in a folder that are closest to the median value
     scores = [np.dot(emb, pivot_feature)[0][0] for emb in embedding_list]
     return scores
 
-def l2_norm(x):
-    return np.sqrt(np.sum(np.square(x)))
-
 def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
-    # embedding
+    # face embedding
     providers           = ["CPUExecutionProvider"]
     face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"), providers=providers)
     face_recognition.prepare(ctx_id=0)
     
     face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", root=os.path.abspath(os.path.dirname(__file__)).replace("scripts", ""), providers=providers)
     face_analyser.prepare(ctx_id=0, det_size=(640, 640))
-    # 人脸检测
+
+    # face detection
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
-    # 显著性检测
+    # semantic segmentation
     salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection')
-    # 人像美肤
-    skin_retouching         = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.1')
-    # 
-    portrait_enhancement    = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
+    # skin retouching
+    try:
+        skin_retouching = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
+    except:
+        logging.info("Skin Retouching model load error, but pass.")
+    # portrait enhancement
+    try:
+        portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
+    except:
+        logging.info("Portrait Enhancement model load error, but pass.")
     
-    # 获得jpg列表
+    # jpg list
     jpgs            = os.listdir(inputs_dir)
     # ---------------------------人脸得分计算-------------------------- #
     face_id_scores  = []
@@ -55,29 +60,35 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     copy_jpgs       = []
     selected_paths  = []
     for index, jpg in enumerate(tqdm(jpgs)):
-        try:
+        # try:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
                 continue
             _image_path = os.path.join(inputs_dir, jpg)
             image       = Image.open(_image_path)
             h, w, c     = np.shape(image)
 
-            retinaface_box, retinaface_keypoint, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+            retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+            retinaface_box      = retinaface_boxes[0]
+            retinaface_keypoint = retinaface_keypoints[0]
+
+            # get key point
             retinaface_keypoint = np.reshape(retinaface_keypoint, [5, 2])
-            # 计算人脸偏移角度
+            # get angle
             x = retinaface_keypoint[0,0] - retinaface_keypoint[1,0]
             y = retinaface_keypoint[0,1] - retinaface_keypoint[1,1]
             angle = 0 if x==0 else abs(math.atan(y/x)*180/math.pi)
             angle = (90 - angle)/ 90 
 
-            # 人脸宽度判断
+            # width judge
             face_width  = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
             face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
             if face_width / w < 1/8 or face_height / h < 1/8:
                 continue
 
+            # face crop
             sub_image = image.crop(retinaface_box)
 
+            # get embedding
             embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
             embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
 
@@ -86,10 +97,10 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             copy_jpgs.append(jpg)
             selected_paths.append(_image_path)
-        except:
-            pass
+        # except:
+        #     pass
 
-    # 根据得分进行参考人脸的筛选，考虑质量分，相似分与角度分
+    # Filter reference faces based on scores, considering quality scores, similarity scores, and angle scores
     face_id_scores      = compare_jpg_with_face_id(face_id_scores)
     ref_total_scores    = np.array(face_angles) * np.array(face_id_scores)
     ref_indexes         = np.argsort(ref_total_scores)[::-1]
@@ -97,7 +108,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         print("selected paths:", selected_paths[index], "total scores: ", ref_total_scores[index], "face angles", face_angles[index])
     copyfile(selected_paths[ref_indexes[0]], ref_image_path)
              
-    # 根据得分进行训练人脸的筛选，考虑相似分
+    # Select faces based on scores, considering similarity scores
     total_scores    = np.array(face_id_scores)
     indexes         = np.argsort(total_scores)[::-1][:15]
     
@@ -109,24 +120,29 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         print("jpg:", copy_jpgs[index], "face_id_scores", ref_total_scores[index])
                              
     images              = []
-    codeformer_num      = 0
-    max_codeformer_num  = len(selected_jpgs) // 2
+    enhancement_num      = 0
+    max_enhancement_num  = len(selected_jpgs) // 2
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
         if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
             continue
         _image_path             = os.path.join(inputs_dir, jpg)
         image                   = Image.open(_image_path)
-        retinaface_box, _, _    = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+        retinaface_boxes, _, _  = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+        retinaface_box          = retinaface_boxes[0]
+        # crop image
         sub_image               = image.crop(retinaface_box)
         sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
 
-        # 根据质量得分、图像大小去判断哪些图片进行codeformer
-        if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and codeformer_num < max_codeformer_num:
+        # Determine which images to enhance based on quality score and image size
+        if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
             sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-            codeformer_num += 1
+            enhancement_num += 1
 
-        # 对人脸的mask区域进行修正
-        sub_box, _, sub_mask = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
+        # Correct the mask area of the face
+        sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
+        sub_box     = sub_boxes[0]
+        sub_mask    = sub_masks[0]
+
         h, w, c     = np.shape(sub_mask)
         face_width  = sub_box[2] - sub_box[0]
         face_height = sub_box[3] - sub_box[1]
@@ -137,16 +153,17 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
         sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
 
-        # 显著性检测，合并人脸mask
+        # Significance detection, merging facial masks
         result      = salient_detect(sub_image)[OutputKeys.MASKS]
         mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
-        # 获得mask后的图像
+
+        # Obtain the image after the mask
         mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
         mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
         if np.sum(np.array(mask)) != 0:
             images.append(mask_sub_image)
 
-    # 写入结果
+    # write resuilt
     for index, base64_pilimage in enumerate(images):
         image = base64_pilimage.convert("RGB")
         image.save(os.path.join(images_save_path, str(index) + ".jpg"))
