@@ -151,7 +151,7 @@ def on_ui_tabs():
                 with gr.Box():
                     gr.Markdown(
                         '''
-                        We need to train first to predict, please wait for the training to complete, thank you for your patience.
+                        We need to train first to predict, please wait for the training to complete, thank you for your patience.  
                         '''
                     )
                     output_message = gr.Markdown()
