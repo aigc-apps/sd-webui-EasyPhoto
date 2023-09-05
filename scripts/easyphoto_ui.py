@@ -6,7 +6,7 @@ import requests
 
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_config import easyphoto_outpath_samples, id_path, user_id_outpath_samples
-from scripts.easyphoto_train import easyphoto_train_forward
+from scripts.easyphoto_train import easyphoto_train_forward, DEFAULT_CACHE_LOG_FILE
 from modules import script_callbacks, shared
 from modules.paths import models_path
 
@@ -36,6 +36,19 @@ class ToolButton(gr.Button, gr.components.FormComponent):
 def upload_file(files, current_files):
     file_paths = [file_d['name'] for file_d in current_files] + [file.name for file in files]
     return file_paths
+
+def refresh_display():
+    cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
+    if os.path.exists(cache_log_file_path):
+        lines = open(cache_log_file_path).readlines()
+        if len(lines) > 3:
+            original_display_text = '  '.join(lines[-3:])
+        else:
+            original_display_text = 'Training start already, wait a minute!  ' + '  '.join(lines)
+    else:
+        original_display_text='No Lora is training now, should go to infer or retrain!'
+    return original_display_text 
+
 
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
@@ -129,8 +142,11 @@ def on_ui_tabs():
                             '''
                         )
 
-                with gr.Column():
-                    run_button = gr.Button('Start Training')
+                with gr.Row():
+                    with gr.Column(width=3):
+                        run_button = gr.Button('Start Training')
+                    with gr.Column(width=1):
+                        refresh_button = gr.Button('Refresh Log when reconnect to SDWebUI')
 
                 with gr.Box():
                     gr.Markdown(
@@ -139,7 +155,13 @@ def on_ui_tabs():
                         '''
                     )
                     output_message = gr.Markdown()
-            
+
+                refresh_button.click(
+                    fn = refresh_display,
+                    inputs = [],
+                    outputs = [output_message]
+                )
+
                 run_button.click(fn=easyphoto_train_forward,
                                 _js="ask_for_style_name",
                                 inputs=[

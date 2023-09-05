@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import random
+import time
 import shutil
 from glob import glob
 from pathlib import Path
@@ -756,6 +757,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--cache_log_file",
+        type=str,
+        default='train_kohya_log.txt',
+        help=(
+            "The output log file path"
+        ),
+    )
+    parser.add_argument(
         "--faceid_post_url",
         type=str,
         default=None,
@@ -1168,9 +1177,20 @@ def main():
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
         unwrapped_nw.save_weights(ckpt_file, weight_dtype, None)
 
+    user_id = args.output_dir.split('/')[-2]
+    # check log path
+    if accelerator.is_main_process:
+        os.system(f'rm {args.cache_log_file}')
+        output_log = open(args.cache_log_file, 'w')
+
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         train_loss = 0.0
+        if epoch % 10 == 0:
+            log_line = f"{str(time.asctime(time.localtime(time.time())))} training Lora of {user_id} at step {epoch} / {args.num_train_epochs}\n"
+            if accelerator.is_main_process:
+                output_log.write(log_line)
+                output_log.flush()
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
             if args.resume_from_checkpoint and epoch == first_epoch and step < resume_step:
@@ -1386,6 +1406,8 @@ def main():
                 copyfile(result, os.path.join(best_outputs_dir, os.path.basename(result)))
             copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
 
+        # we will remove cache_log_file after train
+        os.system(f'rm {args.cache_log_file}')
 
     accelerator.end_training()
 
