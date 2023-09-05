@@ -154,8 +154,8 @@ def easyphoto_train_forward(
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
         command = [
-            f'{python_executable_path} -m accelerate', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}', 
+            f'{os.path.join(os.path.dirname(python_executable_path), "accelerate")}', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
             f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
             f'--train_data_dir={os.path.relpath(user_path, pwd)}',
             '--caption_column=text', 
