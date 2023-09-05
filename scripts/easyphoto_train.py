@@ -7,6 +7,7 @@ from shutil import copyfile
 
 import time
 import requests
+import sys
 from PIL import Image
 from glob import glob
 from tqdm import tqdm
@@ -17,6 +18,7 @@ from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
+python_executable_path = sys.executable
 
 def urldownload_progressbar(url, filepath):
     start = time.time() 
@@ -152,8 +154,8 @@ def easyphoto_train_forward(
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
         command = [
-            'accelerate', 'launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}', 
+            f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
             f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
             f'--train_data_dir={os.path.relpath(user_path, pwd)}',
             '--caption_column=text', 
