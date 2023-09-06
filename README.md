@@ -27,7 +27,8 @@ Our ui interface is as follows:
 
 # Quick Start
 ### 1. Environment Check
-We have verified EasyPhoto execution on the following environment:   
+We have verified EasyPhoto execution on the following environment:  
+If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us,Thanks
 
 The detailed of Windows 10:  
 - OS: Windows10
