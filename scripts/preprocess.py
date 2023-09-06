@@ -60,7 +60,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     copy_jpgs       = []
     selected_paths  = []
     for index, jpg in enumerate(tqdm(jpgs)):
-        # try:
+        try:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
                 continue
             _image_path = os.path.join(inputs_dir, jpg)
@@ -97,8 +97,8 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             copy_jpgs.append(jpg)
             selected_paths.append(_image_path)
-        # except:
-        #     pass
+        except:
+            pass
 
     # Filter reference faces based on scores, considering quality scores, similarity scores, and angle scores
     face_id_scores      = compare_jpg_with_face_id(face_id_scores)
