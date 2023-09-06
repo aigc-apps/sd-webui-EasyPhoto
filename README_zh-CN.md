@@ -4,11 +4,14 @@
 
 [English](./README.md) | 简体中文
 
-EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。建议使用 5 到 20 张肖像图片进行训练，最好是半身照片且不要佩戴眼镜（少量可以接受）。训练完成后，我们可以在推理部分生成图像。我们支持使用预设模板图片与上传自己的图片进行推理。
+EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。建议使用 5 到 20 张肖像图片进行训练，最好是半身照片且不要佩戴眼镜（少量可以接受）。训练完成后，我们可以在推理部分生成图像。我们支持使用预设模板图片与上传自己的图片进行推理。  
+
+**新功能！！** 🔥🔥 我们目前支持多人生成。  
 
 这些是我们的生成结果:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
+![results_3](images/results_3.jpg)
 
 我们的ui界面如下:  
 **训练部分:**
@@ -17,13 +20,13 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 ![infer_ui](images/infer_ui.jpg)
 
 # 新功能
+- **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
 - 创建代码！现在支持 Windows 和 Linux。[🔥 2023.09.02]
 
 # TODO List
 - 支持中文界面。
 - 支持模板背景部分变化。
 - 支持高分辨率。
-- 支持多人模板。
 
 # 快速启动
 ### 1. 环境检查
@@ -68,6 +71,55 @@ Linux 的详细信息：
 今后，我们将支持从 **Available** 安装 EasyPhoto。
 
 ![install](images/install.jpg)
+
+# 如何使用
+### 1.模型训练
+EasyPhoto培训界面如下：
+- 左边是训练图像。只需点击上传照片即可上传图片，点击清除照片即可删除上传的图片；
+- 右边是训练参数，不能为第一次训练进行调整。
+
+点击上传照片后，我们可以开始上传图像**这里最好上传5到15张图像，包括不同的角度和光照**。最好有一些不包括眼镜的图像。如果所有图片都包含眼镜眼镜，则生成的结果可以容易地生成眼镜。
+![train_1](images/train_1.jpg)
+
+然后我们点击下面的“开始培训”，此时，我们需要填写上面的用户ID，例如用户名，才能开始培训。
+![train_2](images/train_2.jpg)
+
+模型开始训练后，webui会自动刷新训练日志。如果没有刷新，请单击“Refresh Log”按钮。
+![train_3](images/train_3.jpg)
+
+如果要设置参数，每个参数的解析如下：
+| 参数名 | 含义 |
+|--|--|
+| resolution  | 训练时喂入网络的图片大小，默认值为512 |
+| validation & save steps| 验证图片与保存中间权重的steps数，默认值为100，代表每100步验证一次图片并保存权重 |
+| max train steps | 最大训练步数，默认值为800 |
+| max steps per photos | 每张图片的最大训练次数，默认为200 |
+| train batch size | 训练的批次大小，默认值为1 |
+| gradient accumulationsteps | 是否进行梯度累计，默认值为4，结合train batch size来看，每个Step相当于喂入四张图片 |
+| dataloader num workers | 数据加载的works数量，windows下不生效，因为设置了会报错，Linux正常设置 |
+| learning rate  | 训练Lora的学习率，默认为1e-4 |
+| rank Lora | 权重的特征长度，默认为128 |
+| network alpha | Lora训练的正则化参数，一般为rank的二分之一，默认为64 |
+
+### 2.人物生成
+#### a.单人模版
+- 步骤1：点击刷新按钮，查询训练后的用户ID对应的模型。
+- 步骤2：选择用户ID。
+- 步骤3：选择需要生成的模板。
+- 步骤4：单击“生成”按钮生成结果。
+
+![single_people](images/single_people.jpg)
+
+#### b.多人模板
+- 步骤1：转到EasyPhoto的设置页面，设置num_of_Faceid大于1。
+- 步骤2：应用设置。
+- 步骤3：重新启动webui的ui界面。
+- 步骤4：返回EasyPhoto并上传多人模板。
+- 步骤5：选择两个人的用户ID。
+- 步骤6：单击“生成”按钮。执行图像生成。
+
+![single_people](images/multi_people_1.jpg)
+![single_people](images/multi_people_2.jpg)
 
 # 算法详细信息
 

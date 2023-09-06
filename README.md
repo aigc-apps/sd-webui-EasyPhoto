@@ -4,11 +4,15 @@
 
 English | [简体中文](./README_zh-CN.md)
 
-EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.
+EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.  
+
+**New features!!** 🔥🔥 We currently support multiple people generation.
 
 These are our generated results:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
+![results_3](images/results_3.jpg)
+
 
 Our ui interface is as follows:  
 **train part:**
@@ -17,18 +21,18 @@ Our ui interface is as follows:
 ![infer_ui](images/infer_ui.jpg)
 
 # What's New
+- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
 - Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
 
 # TODO List
 - Support chinese ui.
 - Support change in template's background.
 - Support high resolution.
-- Support multi-person templates.
 
 # Quick Start
 ### 1. Environment Check
 We have verified EasyPhoto execution on the following environment:  
-If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us,Thanks
+If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
 
 The detailed of Windows 10:  
 - OS: Windows10
@@ -69,6 +73,56 @@ We will support installing EasyPhoto from **Available** in the future.
 
 ![install](images/install.jpg)
 
+# How to use
+### 1. Model Training
+The EasyPhoto training interface is as follows:
+
+- On the left is the training image. Simply click Upload Photos to upload the image, and click Clear Photos to delete the uploaded image;
+- On the right are the training parameters, which cannot be adjusted for the first training.
+
+After clicking Upload Photos, we can start uploading images. **It is best to upload 5 to 15 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
+![train_1](images/train_1.jpg)
+
+Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
+![train_2](images/train_2.jpg)
+
+After the model starts training, the webui will automatically refresh the training log. If there is no refresh, click Refresh Log button.
+![train_3](images/train_3.jpg)
+
+If you want to set parameters, the parsing of each parameter is as follows:
+
+|Parameter Name | Meaning|
+|--|--|
+|Resolution | The size of the image fed into the network during training, with a default value of 512|
+|Validation & save steps | The number of steps between validating the image and saving intermediate weights, with a default value of 100, representing verifying the image every 100 steps and saving the weights|
+|Max train steps | Maximum number of training steps, default value is 800|
+|Max steps per photos | The maximum number of training sessions per image, default to 200|
+|Train batch size | The batch size of the training, with a default value of 1|
+|Gradient accumulation steps | Whether to perform gradient accumulation. The default value is 4. Combined with the train batch size, each step is equivalent to feeding four images|
+|Dataloader num workers | The number of jobs loaded with data, which does not take effect under Windows because an error will be reported if set, but is set normally on Linux|
+|Learning rate | Train Lora's learning rate, default to 1e-4|
+|Rank Lora | The feature length of the weight, default to 128|
+|Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to 64|
+
+### 2. Inference 
+#### a. single people
+- Step 1: Click the refresh button to query the model corresponding to the trained user ID.
+- Step 2: Select the user ID.
+- Step 3: Select the template that needs to be generated.
+- Step 4: Click the Generate button to generate the results.
+
+![single_people](images/single_people.jpg)
+
+#### b. multi people
+- Step 1: Go to the settings page of EasyPhoto and set num_of_faceid is greater than 1.
+- Step 2: Apply settings.
+- Step 3: Restart the ui interface of the webui.
+- Step 4: Return to EasyPhoto and upload the two person template.
+- Step 5: Select the user IDs of two people.
+- Step 6: Click the Generate button. Perform image generation.
+
+![single_people](images/multi_people_1.jpg)
+![single_people](images/multi_people_2.jpg)
 # Algorithm Detailed
 
 ### 1.Architectural Overview
@@ -76,8 +130,6 @@ We will support installing EasyPhoto from **Available** in the future.
 ![overview](images/overview.jpg)
 
 In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference. 
-
-
 
 ### 2.Training Detailed
 
