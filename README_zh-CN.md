@@ -62,11 +62,11 @@ Linux 的详细信息：
 我们所需的权重会在第一次开始训练时自动下载。
 
 ### 3. 插件安装
-现在我们支持从 git 安装 EasyPhoto。我们的仓库网址是 https://github.com/aigc-apps/EasyPhoto-sd-webui。
+现在我们支持从 git 安装 EasyPhoto。我们的仓库网址是 https://github.com/aigc-apps/sd-webui-EasyPhoto。
 
 今后，我们将支持从 **Available** 安装 EasyPhoto。
 
-![install](images/install.png)
+![install](images/install.jpg)
 
 # 算法详细信息
 
