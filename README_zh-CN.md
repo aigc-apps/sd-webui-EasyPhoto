@@ -107,3 +107,7 @@ Linux 的详细信息：
 
 # 许可证
 本项目采用 [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
+
+## 联系我们
+使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
+![join](images/erweima.jpg)
