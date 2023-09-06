@@ -62,11 +62,11 @@ We are mutually compatible with the existing stable-diffusion-webui environment,
 The weights we need will be downloaded automatically when you start training first time.
 
 ### 3. Plug-in Installation
-Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/EasyPhoto-sd-webui.
+Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
 
 We will support installing EasyPhoto from **Available** in the future.
 
-![install](images/install.png)
+![install](images/install.jpg)
 
 # Algorithm Detailed
 
