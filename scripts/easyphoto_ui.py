@@ -6,9 +6,10 @@ import requests
 
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_config import easyphoto_outpath_samples, id_path, user_id_outpath_samples
-from scripts.easyphoto_train import easyphoto_train_forward
+from scripts.easyphoto_train import easyphoto_train_forward, DEFAULT_CACHE_LOG_FILE
 from modules import script_callbacks, shared
 from modules.paths import models_path
+import time
 
 gradio_compat = True
 
@@ -36,6 +37,29 @@ class ToolButton(gr.Button, gr.components.FormComponent):
 def upload_file(files, current_files):
     file_paths = [file_d['name'] for file_d in current_files] + [file.name for file in files]
     return file_paths
+
+def refresh_display():
+    cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
+    lines_limit = 3
+    try:
+        with open(cache_log_file_path, "r", newline="") as f:
+            lines = []
+            for s in f.readlines():
+                line = s.replace("\x00", "")
+                if line.strip() == "" or line.strip() == "\r":
+                    continue
+                lines.append(line)
+
+            total_lines = len(lines)
+            if total_lines <= lines_limit:
+                chatbot = [(None, ''.join(lines))]
+            else:
+                chatbot = [(None, ''.join(lines[total_lines-lines_limit:]))]
+            return chatbot
+    except Exception:
+        with open(cache_log_file_path, "w") as f:
+            pass
+        return None
 
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
@@ -129,17 +153,31 @@ def on_ui_tabs():
                             '''
                         )
 
-                with gr.Column():
-                    run_button = gr.Button('Start Training')
+                with gr.Row():
+                    with gr.Column(width=3):
+                        run_button = gr.Button('Start Training')
+                    with gr.Column(width=1):
+                        refresh_button = gr.Button('Refresh Log')
+
+                gr.Markdown(
+                    '''
+                    We need to train first to predict, please wait for the training to complete, thank you for your patience.  
+                    '''
+                )
+                output_message  = gr.Markdown()
 
                 with gr.Box():
-                    gr.Markdown(
-                        '''
-                        We need to train first to predict, please wait for the training to complete, thank you for your patience.
-                        '''
+                    logs_out        = gr.Chatbot(label='Training Logs', height=700)
+                    block           = gr.Blocks()
+                    with block:
+                        block.load(refresh_display, None, logs_out, every=1)
+
+                    refresh_button.click(
+                        fn = refresh_display,
+                        inputs = [],
+                        outputs = [logs_out]
                     )
-                    output_message = gr.Markdown()
-            
+
                 run_button.click(fn=easyphoto_train_forward,
                                 _js="ask_for_style_name",
                                 inputs=[
@@ -148,7 +186,7 @@ def on_ui_tabs():
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, instance_images,
                                 ],
                                 outputs=[output_message])
-
+                                
         with gr.TabItem('Inference'):
             dummy_component = gr.Label(visible=False)
             training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
