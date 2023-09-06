@@ -18,7 +18,7 @@ from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
-DEFAULT_CACHE_LOG_FILE="train_kohya_log.txt"
+DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
 
 def urldownload_progressbar(url, filepath):

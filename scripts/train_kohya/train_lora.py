@@ -1180,17 +1180,11 @@ def main():
     user_id = args.output_dir.split('/')[-2]
     # check log path
     if accelerator.is_main_process:
-        os.system(f'rm {args.cache_log_file}')
         output_log = open(args.cache_log_file, 'w')
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         train_loss = 0.0
-        if epoch % 10 == 0:
-            log_line = f"{str(time.asctime(time.localtime(time.time())))} training Lora of {user_id} at step {epoch} / {args.num_train_epochs}\n"
-            if accelerator.is_main_process:
-                output_log.write(log_line)
-                output_log.flush()
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
             if args.resume_from_checkpoint and epoch == first_epoch and step < resume_step:
@@ -1270,6 +1264,12 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
+                if global_step % 10 == 0:
+                    log_line = f"{str(time.asctime(time.localtime(time.time())))} training lora of {user_id} at step {global_step} / {args.max_train_steps}\n"
+                    if accelerator.is_main_process:
+                        output_log.write(log_line)
+                        output_log.flush()
+
                 progress_bar.update(1)
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
@@ -1407,7 +1407,7 @@ def main():
             copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
 
         # we will remove cache_log_file after train
-        os.system(f'rm {args.cache_log_file}')
+        f = open(args.cache_log_file, 'w')
 
     accelerator.end_training()
 
