@@ -131,12 +131,18 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         retinaface_box          = retinaface_boxes[0]
         # crop image
         sub_image               = image.crop(retinaface_box)
-        sub_image               = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+        try:
+            sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+        except:
+            logging.info("Skin Retouching model detect error, but pass.")
 
-        # Determine which images to enhance based on quality score and image size
-        if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
-            sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-            enhancement_num += 1
+        try:
+            # Determine which images to enhance based on quality score and image size
+            if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
+                sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                enhancement_num += 1
+        except:
+            logging.info("Portrait Enhancement model detect error, but pass.")
 
         # Correct the mask area of the face
         sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")

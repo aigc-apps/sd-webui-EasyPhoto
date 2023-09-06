@@ -16,9 +16,11 @@ from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_
 from scripts.easyphoto_utils import check_files_exists_and_download
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.swapper import UpscaleOptions, swap_face
+from scripts.face_process_utils import Face_Skin
 
 from modules.images import save_image
 from modules.shared import opts, state
+from modules import script_callbacks, shared
 
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
@@ -194,26 +196,43 @@ def inpaint_only(
     )
     return image
 
+retinaface_detection = None
+image_face_fusion = None
+skin_retouching = None
+portrait_enhancement = None
+face_skin = None
+
 def easyphoto_infer_forward(
     selected_template_images, init_image, additional_prompt, \
-    after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+    before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, tabs, *user_ids
 ): 
     # download weights
     check_files_exists_and_download()
+    # global
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin
     
     # create modelscope model
-    retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
-    image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
-    try:
-        skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
-    except:
-        logging.info("Skin Retouching model load error, but pass.")
-    try:
-        portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
-    except:
-        logging.info("Portrait Enhancement model load error, but pass.")
-    
+    if retinaface_detection is None:
+        retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
+    if image_face_fusion is None:
+        image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
+    if skin_retouching is None:
+        try:
+            skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
+        except:
+            logging.info("Skin Retouching model load error, but pass.")
+    if portrait_enhancement is None:
+        try:
+            portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
+        except:
+            logging.info("Portrait Enhancement model load error, but pass.")
+    if face_skin is None:
+        try:
+            face_skin = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"), [12, 13])
+        except:
+            logging.info("Face Skin model load error, but pass.")
+
     # get random seed 
     if int(seed) == -1:
         seed = np.random.randint(0, 65536)
@@ -340,8 +359,11 @@ def easyphoto_infer_forward(
             
             # Fusion of user reference images and input images as canny input
             if roop_images[index] is not None and apply_face_fusion_before:
-                input_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
-                input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
+                # input_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]# swap_face(target_img=input_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                # input_image = Image.fromarray(np.uint8(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)))
+                fusion_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG] # swap_face(target_img=output_image, source_img=roop_image, model="inswapper_128.onnx", upscale_options=UpscaleOptions())
+                fusion_image = Image.fromarray(cv2.cvtColor(fusion_image, cv2.COLOR_BGR2RGB))
+                input_image = Image.fromarray(np.uint8((np.array(input_image, np.float32) * (1 - before_face_fusion_ratio) + np.array(fusion_image, np.float32) * before_face_fusion_ratio)))
 
             # Expand the template image in the x-axis direction to include the ears.
             h, w, c     = np.shape(input_mask)
@@ -387,6 +409,9 @@ def easyphoto_infer_forward(
             else:
                 fusion_image = None
                 input_image = first_diffusion_output_image
+
+            mouth_mask          = face_skin(input_image, retinaface_detection)
+            input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask) + np.float32(mouth_mask), 0, 255)))
             second_diffusion_output_image = inpaint_only(input_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale)
 
             # use original template face area to shift generated face color at last
@@ -438,5 +463,13 @@ def easyphoto_infer_forward(
 
         outputs.append(output_image)
         save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+
+    if not shared.opts.data.get("easyphoto_cache_model", True):
+        retinaface_detection = None
+        image_face_fusion = None
+        skin_retouching = None
+        portrait_enhancement = None
+        face_skin = None
+        torch.cuda.empty_cache()
 
     return "Success", outputs

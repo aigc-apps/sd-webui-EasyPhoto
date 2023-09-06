@@ -223,10 +223,15 @@ def on_ui_tabs():
                                 label="Seed", 
                                 value=12345,
                             )
-                            after_face_fusion_ratio = gr.Slider(
-                                minimum=0.2, maximum=0.8, value=0.50,
-                                step=0.05, label='After Face Fusion Ratio'
-                            )
+                            with gr.Row():
+                                before_face_fusion_ratio = gr.Slider(
+                                    minimum=0.2, maximum=0.8, value=0.50,
+                                    step=0.05, label='Face Fusion Ratio Before'
+                                )
+                                after_face_fusion_ratio = gr.Slider(
+                                    minimum=0.2, maximum=0.8, value=0.50,
+                                    step=0.05, label='Face Fusion Ratio After'
+                                )
 
                             with gr.Row():
                                 first_diffusion_steps = gr.Slider(
@@ -273,10 +278,11 @@ def on_ui_tabs():
                                 gr.Markdown(
                                     '''
                                     Parameter parsing:
-                                    1. **After Face Fusion Ratio** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
-                                    2. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
-                                    3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
-                                    4. **Apply Face Fusion After** represents whether to perform the second facial fusion.  
+                                    1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
+                                    2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
+                                    3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
+                                    4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
+                                    5. **Apply Face Fusion After** represents whether to perform the second facial fusion.  
                                     '''
                                 )
                             
@@ -298,7 +304,7 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[selected_template_images, init_image, additional_prompt, 
-                            after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+                            before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]
                 )
@@ -308,12 +314,15 @@ def on_ui_tabs():
 # 注册设置页的配置项
 def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
+    shared.opts.add_option("num_of_faceid", shared.OptionInfo(
+        1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
+
+    shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
+        True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
+        
     shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
         easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
 
-    shared.opts.add_option("num_of_faceid", shared.OptionInfo(
-        1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
-        
     shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
         user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 
