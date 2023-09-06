@@ -18,6 +18,7 @@ from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
+DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
 
 def urldownload_progressbar(url, filepath):
@@ -149,7 +150,11 @@ def easyphoto_train_forward(
         return "未能获得预处理后的metadata.jsonl，请检查训练过程。"
 
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
-    print(train_kohya_path)
+    print("train_file_path : ", train_kohya_path)
+    
+    # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
+    cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
+    print("cache_log_file_path   : ", cache_log_file_path)
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
@@ -182,7 +187,8 @@ def easyphoto_train_forward(
             f'--template_dir={os.path.relpath(training_templates_path, pwd)}', 
             '--template_mask', 
             '--merge_best_lora_based_face_id', 
-            f'--merge_best_lora_name={user_id}', 
+            f'--merge_best_lora_name={user_id}',
+            f'--cache_log_file={cache_log_file_path}'
         ]
         try:
             subprocess.run(command, check=True)
@@ -210,7 +216,8 @@ def easyphoto_train_forward(
             --template_dir="{training_templates_path}" \
             --template_mask \
             --merge_best_lora_based_face_id \
-            --merge_best_lora_name="{user_id}"
+            --merge_best_lora_name="{user_id}" \
+            --cache_log_file="{cache_log_file_path}"
             '''
         )
     
