@@ -207,7 +207,7 @@ def easyphoto_infer_forward(
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, tabs, *user_ids
 ): 
-    # download weights
+    # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin
@@ -261,10 +261,14 @@ def easyphoto_infer_forward(
     face_id_retinaface_keypoints    = []
     face_id_retinaface_masks        = []
     input_prompt_without_lora       = f"{validation_prompt}" + additional_prompt
-    
+    best_lora_weights= str(0.9)
+    multi_user_facecrop_ratio = 1.5
+    multi_user_safecrop_ratio = 1.1
+
+
     for user_id in user_ids:
         # get prompt
-        input_prompt            = f"{validation_prompt}, <lora:{user_id}:0.9>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+        input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
         
         # get best image after training
         best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -279,7 +283,7 @@ def easyphoto_infer_forward(
         roop_image              = Image.open(roop_image_path).convert("RGB")
 
         # Crop user images to obtain portrait boxes, facial keypoints, and masks
-        _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(retinaface_detection, face_id_image, 1.5, "roop")
+        _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(retinaface_detection, face_id_image, multi_user_facecrop_ratio, "roop")
         _face_id_retinaface_box      = _face_id_retinaface_boxes[0]
         _face_id_retinaface_keypoint = _face_id_retinaface_keypoints[0]
         _face_id_retinaface_mask     = _face_id_retinaface_masks[0]
@@ -299,7 +303,7 @@ def easyphoto_infer_forward(
         else:
             template_image = Image.fromarray(template_image).convert("RGB")
 
-        template_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, template_image, 1.10, "crop")
+        template_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, template_image, multi_user_safecrop_ratio, "crop")
         if len(template_face_safe_boxes) == 0:
             return "Please upload a template with face.", []
 
@@ -316,7 +320,7 @@ def easyphoto_infer_forward(
         for index in range(min(len(template_face_safe_boxes), len(user_ids))):
             loop_template_image = copy.deepcopy(template_image)
             
-            # mask other people in this term
+            # mask other people face use 255 in this term, to transfer multi user to single user situation
             if min(len(template_face_safe_boxes), len(user_ids)) > 1:
                 loop_template_image = np.array(loop_template_image)
                 for sub_index in range(len(template_face_safe_boxes)):
@@ -410,8 +414,14 @@ def easyphoto_infer_forward(
                 fusion_image = None
                 input_image = first_diffusion_output_image
 
-            mouth_mask          = face_skin(input_image, retinaface_detection)
-            input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask) + np.float32(mouth_mask), 0, 255)))
+            # Add mouth_mask to avoid some fault lips, close if you dont need
+            need_mouth_fix = True
+            if need_mouth_fix:
+                mouth_mask          = face_skin(input_image, retinaface_detection)
+                input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask) + np.float32(mouth_mask), 0, 255)))
+            else:
+                input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask))))
+            
             second_diffusion_output_image = inpaint_only(input_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale)
 
             # use original template face area to shift generated face color at last

@@ -39,7 +39,7 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_keypoints = []
         retinaface_mask_pils = []
         for index in range(len(retinaface_result['boxes'])):
-            # 获得retinaface的box并且做一手扩增
+            # 获得retinaface的box并做扩充
             retinaface_box      = np.array(retinaface_result['boxes'][index])
             face_width          = retinaface_box[2] - retinaface_box[0]
             face_height         = retinaface_box[3] - retinaface_box[1]
@@ -81,37 +81,45 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
             
         return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
-def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Point, Target_Five_Point, Source_box):
-    '''
-    Inputs:
-        Source_image            原图像；
-        Source_image_mask       原图像人脸的mask比例；
-        Target_image            目标模板图像；
-        Source_Five_Point       原图像五个人脸关键点；
-        Target_Five_Point       目标图像五个人脸关键点；
-        Source_box              原图像人脸的坐标；
-    
-    Outputs:
-        output                  贴脸后的人像
-    '''
-    Source_Five_Point = np.reshape(Source_Five_Point, [5, 2]) - np.array(Source_box[:2])
-    Target_Five_Point = np.reshape(Target_Five_Point, [5, 2])
+def crop_and_paste(source_image, source_image_mask, target_image, source_five_point, target_five_point, source_box):
+    """
+    Applies a face replacement by cropping and pasting one face onto another image.
 
-    Crop_Source_image                       = Source_image.crop(np.int32(Source_box))
-    Crop_Source_image_mask                  = Source_image_mask.crop(np.int32(Source_box))
-    Source_Five_Point, Target_Five_Point    = np.array(Source_Five_Point), np.array(Target_Five_Point)
+    Args:
+        source_image (PIL.Image): The source image containing the face to be pasted.
+        source_image_mask (PIL.Image): The mask representing the face in the source image.
+        target_image (PIL.Image): The target image where the face will be pasted.
+        source_five_point (numpy.ndarray): Five key points of the face in the source image.
+        target_five_point (numpy.ndarray): Five key points of the corresponding face in the target image.
+        source_box (list): Coordinates of the bounding box around the face in the source image.
+
+    Returns:
+        PIL.Image: The resulting image with the pasted face.
+
+    Notes:
+        The function takes a source image, its corresponding mask, a target image, key points, and the bounding box
+        around the face in the source image. It then aligns and pastes the face from the source image onto the
+        corresponding location in the target image, taking into account the key points and bounding box.
+    """
+    source_five_point = np.reshape(source_five_point, [5, 2]) - np.array(source_box[:2])
+    target_five_point = np.reshape(target_five_point, [5, 2])
+
+    crop_source_image                       = source_image.crop(np.int32(source_box))
+    crop_source_image_mask                  = source_image_mask.crop(np.int32(source_box))
+    source_five_point, target_five_point    = np.array(source_five_point), np.array(target_five_point)
 
     tform = transform.SimilarityTransform()
     # 程序直接估算出转换矩阵M
-    tform.estimate(Source_Five_Point, Target_Five_Point)
+    tform.estimate(source_five_point, target_five_point)
     M = tform.params[0:2, :]
 
-    warped      = cv2.warpAffine(np.array(Crop_Source_image), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
-    warped_mask = cv2.warpAffine(np.array(Crop_Source_image_mask), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
+    warped      = cv2.warpAffine(np.array(crop_source_image), M, np.shape(target_image)[:2][::-1], borderValue=0.0)
+    warped_mask = cv2.warpAffine(np.array(crop_source_image_mask), M, np.shape(target_image)[:2][::-1], borderValue=0.0)
 
     mask        = np.float32(warped_mask == 0)
-    output      = mask * np.float32(Target_image) + (1 - mask) * np.float32(warped)
+    output      = mask * np.float32(target_image) + (1 - mask) * np.float32(warped)
     return output
+
 
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface detect 

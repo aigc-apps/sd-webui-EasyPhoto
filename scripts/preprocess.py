@@ -54,7 +54,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     
     # jpg list
     jpgs            = os.listdir(inputs_dir)
-    # ---------------------------人脸得分计算-------------------------- #
+    # ---------------------------FaceID score calculate-------------------------- #
     face_id_scores  = []
     face_angles     = []
     copy_jpgs       = []
