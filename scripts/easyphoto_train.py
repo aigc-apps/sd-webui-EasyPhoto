@@ -33,9 +33,9 @@ def easyphoto_train_forward(
     *args
 ):  
     if user_id == "" or user_id is None:
-        return "User id cannot be set to empty。"
+        return "User id cannot be set to empty."
     if user_id == "none" :
-        return "User id cannot be set to none。"
+        return "User id cannot be set to none."
     
     if os.path.exists(id_path):
         with open(id_path, "r") as f:
@@ -82,9 +82,9 @@ def easyphoto_train_forward(
 
     train_images = glob(os.path.join(images_save_path, "*.jpg"))
     if len(train_images) == 0:
-        return "未能获得预处理后的图片，请检查预处理过程。"
+        return "Failed to obtain preprocessed images, please check the preprocessing process"
     if not os.path.exists(json_save_path):
-        return "未能获得预处理后的metadata.jsonl，请检查预处理过程。"
+        return "Failed to obtain preprocessed metadata.jsonl, please check the preprocessing process."
 
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     print("train_file_path : ", train_kohya_path)
@@ -160,9 +160,9 @@ def easyphoto_train_forward(
     
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     if not os.path.exists(best_weight_path):
-        return "未能获得训练后的Lora，请检查训练过程。"
+        return "Failed to obtain Lora after training, please check the training process."
 
     copyfile(best_weight_path, webui_save_path)
     with open(id_path, "a") as f:
         f.write(f"{user_id}\n")
-    return "训练已经完成。"
+    return "The training has been completed."

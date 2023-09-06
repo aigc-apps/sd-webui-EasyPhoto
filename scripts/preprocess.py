@@ -138,7 +138,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
         try:
             # Determine which images to enhance based on quality score and image size
-            if (selected_scores[index] < 0.60 or np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
+            if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
                 sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
                 enhancement_num += 1
         except:
@@ -169,7 +169,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         if np.sum(np.array(mask)) != 0:
             images.append(mask_sub_image)
 
-    # write resuilt
+    # write resuilts
     for index, base64_pilimage in enumerate(images):
         image = base64_pilimage.convert("RGB")
         image.save(os.path.join(images_save_path, str(index) + ".jpg"))

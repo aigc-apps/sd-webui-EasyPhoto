@@ -80,7 +80,7 @@ The EasyPhoto training interface is as follows:
 - On the left is the training image. Simply click Upload Photos to upload the image, and click Clear Photos to delete the uploaded image;
 - On the right are the training parameters, which cannot be adjusted for the first training.
 
-After clicking Upload Photos, we can start uploading images. **It is best to upload 5 to 15 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
+After clicking Upload Photos, we can start uploading images. **It is best to upload 5 to 20 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
 ![train_1](images/train_1.jpg)
 
 Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
