@@ -243,16 +243,14 @@ def easyphoto_infer_forward(
     else:
         template_images = [init_image]
     
-    # delete none in user_ids
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
-    if 1:
-        _user_ids = []
-        passed_userid_list = []
-        for idx, user_id in enumerate(user_ids):
-            if user_id == "none":
-                passed_userid_list.append(idx)
-            _user_ids.append(user_id)
-        user_ids = _user_ids
+    _user_ids = []
+    passed_userid_list = []
+    for idx, user_id in enumerate(user_ids):
+        if user_id == "none":
+            passed_userid_list.append(idx)
+        _user_ids.append(user_id)
+    user_ids = _user_ids
 
 
     if len(user_ids) == 0:
@@ -273,6 +271,7 @@ def easyphoto_infer_forward(
 
     for user_id in user_ids:
         if user_id == 'none':
+            # use some placeholder 
             input_prompts.append('none')
             face_id_images.append('none')
             roop_images.append('none')
@@ -309,7 +308,7 @@ def easyphoto_infer_forward(
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
     outputs = []
-    for template_image in template_images:
+    for template_idx, template_image in enumerate(template_images):
         # open the template image
         if tabs == 0:
             template_image = Image.open(template_image).convert("RGB")
@@ -320,6 +319,15 @@ def easyphoto_infer_forward(
         if len(template_face_safe_boxes) == 0:
             return "Please upload a template with face.", []
         template_detected_facenum = len(template_face_safe_boxes)
+        
+        # use some print/log to record mismatch of detectionface and user_ids
+        if template_detected_facenum > len(user_ids):
+            logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
+             the last {template_detected_facenum-len(user_ids)} face will remains")
+        
+        if len(user_id) > template_detected_facenum:
+            logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
+             the last {len(user_ids)-template_detected_facenum} set user_ids is useless")
 
         if min(template_detected_facenum, len(user_ids)) > 1:
             output_image = np.array(copy.deepcopy(template_image))
