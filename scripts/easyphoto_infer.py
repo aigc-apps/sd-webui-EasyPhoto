@@ -244,12 +244,17 @@ def easyphoto_infer_forward(
         template_images = [init_image]
     
     # delete none in user_ids
-    _user_ids = []
-    for user_id in user_ids:
-        if user_id != "none":
+    # update donot delete but use "none" as placeholder and will pass this face inpaint later
+    if 1:
+        _user_ids = []
+        passed_userid_list = []
+        for idx, user_id in enumerate(user_ids):
+            if user_id == "none":
+                passed_userid_list.append(idx)
             _user_ids.append(user_id)
-    user_ids = _user_ids
-    
+        user_ids = _user_ids
+
+
     if len(user_ids) == 0:
         return "Please choose a user id.", []
 
@@ -267,33 +272,41 @@ def easyphoto_infer_forward(
 
 
     for user_id in user_ids:
-        # get prompt
-        input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
-        
-        # get best image after training
-        best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
-        # get roop image
-        if len(best_outputs_paths) > 0:
-            face_id_image_path  = best_outputs_paths[0]
+        if user_id == 'none':
+            input_prompts.append('none')
+            face_id_images.append('none')
+            roop_images.append('none')
+            face_id_retinaface_boxes.append([])
+            face_id_retinaface_keypoints.append([])
+            face_id_retinaface_masks.append([])
         else:
-            face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
-        roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+            # get prompt
+            input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            
+            # get best image after training
+            best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
+            # get roop image
+            if len(best_outputs_paths) > 0:
+                face_id_image_path  = best_outputs_paths[0]
+            else:
+                face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
+            roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
 
-        face_id_image           = Image.open(face_id_image_path).convert("RGB")
-        roop_image              = Image.open(roop_image_path).convert("RGB")
+            face_id_image           = Image.open(face_id_image_path).convert("RGB")
+            roop_image              = Image.open(roop_image_path).convert("RGB")
 
-        # Crop user images to obtain portrait boxes, facial keypoints, and masks
-        _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(retinaface_detection, face_id_image, multi_user_facecrop_ratio, "roop")
-        _face_id_retinaface_box      = _face_id_retinaface_boxes[0]
-        _face_id_retinaface_keypoint = _face_id_retinaface_keypoints[0]
-        _face_id_retinaface_mask     = _face_id_retinaface_masks[0]
+            # Crop user images to obtain portrait boxes, facial keypoints, and masks
+            _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(retinaface_detection, face_id_image, multi_user_facecrop_ratio, "roop")
+            _face_id_retinaface_box      = _face_id_retinaface_boxes[0]
+            _face_id_retinaface_keypoint = _face_id_retinaface_keypoints[0]
+            _face_id_retinaface_mask     = _face_id_retinaface_masks[0]
 
-        input_prompts.append(input_prompt)
-        face_id_images.append(face_id_image)
-        roop_images.append(roop_image)
-        face_id_retinaface_boxes.append(_face_id_retinaface_box)
-        face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
-        face_id_retinaface_masks.append(_face_id_retinaface_mask)
+            input_prompts.append(input_prompt)
+            face_id_images.append(face_id_image)
+            roop_images.append(roop_image)
+            face_id_retinaface_boxes.append(_face_id_retinaface_box)
+            face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
+            face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
     outputs = []
     for template_image in template_images:
@@ -306,18 +319,27 @@ def easyphoto_infer_forward(
         template_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, template_image, multi_user_safecrop_ratio, "crop")
         if len(template_face_safe_boxes) == 0:
             return "Please upload a template with face.", []
+        template_detected_facenum = len(template_face_safe_boxes)
 
-        if min(len(template_face_safe_boxes), len(user_ids)) > 1:
+        if min(template_detected_facenum, len(user_ids)) > 1:
             output_image = np.array(copy.deepcopy(template_image))
             output_mask  = np.ones_like(output_image)
 
             # get mask in final diffusion for multi people
             for index in range(len(template_face_safe_boxes)):
-                retinaface_box = template_face_safe_boxes[index]
-                output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+                # pass this userid, not mask the face
+                if index in passed_userid_list:
+                    continue
+                else:
+                    retinaface_box = template_face_safe_boxes[index]
+                    output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
             output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
         for index in range(min(len(template_face_safe_boxes), len(user_ids))):
+            # pass this userid, not do anything
+            if index in passed_userid_list:
+                continue
+
             loop_template_image = copy.deepcopy(template_image)
             
             # mask other people face use 255 in this term, to transfer multi user to single user situation
