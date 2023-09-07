@@ -1177,7 +1177,7 @@ def main():
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
         unwrapped_nw.save_weights(ckpt_file, weight_dtype, None)
 
-    user_id = args.output_dir.split('/')[-2]
+    user_id = os.path.basename(os.path.dirname(args.output_dir))
     # check log path
     if accelerator.is_main_process:
         output_log = open(args.cache_log_file, 'w')
