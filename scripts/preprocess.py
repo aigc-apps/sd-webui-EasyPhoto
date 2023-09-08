@@ -39,29 +39,29 @@ def process_rotate_image(img: Image) -> Image:
     Returns:
     PIL.Image: The rotated image or the original image if rotation fails.
     """
-    
+    orientation = 274
     # Try to get EXIF data to determine image orientation
-    try:
-        exif = dict(img._getexif().items())
-        orientation = 274  # Orientation tag ID in EXIF
-        
+    if img._getexif() is not None:
         # Check orientation and rotate accordingly
-        if exif.get(orientation) == 3:
-            img2 = img.rotate(180, expand=True)
-            logging.info('Check rotate & find rotate: rotate 180')
-        elif exif.get(orientation) == 6:
-            img2 = img.rotate(270, expand=True)
-            logging.info('Check rotate & find rotate: rotate 270')
-        elif exif.get(orientation) == 8:
-            img2 = img.rotate(90, expand=True)
-            logging.info('Check rotate & find rotate: rotate 90')
-        else:
-            img2 = img
-            logging.info('No rotation needed.')
-            
-    except Exception as e:
-        # Log any exception that occurs and return the original image
-        logging.info(f'Check rotate failed: {e}. Return original img.')
+        exif=dict(img._getexif().items())
+        if exif is not None and isinstance(exif, dict):
+            if exif.get(orientation, None) is not None:
+                if  exif[orientation] == 3 :
+                    img2=img.rotate(180, expand = True)
+                    # in subprocess , logging doesn't work normal
+                    print('check rotate & find rotate : rotate 180')
+                elif exif[orientation] == 6 :
+                    img2=img.rotate(270, expand = True)
+                    print('check rotate & find rotate : rotate 270')
+                elif exif[orientation] == 8 :
+                    img2=img.rotate(90, expand = True)
+                    print('check rotate & find rotate : rotate 90')
+                else:
+                    img2 = img
+                    print('No rotation needed.')
+    else:        
+        logging.info(f'Check rotate failed: has not exif. Return original img.')
+        print(f'Check rotate failed: has not exif. Return original img.')
         img2 = img
         
     return img2
