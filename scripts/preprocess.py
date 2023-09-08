@@ -29,43 +29,6 @@ def compare_jpg_with_face_id(embedding_list):
     return scores
 
 
-def process_rotate_image(img: Image) -> Image:
-    """
-    Rotate an image based on its EXIF orientation data.
-
-    Parameters:
-    img (PIL.Image): The image to process.
-
-    Returns:
-    PIL.Image: The rotated image or the original image if rotation fails.
-    """
-    orientation = 274
-    # Try to get EXIF data to determine image orientation
-    if img._getexif() is not None:
-        # Check orientation and rotate accordingly
-        exif=dict(img._getexif().items())
-        if exif is not None and isinstance(exif, dict):
-            if exif.get(orientation, None) is not None:
-                if  exif[orientation] == 3 :
-                    img2=img.rotate(180, expand = True)
-                    # in subprocess , logging doesn't work normal
-                    print('check rotate & find rotate : rotate 180')
-                elif exif[orientation] == 6 :
-                    img2=img.rotate(270, expand = True)
-                    print('check rotate & find rotate : rotate 270')
-                elif exif[orientation] == 8 :
-                    img2=img.rotate(90, expand = True)
-                    print('check rotate & find rotate : rotate 90')
-                else:
-                    img2 = img
-                    print('No rotation needed.')
-    else:        
-        logging.info(f'Check rotate failed: has not exif. Return original img.')
-        print(f'Check rotate failed: has not exif. Return original img.')
-        img2 = img
-        
-    return img2
-
 def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
     # face embedding
     providers           = ["CPUExecutionProvider"]
@@ -103,8 +66,6 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                 continue
             _image_path = os.path.join(inputs_dir, jpg)
             image       = Image.open(_image_path)
-            image       = process_rotate_image(image)
-
 
             h, w, c     = np.shape(image)
 
