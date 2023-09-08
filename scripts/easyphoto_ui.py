@@ -1,15 +1,16 @@
+import glob
 import os
+import time
 
 import gradio as gr
-import glob
 import requests
-
-from scripts.easyphoto_infer import easyphoto_infer_forward
-from scripts.easyphoto_config import easyphoto_outpath_samples, id_path, user_id_outpath_samples
-from scripts.easyphoto_train import easyphoto_train_forward, DEFAULT_CACHE_LOG_FILE
 from modules import script_callbacks, shared
 from modules.paths import models_path
-import time
+from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
+                                      user_id_outpath_samples)
+from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_train import (DEFAULT_CACHE_LOG_FILE,
+                                     easyphoto_train_forward)
 
 gradio_compat = True
 
@@ -21,7 +22,6 @@ try:
         gradio_compat = False
 except ImportError:
     pass
-
 
 class ToolButton(gr.Button, gr.components.FormComponent):
     """Small button with single emoji as text, fits inside gradio forms"""
@@ -86,6 +86,27 @@ def on_ui_tabs():
                     with gr.Column():
                         gr.Markdown('Params Setting')
                         with gr.Accordion("Advanced Options", open=True):
+                            with gr.Row():
+                                def checkpoint_refresh_function():
+                                    checkpoints = []
+                                    for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                            checkpoints.append(_checkpoint)
+                                    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)))
+                                
+                                checkpoints = []
+                                for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                    if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                        checkpoints.append(_checkpoint)
+                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)), label="The base checkpoint you use.", visible=True)
+
+                                checkpoint_refresh = ToolButton(value="\U0001f504")
+                                checkpoint_refresh.click(
+                                    fn=checkpoint_refresh_function,
+                                    inputs=[],
+                                    outputs=[sd_model_checkpoint]
+                                )
+
                             with gr.Row():
                                 resolution = gr.Textbox(
                                     label="resolution",
@@ -181,7 +202,7 @@ def on_ui_tabs():
                 run_button.click(fn=easyphoto_train_forward,
                                 _js="ask_for_style_name",
                                 inputs=[
-                                    dummy_component,
+                                    sd_model_checkpoint, dummy_component,
                                     uuid,
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, instance_images,
                                 ],
@@ -214,6 +235,27 @@ def on_ui_tabs():
                         model_selected_tabs = [template_images_tab, upload_image_tab]
                         for i, tab in enumerate(model_selected_tabs):
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
+
+                        with gr.Row():
+                            def checkpoint_refresh_function():
+                                checkpoints = []
+                                for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                    if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                        checkpoints.append(_checkpoint)
+                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)))
+                            
+                            checkpoints = []
+                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                    checkpoints.append(_checkpoint)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)), label="The base checkpoint you use.", visible=True)
+
+                            checkpoint_refresh = ToolButton(value="\U0001f504")
+                            checkpoint_refresh.click(
+                                fn=checkpoint_refresh_function,
+                                inputs=[],
+                                outputs=[sd_model_checkpoint]
+                            )
 
                         with gr.Row():
                             def select_function():
@@ -341,7 +383,7 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[selected_template_images, init_image, additional_prompt, 
+                    inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]

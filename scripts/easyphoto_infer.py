@@ -2,10 +2,7 @@ import copy
 import glob
 import logging
 import os
-import random
-import sys
-
-import gradio as gr
+import torch
 import cv2
 import numpy as np
 from modelscope.pipelines import pipeline
@@ -57,7 +54,7 @@ def inpaint_with_mask_face(
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
-    sd_model_checkpoint = "ChilloutMix-ni-fp16.safetensors",
+    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -142,7 +139,7 @@ def inpaint_only(
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
-    sd_model_checkpoint = "ChilloutMix-ni-fp16.safetensors",
+    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -203,7 +200,7 @@ portrait_enhancement = None
 face_skin = None
 
 def easyphoto_infer_forward(
-    selected_template_images, init_image, additional_prompt, \
+    sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, tabs, *user_ids
 ): 
@@ -244,16 +241,12 @@ def easyphoto_infer_forward(
         template_images = [init_image]
     
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
-    _user_ids = []
     passed_userid_list = []
     for idx, user_id in enumerate(user_ids):
         if user_id == "none":
             passed_userid_list.append(idx)
-        _user_ids.append(user_id)
-    user_ids = _user_ids
 
-
-    if len(user_ids) == 0:
+    if len(user_ids) == len(passed_userid_list):
         return "Please choose a user id.", []
 
     # params init
@@ -267,7 +260,6 @@ def easyphoto_infer_forward(
     best_lora_weights= str(0.9)
     multi_user_facecrop_ratio = 1.5
     multi_user_safecrop_ratio = 1.1
-
 
     for user_id in user_ids:
         if user_id == 'none':
@@ -325,7 +317,7 @@ def easyphoto_infer_forward(
             logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
              the last {template_detected_facenum-len(user_ids)} face will remains")
         
-        if len(user_id) > template_detected_facenum:
+        if len(user_ids) > template_detected_facenum:
             logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
              the last {len(user_ids)-template_detected_facenum} set user_ids is useless")
 
@@ -416,7 +408,7 @@ def easyphoto_infer_forward(
             template_image_original_face_area = np.array(original_input_template)[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2], :] 
             
             # First diffusion, facial reconstruction
-            first_diffusion_output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
+            first_diffusion_output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
 
             if color_shift_middle:
                 # apply color shift
@@ -452,7 +444,7 @@ def easyphoto_infer_forward(
             else:
                 input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask))))
             
-            second_diffusion_output_image = inpaint_only(input_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale)
+            second_diffusion_output_image = inpaint_only(input_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
 
             # use original template face area to shift generated face color at last
             if color_shift_last:
@@ -490,7 +482,7 @@ def easyphoto_infer_forward(
             resize          = float(short_side / 768.0)
             new_size        = (int(output_image.width//resize), int(output_image.height//resize))
             output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
-            output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20, denoising_strength=0.3, hr_scale=1)
+            output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20, denoising_strength=0.3, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
             
         try:
             output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
@@ -501,7 +493,11 @@ def easyphoto_infer_forward(
         except:
             logging.info("Portrait enhancement error, but pass.")
 
-        outputs.append(output_image)
+        try:
+            outputs.append(output_image)
+        except:
+            output_image = template_image
+            outputs.append(output_image)
         save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
     if not shared.opts.data.get("easyphoto_cache_model", True):
