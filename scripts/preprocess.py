@@ -28,6 +28,7 @@ def compare_jpg_with_face_id(embedding_list):
     scores = [np.dot(emb, pivot_feature)[0][0] for emb in embedding_list]
     return scores
 
+
 def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
     # face embedding
     providers           = ["CPUExecutionProvider"]
@@ -65,6 +66,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                 continue
             _image_path = os.path.join(inputs_dir, jpg)
             image       = Image.open(_image_path)
+
             h, w, c     = np.shape(image)
 
             retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
