@@ -162,5 +162,6 @@ EasyPhoto训练界面如下：
 本项目采用 [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 ## 联系我们
-使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
-![join](images/erweima.jpg)
+1. 使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
+2. 使用 微信 扫描右下二维码加入群聊
+![dingding](images/erweima.jpg)![wechat](images/wechat.jpg)

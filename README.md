@@ -163,5 +163,6 @@ After getting the result of First Diffusion, we will fuse the result with the op
 This project is licensed under the [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 ## ContactUS
-Use [Dingding](https://www.dingtalk.com/) to search group 38250008552 or Scan to join
-![join](images/erweima.jpg)
+1. Use [Dingding](https://www.dingtalk.com/) to search group 38250008552 or Scan to join
+2. Use Wechat, scan the right pic to join
+![dingding](images/erweima.jpg)![wechat](images/wechat.jpg)
