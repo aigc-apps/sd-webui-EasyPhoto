@@ -12,7 +12,6 @@ from scripts.face_process_utils import call_face_crop, crop_and_paste, color_tra
 from scripts.easyphoto_config import user_id_outpath_samples, easyphoto_outpath_samples, validation_prompt, DEFAULT_POSITIVE, DEFAULT_NEGATIVE, easyphoto_img2img_samples
 from scripts.easyphoto_utils import check_files_exists_and_download
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
-from scripts.swapper import UpscaleOptions, swap_face
 from scripts.face_process_utils import Face_Skin
 
 from modules.images import save_image
