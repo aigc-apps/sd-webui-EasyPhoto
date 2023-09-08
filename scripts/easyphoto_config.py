@@ -1,8 +1,9 @@
 import os, glob
-from modules.paths import data_path
+from modules.paths import data_path, models_path
 
 # save_dirs
 data_dir                        = data_path
+models_path                     = models_path
 easyphoto_img2img_samples       = os.path.join(data_dir, 'outputs/img2img-images')
 easyphoto_outpath_samples       = os.path.join(data_dir, 'outputs/easyphoto-outputs')
 user_id_outpath_samples         = os.path.join(data_dir, 'outputs/easyphoto-user-id-infos')

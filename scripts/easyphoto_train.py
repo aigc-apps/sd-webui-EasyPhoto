@@ -24,6 +24,7 @@ python_executable_path = sys.executable
 
 # Attention! Output of js is str or list, not float or int
 def easyphoto_train_forward(
+    sd_model_checkpoint: str,
     id_task: str,
     user_id: str,
     resolution: int, val_and_checkpointing_steps: int, max_train_steps: int, steps_per_photos: int,
@@ -62,7 +63,7 @@ def easyphoto_train_forward(
     # 训练权重保存
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
-    webui_load_path         = os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors")
+    webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
     sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
     
     os.makedirs(original_backup_path, exist_ok=True)

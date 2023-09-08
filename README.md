@@ -8,11 +8,13 @@ EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to t
 Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md)
 
 **New features!!** 🔥🔥 We currently support multiple people generation.
+**New features!!** 🔥🔥🔥🔥 We currently support different base models for training and inference.
 
 These are our generated results:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
 ![results_3](images/results_3.jpg)
+![results_4](images/results_4.jpg)
 
 
 Our ui interface is as follows:  
@@ -22,6 +24,7 @@ Our ui interface is as follows:
 ![infer_ui](images/infer_ui.jpg)
 
 # What's New
+- **Support different base models for training and inference.** [🔥🔥 2023.09.08]
 - **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
 - Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
 

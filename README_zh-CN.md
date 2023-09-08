@@ -8,11 +8,13 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 请阅读我们的开发者公约，共建美好社区 [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md)
 
 **新功能！！** 🔥🔥 我们目前支持多人生成。  
+**新功能！！** 🔥🔥🔥🔥 我们目前支持不同预测基础模型，见证不一样的自己。
 
 这些是我们的生成结果:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
 ![results_3](images/results_3.jpg)
+![results_4](images/results_4.jpg)
 
 我们的ui界面如下:  
 **训练部分:**
@@ -21,6 +23,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 ![infer_ui](images/infer_ui.jpg)
 
 # 新功能
+- **支持不同预测基础模型。** [🔥🔥 2023.09.08]
 - **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
 - 创建代码！现在支持 Windows 和 Linux。[🔥 2023.09.02]
 
