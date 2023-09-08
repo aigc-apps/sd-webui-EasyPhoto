@@ -7,14 +7,13 @@
 EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。建议使用 5 到 20 张肖像图片进行训练，最好是半身照片且不要佩戴眼镜（少量可以接受）。训练完成后，我们可以在推理部分生成图像。我们支持使用预设模板图片与上传自己的图片进行推理。  
 请阅读我们的开发者公约，共建美好社区 [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md)
 
-**新功能！！** 🔥🔥 我们目前支持多人生成。  
-**新功能！！** 🔥🔥🔥🔥 我们目前支持不同预测基础模型，见证不一样的自己。
+**新功能！！** 🔥🔥 我们目前支持多人生成。     
+**新功能！！** 🔥🔥🔥🔥 我们目前支持不同预测基础模型，见证不一样的自己。  
 
 这些是我们的生成结果:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
-![results_3](images/results_3.jpg)
-![results_4](images/results_4.jpg)
+![results_3](images/results_3.jpg) 
 
 我们的ui界面如下:  
 **训练部分:**
