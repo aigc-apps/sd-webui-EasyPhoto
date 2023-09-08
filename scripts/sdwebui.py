@@ -3,14 +3,15 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import gradio as gr
+import modules
 import modules.scripts as scripts
 import numpy as np
-import modules
-from modules import processing, scripts, sd_samplers, shared
+from modules import processing, scripts, sd_models, sd_samplers, shared, sd_vae
 from modules.api.models import *
 from modules.processing import StableDiffusionProcessingImg2Img
+from modules.sd_models import get_closet_checkpoint_match, load_model
+from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
-from PIL import Image
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
@@ -178,7 +179,14 @@ def init_default_script_args(script_runner):
                     ui_default_values.append(elem.value)
                 script_args[script.args_from:script.args_to] = ui_default_values
     return script_args
-    
+
+def reload_model(k, v):
+    opts.set(k, v)
+    if k == 'sd_model_checkpoint':
+        sd_models.reload_model_weights()
+    if k == 'sd_vae':
+        sd_vae.reload_vae_weights()
+
 def i2i_inpaint_call(
         images=[],  
         resize_mode=0,
@@ -223,16 +231,26 @@ def i2i_inpaint_call(
         controlnet_units: List[ControlNetUnit] = [],
         use_deprecated_controlnet=False,
         outpath_samples = "",
-        sd_vae = "vae-ft-mse-840000-ema-pruned.safetensors", 
-        sd_model_checkpoint = "chilloutmix_NiPrunedFp32Fix.safetensors",
+        sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
+        sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
     if sampler_index is None:
         sampler_index = 0
     if steps is None:
         steps = 20
 
+    try:
+        origin_sd_model_checkpoint  = opts.sd_model_checkpoint
+        origin_sd_vae               = opts.sd_vae
+    except:
+        origin_sd_model_checkpoint  = ""
+        origin_sd_vae               = ""
+
+    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    sd_vae              = os.path.basename(find_vae_near_checkpoint(sd_vae))
+
     p_img2img = StableDiffusionProcessingImg2Img(
-        sd_model=sd_model_checkpoint,
+        sd_model=origin_sd_model_checkpoint,
         outpath_samples=outpath_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
         prompt=prompt,
@@ -275,10 +293,18 @@ def i2i_inpaint_call(
             continue
         if alwayson_scripts.name=='controlnet':
             p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-    # update_cn_script_in_processing(p_img2img, controlnet_units, is_img2img=True, is_ui=False)
     
-    # 处理图片
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+    if origin_sd_vae != sd_vae:
+        reload_model('sd_vae', sd_vae)
+
     processed = processing.process_images(p_img2img)
+
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
+    if origin_sd_vae != sd_vae:
+        reload_model('sd_vae', origin_sd_vae)
 
     # get the generate image!
     h_0, w_0, c_0 = np.shape(processed.images[0])
