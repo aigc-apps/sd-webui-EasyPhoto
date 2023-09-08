@@ -334,10 +334,12 @@ def easyphoto_infer_forward(
                     output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
             output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
+        total_processed_person = 0
         for index in range(min(len(template_face_safe_boxes), len(user_ids))):
             # pass this userid, not do anything
             if index in passed_userid_list:
                 continue
+            total_processed_person += 1
 
             loop_template_image = copy.deepcopy(template_image)
             
@@ -492,10 +494,9 @@ def easyphoto_infer_forward(
         except:
             logging.info("Portrait enhancement error, but pass.")
 
-        try:
-            outputs.append(output_image)
-        except:
+        if total_processed_person == 0:
             output_image = template_image
+        else:
             outputs.append(output_image)
         save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
