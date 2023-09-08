@@ -164,4 +164,7 @@ EasyPhoto训练界面如下：
 ## 联系我们
 1. 使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
 2. 使用 微信 扫描右下二维码加入群聊
-![dingding](images/erweima.jpg)![wechat](images/wechat.jpg)
+<figure>
+<img src="images/erweima.jpg" width=300/>
+<img src="images/wechat.jpg" width=300/>
+</figure>

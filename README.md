@@ -165,4 +165,8 @@ This project is licensed under the [Apache License (Version 2.0)](https://github
 ## ContactUS
 1. Use [Dingding](https://www.dingtalk.com/) to search group 38250008552 or Scan to join
 2. Use Wechat, scan the right pic to join
-![dingding](images/erweima.jpg)![wechat](images/wechat.jpg)
+
+<figure>
+<img src="images/erweima.jpg" width=300/>
+<img src="images/wechat.jpg" width=300/>
+</figure>
