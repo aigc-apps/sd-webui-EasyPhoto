@@ -11,7 +11,7 @@ import platform
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from PIL import Image, ExifTags
+from PIL import Image
 from scripts.face_process_utils import call_face_crop
 from scripts.easyphoto_utils import logging
 from tqdm import tqdm
