@@ -11,7 +11,7 @@ import platform
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from PIL import Image
+from PIL import Image, ExifTags
 from scripts.face_process_utils import call_face_crop
 from scripts.easyphoto_utils import logging
 from tqdm import tqdm
@@ -27,6 +27,44 @@ def compare_jpg_with_face_id(embedding_list):
     # Sort the images in a folder that are closest to the median value
     scores = [np.dot(emb, pivot_feature)[0][0] for emb in embedding_list]
     return scores
+
+
+def process_rotate_image(img: Image) -> Image:
+    """
+    Rotate an image based on its EXIF orientation data.
+
+    Parameters:
+    img (PIL.Image): The image to process.
+
+    Returns:
+    PIL.Image: The rotated image or the original image if rotation fails.
+    """
+    
+    # Try to get EXIF data to determine image orientation
+    try:
+        exif = dict(img._getexif().items())
+        orientation = 274  # Orientation tag ID in EXIF
+        
+        # Check orientation and rotate accordingly
+        if exif.get(orientation) == 3:
+            img2 = img.rotate(180, expand=True)
+            logging.info('Check rotate & find rotate: rotate 180')
+        elif exif.get(orientation) == 6:
+            img2 = img.rotate(270, expand=True)
+            logging.info('Check rotate & find rotate: rotate 270')
+        elif exif.get(orientation) == 8:
+            img2 = img.rotate(90, expand=True)
+            logging.info('Check rotate & find rotate: rotate 90')
+        else:
+            img2 = img
+            logging.info('No rotation needed.')
+            
+    except Exception as e:
+        # Log any exception that occurs and return the original image
+        logging.info(f'Check rotate failed: {e}. Return original img.')
+        img2 = img
+        
+    return img2
 
 def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
     # face embedding
@@ -65,6 +103,9 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
                 continue
             _image_path = os.path.join(inputs_dir, jpg)
             image       = Image.open(_image_path)
+            image       = process_rotate_image(image)
+
+
             h, w, c     = np.shape(image)
 
             retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
