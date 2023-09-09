@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from modules import shared
 from modules.paths import models_path
-from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
+from scripts.easyphoto_config import (id_path, user_id_outpath_samples, data_path, 
                                   validation_prompt)
 from scripts.preprocess import preprocess_images
 
@@ -42,6 +42,16 @@ def urldownload_progressbar(url, filepath):
         print('Error!')
 
 def check_files_exists_and_download():
+    controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
+    controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
+    models_annotator_path               = os.path.join(data_path, "models")
+    if os.path.exists(controlnet_extensions_path):
+        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
+    elif os.path.exists(controlnet_extensions_builtin_path):
+        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
+    else:
+        controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
+
     urls        = [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
@@ -69,9 +79,9 @@ def check_files_exists_and_download():
         os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
         os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
-        os.path.join(models_path, f"annotator/body_pose_model.pth"),
-        os.path.join(models_path, f"annotator/facenet.pth"),
-        os.path.join(models_path, f"annotator/hand_pose_model.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"),
