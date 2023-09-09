@@ -61,44 +61,47 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     copy_jpgs       = []
     selected_paths  = []
     for index, jpg in enumerate(tqdm(jpgs)):
-        if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
-            continue
-        _image_path = os.path.join(inputs_dir, jpg)
-        image       = Image.open(_image_path)
+        try:
+            if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
+                continue
+            _image_path = os.path.join(inputs_dir, jpg)
+            image       = Image.open(_image_path)
 
-        h, w, c     = np.shape(image)
+            h, w, c     = np.shape(image)
 
-        retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
-        retinaface_box      = retinaface_boxes[0]
-        retinaface_keypoint = retinaface_keypoints[0]
+            retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+            retinaface_box      = retinaface_boxes[0]
+            retinaface_keypoint = retinaface_keypoints[0]
 
-        # get key point
-        retinaface_keypoint = np.reshape(retinaface_keypoint, [5, 2])
-        # get angle
-        x = retinaface_keypoint[0,0] - retinaface_keypoint[1,0]
-        y = retinaface_keypoint[0,1] - retinaface_keypoint[1,1]
-        angle = 0 if x==0 else abs(math.atan(y/x)*180/math.pi)
-        angle = (90 - angle)/ 90 
+            # get key point
+            retinaface_keypoint = np.reshape(retinaface_keypoint, [5, 2])
+            # get angle
+            x = retinaface_keypoint[0,0] - retinaface_keypoint[1,0]
+            y = retinaface_keypoint[0,1] - retinaface_keypoint[1,1]
+            angle = 0 if x==0 else abs(math.atan(y/x)*180/math.pi)
+            angle = (90 - angle)/ 90 
 
-        # face size judge
-        face_width  = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
-        face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
-        if min(face_width, face_height) < 128:
-            print("Face size in {} is small than 128. Ignore it.".format(jpg))
-            continue
+            # face size judge
+            face_width  = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
+            face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
+            if min(face_width, face_height) < 128:
+                print("Face size in {} is small than 128. Ignore it.".format(jpg))
+                continue
 
-        # face crop
-        sub_image = image.crop(retinaface_box)
+            # face crop
+            sub_image = image.crop(retinaface_box)
 
-        # get embedding
-        embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
-        embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+            # get embedding
+            embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
+            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
 
-        face_id_scores.append(embedding)
-        face_angles.append(angle)
+            face_id_scores.append(embedding)
+            face_angles.append(angle)
 
-        copy_jpgs.append(jpg)
-        selected_paths.append(_image_path)
+            copy_jpgs.append(jpg)
+            selected_paths.append(_image_path)
+        except:
+            pass
     
     if len(face_id_scores) == 0:
         return "No faces detected. Please increase the size of the face in the upload photos."
