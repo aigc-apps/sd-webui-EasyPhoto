@@ -1404,6 +1404,9 @@ def main():
             
             best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
             os.makedirs(best_outputs_dir, exist_ok=True)
+            
+            # If all training images cannot detect faces, Lora fusion will not be performed
+            # Otherwise, the face ID score will be calculated based on the training images and the validated images for Lora fusion.
             if len(t_result_list) == 0:
                 print("Dectect no face in training data, move last weights and validation image to best_outputs")
                 test_img_dir    = os.path.join(args.output_dir, "validation")
