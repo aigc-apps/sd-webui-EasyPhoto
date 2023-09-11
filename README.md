@@ -82,7 +82,7 @@ If you are using docker, please make sure that the graphics card driver and CUDA
 Then execute the following commands in this way:
 ```
 # pull image
-docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.2
+docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
 
 # enter image
 docker run --rm -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
