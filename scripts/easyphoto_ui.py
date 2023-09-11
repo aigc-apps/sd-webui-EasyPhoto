@@ -83,15 +83,15 @@ def on_ui_tabs():
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)
                     
-                        with gr.Box():
-                            gr.Markdown(
-                                '''
-                                Warm tips:
-                                1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
-                                2. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
-                                '''
-                            )
-
+                        gr.Markdown(
+                            '''
+                            Training steps:
+                            1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
+                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
+                            3. Switch to Inference and generate photos based on the template. 
+                            4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
+                            '''
+                        )
                     with gr.Column():
                         gr.Markdown('Params Setting')
                         with gr.Accordion("Advanced Options", open=True):
@@ -172,10 +172,6 @@ def on_ui_tabs():
                                 )
                         gr.Markdown(
                             '''
-                            1. Upload 5 to 10 daily photos of the training required. 
-                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
-                            3. Switch to Inference and generate photos based on the template. 
-
                             Parameter parsing:
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
