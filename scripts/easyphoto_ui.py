@@ -82,7 +82,16 @@ def on_ui_tabs():
                         clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)
-                        
+                    
+                        with gr.Box():
+                            gr.Markdown(
+                                '''
+                                Warm tips:
+                                1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
+                                2. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
+                                '''
+                            )
+
                     with gr.Column():
                         gr.Markdown('Params Setting')
                         with gr.Accordion("Advanced Options", open=True):

@@ -75,6 +75,19 @@ Linux 的详细信息：
 
 ![install](images/install.jpg)
 
+### 4. 从docker快速开始
+使用docker的情况下，请保证机器中已经正确安装显卡驱动与CUDA环境，然后以此执行以下命令：
+```
+# 拉取镜像
+docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.2
+
+# 进入镜像
+docker run --rm -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+
+# 启动webui
+python3 launch.py --port 7860
+```
+
 # 如何使用
 ### 1.模型训练
 EasyPhoto训练界面如下：
@@ -138,7 +151,6 @@ EasyPhoto训练界面如下：
 ![overview](images/train_detail.jpg)
 
 首先，我们对输入的用户图像进行人脸检测，确定人脸位置后，按照一定比例截取输入图像。然后，我们使用显著性检测模型和皮肤美化模型获得干净的人脸训练图像，该图像基本上只包含人脸。然后，我们为每张图像贴上一个固定标签。这里不需要使用标签器，而且效果很好。最后，我们对稳定扩散模型进行微调，得到用户的数字二重身。  
-
 
 在训练过程中，我们会利用模板图像进行实时验证，在训练结束后，我们会计算验证图像与用户图像之间的人脸 ID 差距，从而实现 Lora 融合，确保我们的 Lora 是用户的完美数字二重身。
 
