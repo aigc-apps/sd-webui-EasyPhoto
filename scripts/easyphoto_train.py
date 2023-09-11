@@ -74,7 +74,8 @@ def easyphoto_train_forward(
     max_train_steps         = int(min(len(instance_images) * int(steps_per_photos), int(max_train_steps)))
 
     for index, user_image in enumerate(instance_images):
-        image = Image.open(user_image['name']).convert("RGB")
+        image = Image.open(user_image['name'])
+        image = process_rotate_image(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
         
     sub_threading = threading.Thread(target=preprocess_images, args=(images_save_path, json_save_path, validation_prompt, original_backup_path, ref_image_path,))
@@ -178,3 +179,52 @@ def easyphoto_train_forward(
     with open(id_path, "a") as f:
         f.write(f"{user_id}\n")
     return "The training has been completed."
+
+
+def process_rotate_image(img: Image) -> Image:
+    """
+    Rotate an image based on its EXIF orientation data.
+
+    Parameters:
+    img (PIL.Image): The image to process.
+
+    Returns:
+    PIL.Image: The rotated image or the original image if rotation fails.
+    """
+    orientation = 274
+    # Try to get EXIF data to determine image orientation
+    if img._getexif() is not None:
+        # Check orientation and rotate accordingly
+        exif=dict(img._getexif().items())
+        if exif is not None and isinstance(exif, dict):
+            if exif.get(orientation, None) is not None:
+                if  exif[orientation] == 3 :
+                    img2 = img.rotate(180, expand = True)
+                    # in subprocess , logging doesn't work normal
+                    print('check rotate & find rotate : rotate 180')
+                elif exif[orientation] == 4:
+                    img2 = img.transpose(Image.FLIP_TOP_BOTTOM)
+                    print('check rotate & find flip: TOP_BOTTOM')
+                elif exif[orientation] == 5:
+                    img2 = img.rotate(270, expand=True)
+                    img2 = img2.transpose(Image.FLIP_LEFT_RIGHT)
+                    print('check rotate & find flip: LEFT_RIGHT & rotate : rotate 270')
+                elif exif[orientation] == 6 :
+                    img2=img.rotate(270, expand = True)
+                    print('check rotate & find rotate : rotate 270')
+                elif exif[orientation] == 7:
+                    img2 = img.rotate(270, expand=True)
+                    img2 = img2.transpose(Image.FLIP_TOP_BOTTOM)
+                    print('check rotate & find flip: TOP_BOTTOM & find rotate : rotate 270')
+                elif exif[orientation] == 8 :
+                    img2 = img.rotate(90, expand = True)
+                    print('check rotate & find rotate : rotate 90')
+                else:
+                    img2 = img
+                    print('No rotation needed.')
+    else:        
+        logging.info(f'Check rotate failed: has not exif. Return original img.')
+        print(f'Check rotate failed: has not exif. Return original img.')
+        img2 = img
+
+    return img2
