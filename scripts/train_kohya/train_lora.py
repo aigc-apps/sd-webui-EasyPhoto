@@ -330,10 +330,17 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     #  vstack all embedding
     embedding_list = []
     for img in face_image_list:
-        image = Image.open(img)
-        embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
-        embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
-        embedding_list.append(embedding)
+        try:
+            image = Image.open(img)
+            embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
+            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+            embedding_list.append(embedding)
+        except Exception as e:
+            print("error at:", str(e))
+
+    if len(embedding_list) == 0:
+        return [], [], []
+        
     embedding_array = np.vstack(embedding_list)
     
     #  mean, get pivot
@@ -343,8 +350,6 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     # sort with cosine distance
     embedding_list = [[np.dot(emb, pivot_feature)[0][0], emb] for emb in embedding_list]
     embedding_list = sorted(embedding_list, key = lambda a : -a[0])
-    # for i in range(10):
-    #     print(embedding_list[i][0], embedding_list[i][1].shape)
 
     top10_embedding         = [emb[1] for emb in embedding_list]
     top10_embedding_array   = np.vstack(top10_embedding)
@@ -366,8 +371,8 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
                 res = np.mean(np.dot(embedding, top10_embedding_array))
                 result_list.append([res, img])
                 result_list = sorted(result_list, key = lambda a : -a[0])
-            except:
-                pass
+            except Exception as e:
+                print("error at:", str(e))
 
     # pick most similar using faceid
     t_result_list = [i[1] for i in result_list][:top_merge]
@@ -1397,14 +1402,31 @@ def main():
                 print(f"Top-{str(index)}: {str(line)}")
                 logger.info(f"Top-{str(index)}: {str(line)}")
             
-            lora_save_path = network_module.merge_from_name_and_index(merge_best_lora_name, tlist, output_dir=args.output_dir)
-            logger.info(f"Save Best Merged Loras To:{lora_save_path}.")
-
             best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
             os.makedirs(best_outputs_dir, exist_ok=True)
-            for result in t_result_list[:1]:
-                copyfile(result, os.path.join(best_outputs_dir, os.path.basename(result)))
-            copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
+            
+            # If all training images cannot detect faces, Lora fusion will not be performed
+            # Otherwise, the face ID score will be calculated based on the training images and the validated images for Lora fusion.
+            if len(t_result_list) == 0:
+                print("Dectect no face in training data, move last weights and validation image to best_outputs")
+                test_img_dir    = os.path.join(args.output_dir, "validation")
+                img_list        = glob(os.path.join(test_img_dir, '*.jpg')) + glob(os.path.join(test_img_dir, '*.JPG')) + glob(os.path.join(test_img_dir, '*.png')) + glob(os.path.join(test_img_dir, '*.PNG'))
+                
+                t_result_list = []
+                for img in img_list:
+                    res = int(img.split("_")[-2])
+                    t_result_list.append([res, img])
+                    t_result_list = sorted(t_result_list, key = lambda a : -a[0])
+
+                copyfile(t_result_list[0][1], os.path.join(best_outputs_dir, os.path.basename(t_result_list[0][1])))
+                copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
+            else:
+                lora_save_path = network_module.merge_from_name_and_index(merge_best_lora_name, tlist, output_dir=args.output_dir)
+                logger.info(f"Save Best Merged Loras To:{lora_save_path}.")
+
+                for result in t_result_list[:1]:
+                    copyfile(result, os.path.join(best_outputs_dir, os.path.basename(result)))
+                copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
 
         # we will remove cache_log_file after train
         f = open(args.cache_log_file, 'w')
