@@ -81,10 +81,11 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
             angle = 0 if x==0 else abs(math.atan(y/x)*180/math.pi)
             angle = (90 - angle)/ 90 
 
-            # width judge
+            # face size judge
             face_width  = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
             face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
-            if face_width / w < 1/8 or face_height / h < 1/8:
+            if min(face_width, face_height) < 128:
+                print("Face size in {} is small than 128. Ignore it.".format(jpg))
                 continue
 
             # face crop
@@ -101,6 +102,9 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
             selected_paths.append(_image_path)
         except:
             pass
+    
+    if len(face_id_scores) == 0:
+        return "No faces detected. Please increase the size of the face in the upload photos."
 
     # Filter reference faces based on scores, considering quality scores, similarity scores, and angle scores
     face_id_scores      = compare_jpg_with_face_id(face_id_scores)
