@@ -11,16 +11,16 @@ from skimage import transform
 def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, mask_type):
     '''
     Inputs:
-        image                   输入图片；
-        retinaface_result       retinaface的检测结果；
-        crop_ratio              人脸部分裁剪扩充比例；
-        face_seg                人脸分割模型；
-        mask_type               人脸分割的方式，一个是crop，一个是skin，人脸分割结果是人脸皮肤或者人脸框
+        image                   Input image
+        retinaface_result       The detection results of retinaface
+        crop_ratio              The proportion of facial clipping and expansion
+        face_seg                Facial segmentation model
+        mask_type               The type of facial segmentation methods, one is loop and the other is skin, and the result of facial segmentation is the skin or frame of the face
     
     Outputs:
-        retinaface_box          扩增后相对于原图的box
-        retinaface_keypoints    相对于原图的keypoints
-        retinaface_mask_pil     人脸分割结果
+        retinaface_box          After box amplification, the box relative to the original image
+        retinaface_keypoints    Points relative to the original image
+        retinaface_mask_pil     Segmentation Results
     '''
     h, w, c = np.shape(image)
     if len(retinaface_result['boxes']) != 0:
@@ -479,9 +479,9 @@ class BiSeNet(nn.Module):
 class Face_Skin(object):
     '''
     Inputs:
-        image   输入图片；
+        image   input image.
     Outputs:
-        mask    输出mask图片；
+        mask    output mask.
     '''
     def __init__(self, model_path) -> None:
         n_classes   = 19
@@ -489,13 +489,14 @@ class Face_Skin(object):
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
         self.model.eval()
 
-        # 对输入图片进行转换
+        # transform for input image
         self.trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
     def __call__(self, image, retinaface_detection, needs_index=[12, 13]):
+        # needs_index 12, 13 means seg the lip
         with torch.no_grad():
             total_mask = np.zeros_like(np.uint8(image))
 
