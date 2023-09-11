@@ -225,7 +225,7 @@ def easyphoto_infer_forward(
             logging.info("Portrait Enhancement model load error, but pass.")
     if face_skin is None:
         try:
-            face_skin = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"), [12, 13])
+            face_skin = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
         except:
             logging.info("Face Skin model load error, but pass.")
 
@@ -416,8 +416,11 @@ def easyphoto_infer_forward(
                 first_diffusion_output_image_face_area  = np.array(copy.deepcopy(first_diffusion_output_image))[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2], :] 
                 first_diffusion_output_image_face_area  = color_transfer(first_diffusion_output_image_face_area, template_image_original_face_area)
 
-                first_diffusion_output_image = np.array(first_diffusion_output_image)
-                first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = first_diffusion_output_image_face_area
+                first_diffusion_output_image    = np.array(first_diffusion_output_image)
+                face_skin_mask                  = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:])), retinaface_detection, needs_index=[1, 2, 3, 4, 5, 10, 12, 13])) > 128)
+                
+                first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
+                    first_diffusion_output_image_face_area * face_skin_mask + first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] * (1 - face_skin_mask)
                 first_diffusion_output_image = Image.fromarray(first_diffusion_output_image)
                 
             # Obtain the mask of the area around the face
@@ -456,7 +459,10 @@ def easyphoto_infer_forward(
                 second_diffusion_output_image_face_area = color_transfer(second_diffusion_output_image_face_area, template_image_original_face_area)
 
                 second_diffusion_output_image = np.array(second_diffusion_output_image)
-                second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = second_diffusion_output_image_face_area
+                face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])), retinaface_detection, needs_index=[1, 2, 3, 4, 5, 10, 12, 13])) > 128)
+                
+                second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
+                    second_diffusion_output_image_face_area * face_skin_mask + second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] * (1 - face_skin_mask)
                 second_diffusion_output_image = Image.fromarray(second_diffusion_output_image)
                 
             # If it is a large template for cutting, paste the reconstructed image back

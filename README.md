@@ -76,6 +76,28 @@ We will support installing EasyPhoto from **Available** in the future.
 
 ![install](images/install.jpg)
 
+### 4. Quick start from docker
+If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
+
+Then execute the following commands in this way:
+```
+# pull image
+docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.2
+
+# enter image
+docker run --rm -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+
+# launch webui
+python3 launch.py --port 7860
+```
+The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first. 
+```
+cd extensions/sd-webui-EasyPhoto/
+git pull
+cd /workspace
+```
+
+
 # How to use
 ### 1. Model Training
 The EasyPhoto training interface is as follows:

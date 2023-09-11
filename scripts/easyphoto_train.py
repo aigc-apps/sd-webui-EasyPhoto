@@ -133,31 +133,42 @@ def easyphoto_train_forward(
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
     else:
-        os.system(
-            f'''
-            accelerate launch --mixed_precision="fp16" --main_process_port=3456 {train_kohya_path} \
-            --pretrained_model_name_or_path="{sd15_save_path}" \
-            --pretrained_model_ckpt="{webui_load_path}" \
-            --train_data_dir="{user_path}" --caption_column="text" \
-            --resolution={resolution} --random_flip --train_batch_size={train_batch_size} --gradient_accumulation_steps={gradient_accumulation_steps} --dataloader_num_workers={dataloader_num_workers} \
-            --max_train_steps={max_train_steps} --checkpointing_steps={val_and_checkpointing_steps} \
-            --learning_rate={learning_rate} --lr_scheduler="constant" --lr_warmup_steps=0 \
-            --train_text_encoder \
-            --seed=42 \
-            --rank={rank} --network_alpha={network_alpha} \
-            --validation_prompt="{validation_prompt}" \
-            --validation_steps={val_and_checkpointing_steps} \
-            --output_dir="{weights_save_path}" \
-            --logging_dir="{weights_save_path}" \
-            --enable_xformers_memory_efficient_attention \
-            --mixed_precision='fp16' \
-            --template_dir="{training_templates_path}" \
-            --template_mask \
-            --merge_best_lora_based_face_id \
-            --merge_best_lora_name="{user_id}" \
-            --cache_log_file="{cache_log_file_path}"
-            '''
-        )
+        command = [
+            f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
+            f'--pretrained_model_name_or_path={sd15_save_path}',
+            f'--pretrained_model_ckpt={webui_load_path}', 
+            f'--train_data_dir={user_path}',
+            '--caption_column=text', 
+            f'--resolution={resolution}',
+            '--random_flip',
+            f'--train_batch_size={train_batch_size}',
+            f'--gradient_accumulation_steps={gradient_accumulation_steps}',
+            f'--dataloader_num_workers={dataloader_num_workers}', 
+            f'--max_train_steps={max_train_steps}',
+            f'--checkpointing_steps={val_and_checkpointing_steps}', 
+            f'--learning_rate={learning_rate}',
+            '--lr_scheduler=constant',
+            '--lr_warmup_steps=0', 
+            '--train_text_encoder', 
+            '--seed=42', 
+            f'--rank={rank}',
+            f'--network_alpha={network_alpha}', 
+            f'--validation_prompt={validation_prompt}', 
+            f'--validation_steps={val_and_checkpointing_steps}', 
+            f'--output_dir={weights_save_path}', 
+            f'--logging_dir={weights_save_path}', 
+            '--enable_xformers_memory_efficient_attention', 
+            '--mixed_precision=fp16', 
+            f'--template_dir={training_templates_path}', 
+            '--template_mask', 
+            '--merge_best_lora_based_face_id', 
+            f'--merge_best_lora_name={user_id}',
+            f'--cache_log_file={cache_log_file_path}'
+        ]
+        try:
+            subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing the command: {e}")
     
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     if not os.path.exists(best_weight_path):
