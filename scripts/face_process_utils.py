@@ -1,23 +1,12 @@
-import copy
-import glob
-import logging
-import os
-import random
-import sys
-
 import cv2
-import gradio as gr
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.model_zoo as modelzoo
 import torchvision.transforms as transforms
-from modelscope.outputs import OutputKeys
-from modelscope.pipelines import pipeline
-from modelscope.utils.constant import Tasks
 from PIL import Image
 from skimage import transform
+
 
 def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, mask_type):
     '''
@@ -494,7 +483,7 @@ class Face_Skin(object):
     Outputs:
         mask    输出mask图片；
     '''
-    def __init__(self, model_path, needs_index) -> None:
+    def __init__(self, model_path) -> None:
         n_classes   = 19
         self.model  = BiSeNet(n_classes=n_classes)
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
@@ -505,9 +494,8 @@ class Face_Skin(object):
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
-        self.needs_index = needs_index
 
-    def __call__(self, image, retinaface_detection):
+    def __call__(self, image, retinaface_detection, needs_index=[12, 13]):
         with torch.no_grad():
             total_mask = np.zeros_like(np.uint8(image))
 
@@ -521,7 +509,7 @@ class Face_Skin(object):
             image_h, image_w, c = np.shape(np.uint8(sub_image))
             PIL_img             = Image.fromarray(np.uint8(sub_image))
             PIL_img             = PIL_img.resize((512, 512), Image.BILINEAR)
-            np_img              = np.uint8(PIL_img)
+            
             torch_img           = self.trans(PIL_img)
             torch_img           = torch.unsqueeze(torch_img, 0)
 
@@ -529,7 +517,7 @@ class Face_Skin(object):
             model_mask          = out.squeeze(0).cpu().numpy().argmax(0)
             
             sub_mask = np.zeros_like(model_mask)
-            for index in self.needs_index:
+            for index in needs_index:
                 sub_mask += np.uint8(model_mask == index)
 
             sub_mask = np.clip(sub_mask, 0, 1) * 255
