@@ -5,12 +5,12 @@ import time
 import gradio as gr
 import requests
 from modules import script_callbacks, shared
-from modules.paths import models_path
 from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
-                                      user_id_outpath_samples)
+                                      models_path, user_id_outpath_samples)
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_train import (DEFAULT_CACHE_LOG_FILE,
                                      easyphoto_train_forward)
+from scripts.easyphoto_utils import check_id_valid
 
 gradio_compat = True
 
@@ -264,20 +264,21 @@ def on_ui_tabs():
 
                         with gr.Row():
                             def select_function():
-                                if os.path.exists(id_path):
-                                    with open(id_path, "r") as f:
-                                        ids = f.readlines()
-                                    ids = [_id.strip() for _id in ids]
-                                else:
-                                    ids = []
+                                ids = []
+                                if os.path.exists(user_id_outpath_samples):
+                                    _ids = os.listdir(user_id_outpath_samples)
+                                    for _id in _ids:
+                                        if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                            ids.append(_id)
+
                                 return gr.update(choices=["none"] + ids)
 
-                            if os.path.exists(id_path):
-                                with open(id_path, "r") as f:
-                                    ids = f.readlines()
-                                ids = [_id.strip() for _id in ids]
-                            else:
-                                ids = []
+                            ids = []
+                            if os.path.exists(user_id_outpath_samples):
+                                _ids = os.listdir(user_id_outpath_samples)
+                                for _id in _ids:
+                                    if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                        ids.append(_id)
 
                             uuids           = []
                             num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
@@ -358,6 +359,10 @@ def on_ui_tabs():
                                     label="Apply color shift last",  
                                     value=True
                                 )
+                                background_restore = gr.Checkbox(
+                                    label="Background Restore",  
+                                    value=False
+                                )
 
                             with gr.Box():
                                 gr.Markdown(
@@ -390,7 +395,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, model_selected_tab, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]
                 )
             
