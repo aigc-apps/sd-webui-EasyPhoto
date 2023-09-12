@@ -401,13 +401,18 @@ def on_ui_tabs():
                             value="No task currently",
                             interactive=False
                         )
+                        with gr.Accordion("Generation FaceID", open=False):
+                            face_id_outputs = gr.Gallery(
+                                label="ID Photo",
+                                show_label=True
+                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, model_selected_tab, *uuids],
-                    outputs=[infer_progress, output_images]
+                    outputs=[infer_progress, output_images, face_id_outputs]
                 )
             
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]

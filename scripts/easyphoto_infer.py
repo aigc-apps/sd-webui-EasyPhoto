@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import torch
+import insightface
 import cv2
 import numpy as np
 from modelscope.pipelines import pipeline
@@ -197,6 +198,8 @@ image_face_fusion = None
 skin_retouching = None
 portrait_enhancement = None
 face_skin = None
+face_recognition = None
+face_analyser = None
 
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
@@ -206,7 +209,7 @@ def easyphoto_infer_forward(
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, face_analyser
     
     # create modelscope model
     if retinaface_detection is None:
@@ -228,6 +231,16 @@ def easyphoto_infer_forward(
             face_skin = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
         except:
             logging.info("Face Skin model load error, but pass.")
+    
+    # Create the face recognition model for computing FaceID.
+    if face_recognition is None:
+        name = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx")
+        face_recognition = insightface.model_zoo.get_model(name, providers=["CPUExecutionProvider"])
+        face_recognition.prepare(ctx_id=0)
+    if face_analyser is None:
+        root = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "")
+        face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", root=root, providers=["CPUExecutionProvider"])
+        face_analyser.prepare(ctx_id=0, det_size=(640, 640))
 
     # get random seed 
     if int(seed) == -1:
@@ -298,7 +311,7 @@ def easyphoto_infer_forward(
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
-    outputs = []
+    outputs, face_id_outputs = [], []
     for template_idx, template_image in enumerate(template_images):
         # open the template image
         if tabs == 0:
@@ -486,6 +499,21 @@ def easyphoto_infer_forward(
             else:
                 loop_output_image               = second_diffusion_output_image
             
+            # Given the current user id, compute the FaceID of the second diffusion generation w.r.t the roop image.
+            # For simplicity, we don't compute the FaceID of the final output image.
+            loop_output_image = np.array(loop_output_image)
+            x1, y1, x2, y2 = loop_template_crop_safe_box
+            loop_output_image_face = loop_output_image[y1:y2, x1:x2]
+
+            embedding = face_recognition.get(np.array(loop_output_image_face), face_analyser.get(np.array(loop_output_image_face))[0])
+            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])  # (512, 1)
+            roop_image_embedding = face_recognition.get(np.array(roop_images[index]), face_analyser.get(np.array(roop_images[index]))[0])
+            roop_image_embedding = np.array([roop_image_embedding / np.linalg.norm(roop_image_embedding, 2)])  # (512, 1)
+            
+            loop_output_image_faceid = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
+            face_id_outputs.append((roop_images[index], "FaceID: {:.2f}".format(loop_output_image_faceid)))
+            loop_output_image = Image.fromarray(loop_output_image)
+            
             if min(len(template_face_safe_boxes), len(user_ids)) > 1:
                 template_face_safe_box = template_face_safe_boxes[index]
                 output_image[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = np.array(loop_output_image, np.float32)[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]]
@@ -527,4 +555,4 @@ def easyphoto_infer_forward(
         face_skin = None
 
     torch.cuda.empty_cache()
-    return "Success", outputs
+    return "Success", outputs, face_id_outputs
