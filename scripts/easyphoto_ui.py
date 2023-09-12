@@ -283,9 +283,9 @@ def on_ui_tabs():
                             num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
                             for i in range(int(num_of_faceid)):
                                 if int(num_of_faceid) > 1:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"Used_{i} id", visible=True)
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"User_{i} id", visible=True)
                                 else:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="Used id (The User id you provide while training)", visible=True)
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="User id (The User id you provide while training)", visible=True)
 
                                 uuids.append(uuid)
                             

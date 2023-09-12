@@ -175,7 +175,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         if np.sum(np.array(mask)) != 0:
             images.append(mask_sub_image)
 
-    # write resuilts
+    # write results
     for index, base64_pilimage in enumerate(images):
         image = base64_pilimage.convert("RGB")
         image.save(os.path.join(images_save_path, str(index) + ".jpg"))
