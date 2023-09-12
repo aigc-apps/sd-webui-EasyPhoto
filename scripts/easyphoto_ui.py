@@ -14,6 +14,16 @@ from scripts.easyphoto_utils import check_id_valid
 
 gradio_compat = True
 
+def get_external_ckpts():
+    external_checkpoints = []
+    external_ckpt_dir = shared.cmd_opts.ckpt_dir if shared.cmd_opts.ckpt_dir else []
+    if len(external_ckpt_dir) > 0:
+        for _checkpoint in os.listdir(external_ckpt_dir):
+            if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                external_checkpoints.append(_checkpoint)
+    return external_checkpoints
+external_checkpoints = get_external_ckpts()
+
 try:
     from distutils.version import LooseVersion
 
@@ -101,13 +111,13 @@ def on_ui_tabs():
                                     for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                         if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
                                             checkpoints.append(_checkpoint)
-                                    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)))
+                                    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
                                 
                                 checkpoints = []
                                 for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                     if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
                                         checkpoints.append(_checkpoint)
-                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)), label="The base checkpoint you use.", visible=True)
+                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
                                 checkpoint_refresh = ToolButton(value="\U0001f504")
                                 checkpoint_refresh.click(
@@ -247,13 +257,13 @@ def on_ui_tabs():
                                 for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                     if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
                                         checkpoints.append(_checkpoint)
-                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)))
+                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
                             
                             checkpoints = []
                             for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                 if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
                                     checkpoints.append(_checkpoint)
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints)), label="The base checkpoint you use.", visible=True)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
                             checkpoint_refresh = ToolButton(value="\U0001f504")
                             checkpoint_refresh.click(
@@ -285,9 +295,9 @@ def on_ui_tabs():
                             num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
                             for i in range(int(num_of_faceid)):
                                 if int(num_of_faceid) > 1:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"Used_{i} id", visible=True)
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"User_{i} id", visible=True)
                                 else:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="Used id (The User id you provide while training)", visible=True)
+                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="User id (The User id you provide while training)", visible=True)
 
                                 uuids.append(uuid)
                             
