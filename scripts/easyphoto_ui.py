@@ -270,7 +270,7 @@ def on_ui_tabs():
                                     for _id in _ids:
                                         if check_id_valid(_id, user_id_outpath_samples, models_path):
                                             ids.append(_id)
-
+                                ids = sorted(ids)
                                 return gr.update(choices=["none"] + ids)
 
                             ids = []
@@ -279,6 +279,7 @@ def on_ui_tabs():
                                 for _id in _ids:
                                     if check_id_valid(_id, user_id_outpath_samples, models_path):
                                         ids.append(_id)
+                                ids = sorted(ids)
 
                             uuids           = []
                             num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)

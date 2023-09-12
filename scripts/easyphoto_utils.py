@@ -13,7 +13,7 @@ logging.getLogger().setLevel(log_level)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')  
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
-    best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
+    best_outputs_paths = glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
     if len(best_outputs_paths) == 0:
         return False
     

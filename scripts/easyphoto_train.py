@@ -15,7 +15,6 @@ from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.preprocess import preprocess_images
-from tqdm import tqdm
 
 DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
@@ -42,6 +41,7 @@ def easyphoto_train_forward(
         for _id in _ids:
             if check_id_valid(_id, user_id_outpath_samples, models_path):
                 ids.append(_id)
+    ids = sorted(ids)
 
     if user_id in ids:
         return "User id 不能重复。"
