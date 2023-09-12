@@ -498,6 +498,7 @@ def easyphoto_infer_forward(
             resize          = float(short_side / 768.0)
             new_size        = (int(output_image.width//resize), int(output_image.height//resize))
             output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
+            # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
             output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20 if not background_restore else 30, denoising_strength=0.30 if not background_restore else 0.10, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
             
         try:
@@ -505,7 +506,10 @@ def easyphoto_infer_forward(
         except:
             logging.info("Skin Retouching error, but pass.")
         try:
-            output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            # If the resolution of the image is less than 768x768 pixels, super-resolution is performed. 
+            h, w, c = np.shape(np.array(output_image))
+            if h * w < 768.0 * 768.0:
+                output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
         except:
             logging.info("Portrait enhancement error, but pass.")
 
