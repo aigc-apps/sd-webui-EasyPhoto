@@ -188,7 +188,7 @@ This project is licensed under the [Apache License (Version 2.0)](https://github
 
 ## ContactUS
 1. Use [Dingding](https://www.dingtalk.com/) to search group 38250008552 or Scan to join
-2. Use Wechat, scan the right pic to join
+2. Since the WeChat group is full, you need to scan the image on the right to add this student as a friend first, and then join the WeChat group.
 
 <figure>
 <img src="images/erweima.jpg" width=300/>

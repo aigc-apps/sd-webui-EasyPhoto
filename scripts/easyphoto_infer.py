@@ -201,7 +201,7 @@ face_skin = None
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, tabs, *user_ids
+    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, tabs, *user_ids
 ): 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
@@ -258,7 +258,7 @@ def easyphoto_infer_forward(
     input_prompt_without_lora       = f"{validation_prompt}" + additional_prompt
     best_lora_weights= str(0.9)
     multi_user_facecrop_ratio = 1.5
-    multi_user_safecrop_ratio = 1.1
+    multi_user_safecrop_ratio = 1.0
 
     for user_id in user_ids:
         if user_id == 'none':
@@ -320,19 +320,28 @@ def easyphoto_infer_forward(
             logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
              the last {len(user_ids)-template_detected_facenum} set user_ids is useless")
 
-        if min(template_detected_facenum, len(user_ids)) > 1:
+        if background_restore:
             output_image = np.array(copy.deepcopy(template_image))
-            output_mask  = np.ones_like(output_image)
+            output_mask  = np.ones_like(output_image) * 255
 
-            # get mask in final diffusion for multi people
             for index in range(len(template_face_safe_boxes)):
-                # pass this userid, not mask the face
-                if index in passed_userid_list:
-                    continue
-                else:
-                    retinaface_box = template_face_safe_boxes[index]
-                    output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
-            output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
+                retinaface_box = template_face_safe_boxes[index]
+                output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 0
+            output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
+        else:
+            if min(template_detected_facenum, len(user_ids)) > 1:
+                output_image = np.array(copy.deepcopy(template_image))
+                output_mask  = np.ones_like(output_image)
+
+                # get mask in final diffusion for multi people
+                for index in range(len(template_face_safe_boxes)):
+                    # pass this userid, not mask the face
+                    if index in passed_userid_list:
+                        continue
+                    else:
+                        retinaface_box = template_face_safe_boxes[index]
+                        output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+                output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
         total_processed_person = 0
         for index in range(min(len(template_face_safe_boxes), len(user_ids))):
@@ -483,20 +492,24 @@ def easyphoto_infer_forward(
             else:
                 output_image = loop_output_image 
 
-        if min(len(template_face_safe_boxes), len(user_ids)) > 1:
+        if min(len(template_face_safe_boxes), len(user_ids)) > 1 or background_restore:
             output_image    = Image.fromarray(np.uint8(output_image))
             short_side      = min(output_image.width, output_image.height)
             resize          = float(short_side / 768.0)
             new_size        = (int(output_image.width//resize), int(output_image.height//resize))
             output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
-            output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20, denoising_strength=0.3, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+            # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
+            output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20 if not background_restore else 30, denoising_strength=0.30 if not background_restore else 0.10, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
             
         try:
             output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
         except:
             logging.info("Skin Retouching error, but pass.")
         try:
-            output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            # If the resolution of the image is less than 768x768 pixels, super-resolution is performed. 
+            h, w, c = np.shape(np.array(output_image))
+            if h * w < 768.0 * 768.0:
+                output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
         except:
             logging.info("Portrait enhancement error, but pass.")
 
@@ -512,6 +525,6 @@ def easyphoto_infer_forward(
         skin_retouching = None
         portrait_enhancement = None
         face_skin = None
-        torch.cuda.empty_cache()
 
+    torch.cuda.empty_cache()
     return "Success", outputs
