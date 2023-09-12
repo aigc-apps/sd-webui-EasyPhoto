@@ -198,32 +198,36 @@ def process_rotate_image(img: Image) -> Image:
         exif=dict(img._getexif().items())
         if exif is not None and isinstance(exif, dict):
             if exif.get(orientation, None) is not None:
-                if  exif[orientation] == 3 :
-                    img2 = img.rotate(180, expand = True)
+                if exif[orientation] == 3 :
+                    output_img = img.rotate(180, expand = True)
                     # in subprocess , logging doesn't work normal
                     print('check rotate & find rotate : rotate 180')
                 elif exif[orientation] == 4:
-                    img2 = img.transpose(Image.FLIP_TOP_BOTTOM)
+                    output_img = img.transpose(Image.FLIP_TOP_BOTTOM)
                     print('check rotate & find flip: TOP_BOTTOM')
                 elif exif[orientation] == 5:
-                    img2 = img.rotate(270, expand=True)
-                    img2 = img2.transpose(Image.FLIP_LEFT_RIGHT)
+                    output_img = img.rotate(270, expand=True)
+                    output_img = output_img.transpose(Image.FLIP_LEFT_RIGHT)
                     print('check rotate & find flip: LEFT_RIGHT & rotate : rotate 270')
                 elif exif[orientation] == 6 :
-                    img2=img.rotate(270, expand = True)
+                    output_img = img.rotate(270, expand = True)
                     print('check rotate & find rotate : rotate 270')
                 elif exif[orientation] == 7:
-                    img2 = img.rotate(270, expand=True)
-                    img2 = img2.transpose(Image.FLIP_TOP_BOTTOM)
+                    output_img = img.rotate(270, expand=True)
+                    output_img = output_img.transpose(Image.FLIP_TOP_BOTTOM)
                     print('check rotate & find flip: TOP_BOTTOM & find rotate : rotate 270')
                 elif exif[orientation] == 8 :
-                    img2 = img.rotate(90, expand = True)
+                    output_img = img.rotate(90, expand = True)
                     print('check rotate & find rotate : rotate 90')
                 else:
-                    img2 = img
+                    output_img = img
                     print('No rotation needed.')
+            else:
+                output_img = img
+        else:
+            output_img = img
     else:        
         print(f'Check rotate failed: has not exif. Return original img.')
-        img2 = img
+        output_img = img
 
-    return img2
+    return output_img
