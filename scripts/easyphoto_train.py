@@ -223,7 +223,6 @@ def process_rotate_image(img: Image) -> Image:
                     img2 = img
                     print('No rotation needed.')
     else:        
-        logging.info(f'Check rotate failed: has not exif. Return original img.')
         print(f'Check rotate failed: has not exif. Return original img.')
         img2 = img
 
