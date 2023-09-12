@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Fine-tuning script for Stable Diffusion for text2image with support for LoRA."""
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import argparse
 import logging
 import math
-import os
 import random
 import time
 import shutil

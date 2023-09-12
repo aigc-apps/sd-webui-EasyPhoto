@@ -2,22 +2,19 @@
 import os
 import platform
 import subprocess
+import sys
 import threading
+import time
+from glob import glob
 from shutil import copyfile
 
-import time
-import requests
-import sys
 from PIL import Image
-from glob import glob
-from tqdm import tqdm
-
-from modules import shared
-from modules.paths import models_path
-from scripts.easyphoto_config import (id_path, user_id_outpath_samples,
-                                  validation_prompt)
+from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
+                                      models_path, user_id_outpath_samples,
+                                      validation_prompt)
+from scripts.easyphoto_utils import (check_files_exists_and_download,
+                                     check_id_valid)
 from scripts.preprocess import preprocess_images
-from scripts.easyphoto_utils import check_files_exists_and_download
 
 DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
@@ -38,12 +35,14 @@ def easyphoto_train_forward(
     if user_id == "none" :
         return "User id cannot be set to none."
     
-    if os.path.exists(id_path):
-        with open(id_path, "r") as f:
-            ids = f.readlines()
-        ids = [_id.strip() for _id in ids]
-    else:
-        ids = []
+    ids = []
+    if os.path.exists(user_id_outpath_samples):
+        _ids = os.listdir(user_id_outpath_samples)
+        for _id in _ids:
+            if check_id_valid(_id, user_id_outpath_samples, models_path):
+                ids.append(_id)
+    ids = sorted(ids)
+
     if user_id in ids:
         return "User id 不能重复。"
 
@@ -176,8 +175,9 @@ def easyphoto_train_forward(
         return "Failed to obtain Lora after training, please check the training process."
 
     copyfile(best_weight_path, webui_save_path)
-    with open(id_path, "a") as f:
-        f.write(f"{user_id}\n")
+    # It has been abandoned and will be deleted later.
+    # with open(id_path, "a") as f:
+    #     f.write(f"{user_id}\n")
     return "The training has been completed."
 
 
