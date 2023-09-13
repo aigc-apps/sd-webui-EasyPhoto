@@ -204,8 +204,8 @@ face_analyser = None
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, tabs, *user_ids
-): 
+    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, tabs, display_score, *user_ids
+):
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
     # global
@@ -232,12 +232,12 @@ def easyphoto_infer_forward(
         except:
             logging.info("Face Skin model load error, but pass.")
     
-    # Create the face recognition model for computing FaceID.
-    if face_recognition is None:
+    # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
+    if display_score and face_recognition is None:
         name = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx")
         face_recognition = insightface.model_zoo.get_model(name, providers=["CPUExecutionProvider"])
         face_recognition.prepare(ctx_id=0)
-    if face_analyser is None:
+    if display_score and face_analyser is None:
         root = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "")
         face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", root=root, providers=["CPUExecutionProvider"])
         face_analyser.prepare(ctx_id=0, det_size=(640, 640))
@@ -501,18 +501,20 @@ def easyphoto_infer_forward(
             
             # Given the current user id, compute the FaceID of the second diffusion generation w.r.t the roop image.
             # For simplicity, we don't compute the FaceID of the final output image.
-            loop_output_image = np.array(loop_output_image)
-            x1, y1, x2, y2 = loop_template_crop_safe_box
-            loop_output_image_face = loop_output_image[y1:y2, x1:x2]
+            if display_score:
+                loop_output_image = np.array(loop_output_image)
+                x1, y1, x2, y2 = loop_template_crop_safe_box
+                loop_output_image_face = loop_output_image[y1:y2, x1:x2]
 
-            embedding = face_recognition.get(np.array(loop_output_image_face), face_analyser.get(np.array(loop_output_image_face))[0])
-            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])  # (512, 1)
-            roop_image_embedding = face_recognition.get(np.array(roop_images[index]), face_analyser.get(np.array(roop_images[index]))[0])
-            roop_image_embedding = np.array([roop_image_embedding / np.linalg.norm(roop_image_embedding, 2)])  # (512, 1)
-            
-            loop_output_image_faceid = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
-            face_id_outputs.append((roop_images[index], "FaceID: {:.2f}".format(loop_output_image_faceid)))
-            loop_output_image = Image.fromarray(loop_output_image)
+                embedding = face_recognition.get(np.array(loop_output_image_face), face_analyser.get(np.array(loop_output_image_face))[0])
+                embedding = np.array([embedding / np.linalg.norm(embedding, 2)])  # (512, 1)
+                roop_image_embedding = face_recognition.get(np.array(roop_images[index]), face_analyser.get(np.array(roop_images[index]))[0])
+                roop_image_embedding = np.array([roop_image_embedding / np.linalg.norm(roop_image_embedding, 2)])  # (512, 1)
+                
+                loop_output_image_faceid = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
+                # Truncate the user id to ensure the full information showing in the Gradio Gallery.
+                face_id_outputs.append((roop_images[index], "{}, {:.2f}".format(user_ids[index][:10], loop_output_image_faceid)))
+                loop_output_image = Image.fromarray(loop_output_image)
             
             if min(len(template_face_safe_boxes), len(user_ids)) > 1:
                 template_face_safe_box = template_face_safe_boxes[index]
@@ -553,6 +555,8 @@ def easyphoto_infer_forward(
         skin_retouching = None
         portrait_enhancement = None
         face_skin = None
+        face_recognition = None
+        face_analyser = None
 
     torch.cuda.empty_cache()
     return "Success", outputs, face_id_outputs

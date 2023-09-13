@@ -374,6 +374,11 @@ def on_ui_tabs():
                                     label="Background Restore",  
                                     value=False
                                 )
+                            with gr.Row():
+                                display_score = gr.Checkbox(
+                                    label="Display Face Similarity Scores",  
+                                    value=False
+                                )
 
                             with gr.Box():
                                 gr.Markdown(
@@ -383,7 +388,8 @@ def on_ui_tabs():
                                     2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
                                     3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
                                     4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
-                                    5. **Apply Face Fusion After** represents whether to perform the second facial fusion.  
+                                    5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
+                                    6. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
                                     '''
                                 )
                             
@@ -396,22 +402,22 @@ def on_ui_tabs():
                             label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                        with gr.Accordion("Face Similarity Scores", open=False):
+                            face_id_outputs = gr.Gallery(
+                                label="ID Photo",
+                                show_label=False,
+                            ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
                             value="No task currently",
                             interactive=False
                         )
-                        with gr.Accordion("Generation FaceID", open=False):
-                            face_id_outputs = gr.Gallery(
-                                label="ID Photo",
-                                show_label=True
-                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, model_selected_tab, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, model_selected_tab, display_score, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
                 )
             
