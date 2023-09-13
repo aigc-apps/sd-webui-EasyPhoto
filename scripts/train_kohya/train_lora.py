@@ -468,6 +468,11 @@ def parse_args():
         help="The column of the dataset containing a caption or a list of captions.",
     )
     parser.add_argument(
+        "--validation", 
+        action="store_true",
+        help="whether to validation in whole training.",
+    )
+    parser.add_argument(
         "--validation_prompt", type=str, default=None, help="A prompt that is sampled during training for inference."
     )
     parser.add_argument(
@@ -1320,7 +1325,7 @@ def main():
 
             if accelerator.sync_gradients:
                 if accelerator.is_main_process:
-                    if args.validation_steps is not None and args.validation_prompt is not None and global_step % args.validation_steps == 0:
+                    if args.validation_steps is not None and args.validation_prompt is not None and global_step % args.validation_steps == 0 and args.validation:
                         logger.info(
                             f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
                             f" {args.validation_prompt}."
@@ -1345,7 +1350,7 @@ def main():
                         )
 
         if accelerator.is_main_process:
-            if args.validation_steps is None and args.validation_prompt is not None and global_step % args.validation_epochs == 0:
+            if args.validation_steps is None and args.validation_prompt is not None and global_step % args.validation_epochs == 0 and args.validation:
                 logger.info(
                     f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
                     f" {args.validation_prompt}."
@@ -1377,25 +1382,26 @@ def main():
         if args.save_state:
             accelerator.save_state(accelerator_save_path)
 
-        log_validation(
-            network,
-            noise_scheduler,
-            vae,
-            text_encoder,
-            tokenizer,
-            unet,
-            args,
-            accelerator,
-            weight_dtype,
-            epoch,
-            global_step,
-            input_images=input_images, 
-            input_images_shape=input_images_shape, 
-            control_images=control_images, 
-            input_masks=input_masks,
-            new_size=new_size
-        )
-        if args.merge_best_lora_based_face_id:
+        if args.validation:
+            log_validation(
+                network,
+                noise_scheduler,
+                vae,
+                text_encoder,
+                tokenizer,
+                unet,
+                args,
+                accelerator,
+                weight_dtype,
+                epoch,
+                global_step,
+                input_images=input_images, 
+                input_images_shape=input_images_shape, 
+                control_images=control_images, 
+                input_masks=input_masks,
+                new_size=new_size
+            )
+        if args.merge_best_lora_based_face_id and args.validation:
             pivot_dir = os.path.join(args.train_data_dir, 'train')
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
             t_result_list, tlist, scores = eval_jpg_with_faceid(pivot_dir, os.path.join(args.output_dir, "validation"))
@@ -1429,6 +1435,11 @@ def main():
                 for result in t_result_list[:1]:
                     copyfile(result, os.path.join(best_outputs_dir, os.path.basename(result)))
                 copyfile(lora_save_path, os.path.join(best_outputs_dir, os.path.basename(lora_save_path)))
+        else:
+            best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
+            os.makedirs(best_outputs_dir, exist_ok=True)
+            merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
+            copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
 
         # we will remove cache_log_file after train
         f = open(args.cache_log_file, 'w')

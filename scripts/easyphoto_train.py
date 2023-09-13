@@ -27,6 +27,7 @@ def easyphoto_train_forward(
     resolution: int, val_and_checkpointing_steps: int, max_train_steps: int, steps_per_photos: int,
     train_batch_size: int, gradient_accumulation_steps: int, dataloader_num_workers: int, learning_rate: float, 
     rank: int, network_alpha: int,
+    validation: bool,
     instance_images: list,
     *args
 ):  
@@ -128,6 +129,8 @@ def easyphoto_train_forward(
             f'--merge_best_lora_name={user_id}',
             f'--cache_log_file={cache_log_file_path}'
         ]
+        if validation:
+            command += ["--validation"]
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
@@ -165,6 +168,8 @@ def easyphoto_train_forward(
             f'--merge_best_lora_name={user_id}',
             f'--cache_log_file={cache_log_file_path}'
         ]
+        if validation:
+            command += ["--validation"]
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:

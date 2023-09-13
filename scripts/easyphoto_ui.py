@@ -180,11 +180,18 @@ def on_ui_tabs():
                                     value=64,
                                     interactive=True
                                 )
+                            with gr.Row():
+                                validation = gr.Checkbox(
+                                    label="Validation",  
+                                    value=True
+                                )
+
                         gr.Markdown(
                             '''
                             Parameter parsing:
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
+                            - **Validation** Whether to validate at training time.
                             - Final training step = Min(photo_num * max_steps_per_photos, max_train_steps)
                             '''
                         )
@@ -219,7 +226,7 @@ def on_ui_tabs():
                                 inputs=[
                                     sd_model_checkpoint, dummy_component,
                                     uuid,
-                                    resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, instance_images,
+                                    resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
                                 ],
                                 outputs=[output_message])
                                 
@@ -374,6 +381,11 @@ def on_ui_tabs():
                                     label="Background Restore",  
                                     value=False
                                 )
+                            with gr.Row():
+                                super_resolution = gr.Checkbox(
+                                    label="Super Resolution at last",  
+                                    value=True
+                                )
 
                             with gr.Box():
                                 gr.Markdown(
@@ -406,7 +418,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, model_selected_tab, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, super_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images]
                 )
             
@@ -417,15 +429,8 @@ def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("num_of_faceid", shared.OptionInfo(
         1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
-
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
         True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
-        
-    shared.opts.add_option("EasyPhoto_outpath_samples", shared.OptionInfo(
-        easyphoto_outpath_samples, "EasyPhoto output path for image", section=section))
-
-    shared.opts.add_option("EasyPhoto_user_id_outpath", shared.OptionInfo(
-        user_id_outpath_samples, "EasyPhoto user id outpath", section=section)) 
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)
