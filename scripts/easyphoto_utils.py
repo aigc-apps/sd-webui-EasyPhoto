@@ -13,16 +13,12 @@ logging.getLogger().setLevel(log_level)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')  
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
-    best_outputs_paths = glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
-    if len(best_outputs_paths) == 0:
-        return False
-    
-    face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
+    face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
     if not os.path.exists(face_id_image_path):
         return False
     
-    safetensors_lora_path = os.path.join(models_path, "Lora", f"{user_id}.safetensors") 
-    ckpt_lora_path = os.path.join(models_path, "Lora", f"{user_id}.ckpt") 
+    safetensors_lora_path   = os.path.join(models_path, "Lora", f"{user_id}.safetensors") 
+    ckpt_lora_path          = os.path.join(models_path, "Lora", f"{user_id}.ckpt") 
     if not (os.path.exists(safetensors_lora_path) or os.path.exists(ckpt_lora_path)):
         return False
     return True
