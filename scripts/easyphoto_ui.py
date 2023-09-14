@@ -397,16 +397,19 @@ def on_ui_tabs():
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
-
                         output_images = gr.Gallery(
                             label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
-                        with gr.Accordion("Face Similarity Scores", open=False):
-                            face_id_outputs = gr.Gallery(
-                                label="ID Photo",
-                                show_label=False,
-                            ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
+                        face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
+                        face_id_outputs = gr.Gallery(
+                            label="Face Similarity Scores",
+                            show_label=False,
+                            visible=False,
+                        ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
+                        # Display Face Similarity Scores if the user intend to do it.
+                        display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
+                        display_score.change(lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs])
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
                             value="No task currently",
