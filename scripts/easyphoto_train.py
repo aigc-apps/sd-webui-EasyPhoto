@@ -8,7 +8,7 @@ import time
 from glob import glob
 from shutil import copyfile
 
-from PIL import Image
+from PIL import Image, ImageOps
 from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
                                       models_path, user_id_outpath_samples,
                                       validation_prompt)
@@ -74,7 +74,7 @@ def easyphoto_train_forward(
 
     for index, user_image in enumerate(instance_images):
         image = Image.open(user_image['name'])
-        image = process_rotate_image(image).convert("RGB")
+        image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
         
     sub_threading = threading.Thread(target=preprocess_images, args=(images_save_path, json_save_path, validation_prompt, original_backup_path, ref_image_path,))
@@ -179,55 +179,3 @@ def easyphoto_train_forward(
     # with open(id_path, "a") as f:
     #     f.write(f"{user_id}\n")
     return "The training has been completed."
-
-
-def process_rotate_image(img: Image) -> Image:
-    """
-    Rotate an image based on its EXIF orientation data.
-
-    Parameters:
-    img (PIL.Image): The image to process.
-
-    Returns:
-    PIL.Image: The rotated image or the original image if rotation fails.
-    """
-    orientation = 274
-    # Try to get EXIF data to determine image orientation
-    if img._getexif() is not None:
-        # Check orientation and rotate accordingly
-        exif=dict(img._getexif().items())
-        if exif is not None and isinstance(exif, dict):
-            if exif.get(orientation, None) is not None:
-                if exif[orientation] == 3 :
-                    output_img = img.rotate(180, expand = True)
-                    # in subprocess , logging doesn't work normal
-                    print('check rotate & find rotate : rotate 180')
-                elif exif[orientation] == 4:
-                    output_img = img.transpose(Image.FLIP_TOP_BOTTOM)
-                    print('check rotate & find flip: TOP_BOTTOM')
-                elif exif[orientation] == 5:
-                    output_img = img.rotate(270, expand=True)
-                    output_img = output_img.transpose(Image.FLIP_LEFT_RIGHT)
-                    print('check rotate & find flip: LEFT_RIGHT & rotate : rotate 270')
-                elif exif[orientation] == 6 :
-                    output_img = img.rotate(270, expand = True)
-                    print('check rotate & find rotate : rotate 270')
-                elif exif[orientation] == 7:
-                    output_img = img.rotate(270, expand=True)
-                    output_img = output_img.transpose(Image.FLIP_TOP_BOTTOM)
-                    print('check rotate & find flip: TOP_BOTTOM & find rotate : rotate 270')
-                elif exif[orientation] == 8 :
-                    output_img = img.rotate(90, expand = True)
-                    print('check rotate & find rotate : rotate 90')
-                else:
-                    output_img = img
-                    print('No rotation needed.')
-            else:
-                output_img = img
-        else:
-            output_img = img
-    else:        
-        print(f'Check rotate failed: has not exif. Return original img.')
-        output_img = img
-
-    return output_img
