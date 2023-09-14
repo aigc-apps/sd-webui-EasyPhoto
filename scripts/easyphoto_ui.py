@@ -377,19 +377,26 @@ def on_ui_tabs():
                                     label="Apply color shift last",  
                                     value=True
                                 )
+                                super_resolution = gr.Checkbox(
+                                    label="Super Resolution at last",  
+                                    value=True
+                                )
+                            with gr.Row():
+                                display_score = gr.Checkbox(
+                                    label="Display Face Similarity Scores",  
+                                    value=False
+                                )
                                 background_restore = gr.Checkbox(
                                     label="Background Restore",  
                                     value=False
                                 )
                             with gr.Row():
-                                super_resolution = gr.Checkbox(
-                                    label="Super Resolution at last",  
-                                    value=True
+                                background_restore_denoising_strength = gr.Slider(
+                                    minimum=0.10, maximum=0.60, value=0.35,
+                                    step=0.05, label='Background restore denoising strength',
+                                    visible=False
                                 )
-                                display_score = gr.Checkbox(
-                                    label="Display Face Similarity Scores",  
-                                    value=False
-                                )
+                                background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -401,6 +408,7 @@ def on_ui_tabs():
                                     4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
                                     5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
                                     6. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
+                                    7. **Background Restore** represents whether to give a different background.
                                     '''
                                 )
                             
@@ -408,19 +416,22 @@ def on_ui_tabs():
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
+
                         output_images = gr.Gallery(
                             label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
-                        face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
+
+                        face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
                         face_id_outputs = gr.Gallery(
-                            label="Face Similarity Scores",
+                            label ="Face Similarity Scores",
                             show_label=False,
                             visible=False,
                         ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
                         # Display Face Similarity Scores if the user intend to do it.
                         display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
                         display_score.change(lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs])
+
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
                             value="No task currently",
@@ -431,7 +442,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, super_resolution, model_selected_tab, display_score, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )

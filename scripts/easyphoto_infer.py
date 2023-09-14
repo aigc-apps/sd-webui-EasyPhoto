@@ -43,48 +43,26 @@ def resize_image(input_image, resolution, nearest = False, crop264 = True):
         img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_NEAREST)
     return img
 
-def inpaint_with_mask_face(
-    input_image: Image.Image,
-    select_mask_input: Image.Image,
-    replaced_input_image: Image.Image,
-    diffusion_steps = 50,
-    denoising_strength = 0.45,
-    input_prompt = '1girl',
-    hr_scale: float = 1.0,
-    default_positive_prompt = DEFAULT_POSITIVE,
-    default_negative_prompt = DEFAULT_NEGATIVE,
-    seed: int = 123456,
-    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-):
-    assert input_image is not None, f'input_image must not be none'
-    controlnet_units_list = []
-    w = int(input_image.width)
-    h = int(input_image.height)
-
-    if 1:
-        controlnet_units_list.append(
-            ControlNetUnit(
-                input_image=input_image, module='canny',
-                weight=0.50,
-                guidance_end=1,
-                resize_mode='Just Resize',
-                threshold_a=100,
-                threshold_b=200,
-                model='control_v11p_sd15_canny'
-            )
+def get_controlnet_unit(unit, input_image, weight):
+    if unit == "canny":
+        control_unit = ControlNetUnit(
+            input_image=input_image, module='canny',
+            weight=weight,
+            guidance_end=1,
+            resize_mode='Just Resize',
+            threshold_a=100,
+            threshold_b=200,
+            model='control_v11p_sd15_canny'
         )
-    if 1:
-        controlnet_units_list.append(
-            ControlNetUnit(
-                input_image=replaced_input_image, module='openpose_full',
-                weight=0.5,
-                guidance_end=1,
-                resize_mode='Just Resize',
-                model='control_v11p_sd15_openpose'
-            )
+    elif unit == "openpose":
+        control_unit = ControlNetUnit(
+            input_image=input_image, module='openpose_full',
+            weight=weight,
+            guidance_end=1,
+            resize_mode='Just Resize',
+            model='control_v11p_sd15_openpose'
         )
-
-    if 1:
+    elif unit == "color":
         blur_ratio      = 24
         h, w, c         = np.shape(input_image)
         color_image     = np.array(input_image, np.uint8)
@@ -97,12 +75,45 @@ def inpaint_with_mask_face(
         color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
         color_image = Image.fromarray(np.uint8(color_image))
 
-        control_unit_canny = ControlNetUnit(input_image=color_image, module='none',
-                                            weight=0.85,
+        control_unit = ControlNetUnit(input_image=color_image, module='none',
+                                            weight=weight,
                                             guidance_end=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
-        controlnet_units_list.append(control_unit_canny)
+    elif unit == "tile":
+        control_unit = ControlNetUnit(
+            input_image=input_image, module='tile_resample',
+            weight=weight,
+            guidance_end=1,
+            resize_mode='Just Resize',
+            threshold_a=1,
+            threshold_b=200,
+            model='control_v11f1e_sd15_tile'
+        )
+    return control_unit
+
+def inpaint(
+    input_image: Image.Image,
+    select_mask_input: Image.Image,
+    controlnet_pairs: list,
+    input_prompt = '1girl',
+    diffusion_steps = 50,
+    denoising_strength = 0.45,
+    hr_scale: float = 1.0,
+    default_positive_prompt = DEFAULT_POSITIVE,
+    default_negative_prompt = DEFAULT_NEGATIVE,
+    seed: int = 123456,
+    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+):
+    assert input_image is not None, f'input_image must not be none'
+    controlnet_units_list = []
+    w = int(input_image.width)
+    h = int(input_image.height)
+
+    for pair in controlnet_pairs:
+        controlnet_units_list.append(
+            get_controlnet_unit(pair[0], pair[1], pair[2])
+        )
 
     positive = f'{input_prompt}, {default_positive_prompt}'
     negative = f'{default_negative_prompt}'
@@ -128,71 +139,6 @@ def inpaint_with_mask_face(
 
     return image
 
-def inpaint_only(        
-    input_image: Image.Image,
-    input_mask: Image.Image,
-    input_prompt = '1girl',
-    fusion_image = None,
-    diffusion_steps = 50,
-    denoising_strength = 0.2, 
-    hr_scale: float = 1.0,
-    default_positive_prompt = DEFAULT_POSITIVE,
-    default_negative_prompt = DEFAULT_NEGATIVE,
-    seed: int = 123456,
-    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-):
-    assert input_image is not None, f'input_image must not be none'
-    controlnet_units_list = []
-    w = int(input_image.width)
-    h = int(input_image.height)
-
-    if 1:
-        controlnet_units_list.append(
-            ControlNetUnit(
-                    input_image=input_image if fusion_image is None else fusion_image, module='canny',
-                    weight=1,
-                    guidance_end=1,
-                    resize_mode='Just Resize',
-                    threshold_a=100,
-                    threshold_b=200,
-                    model='control_v11p_sd15_canny'
-            )
-        )
-    if 1:
-        controlnet_units_list.append(
-            ControlNetUnit(
-                input_image=input_image if fusion_image is None else fusion_image, module='tile_resample',
-                weight=1,
-                guidance_end=1,
-                resize_mode='Just Resize',
-                threshold_a=1,
-                threshold_b=200,
-                model='control_v11f1e_sd15_tile'
-            )
-        )
-
-    positive = f'{input_prompt}, {default_positive_prompt}'
-    negative = f'{default_negative_prompt}'
-
-    image = i2i_inpaint_call(
-        images=[input_image], 
-        mask_image=input_mask, 
-        inpainting_fill=1, 
-        steps=diffusion_steps,
-        denoising_strength=denoising_strength, 
-        inpainting_mask_invert=0, 
-        width=int(hr_scale * w), 
-        height=int(hr_scale * h), 
-        inpaint_full_res=False, 
-        seed=seed, 
-        prompt=positive, 
-        negative_prompt=negative, 
-        controlnet_units=controlnet_units_list, 
-        sd_model_checkpoint=sd_model_checkpoint, 
-        outpath_samples=easyphoto_img2img_samples,
-    )
-    return image
-
 retinaface_detection = None
 image_face_fusion = None
 skin_retouching = None
@@ -204,8 +150,8 @@ face_analyser = None
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, background_restore, super_resolution, tabs, display_score, *user_ids
-):
+    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, tabs, *user_ids
+): 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
     # global
@@ -221,19 +167,15 @@ def easyphoto_infer_forward(
     if skin_retouching is None:
         try:
             skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
-        except:
-            logging.info("Skin Retouching model load error, but pass.")
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.info(f"Skin Retouching model load error. Error Info: {e}")
     if portrait_enhancement is None:
         try:
             portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
-        except:
-            logging.info("Portrait Enhancement model load error, but pass.")
-
-    if face_skin is None:
-        try:
-            face_skin = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
-        except:
-            logging.info("Face Skin model load error, but pass.")
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.info(f"Portrait Enhancement model load error. Error Info: {e}")
     
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
@@ -262,7 +204,7 @@ def easyphoto_infer_forward(
             passed_userid_list.append(idx)
 
     if len(user_ids) == len(passed_userid_list):
-        return "Please choose a user id.", []
+        return "Please choose a user id.", [], []
 
     # params init
     input_prompts                   = []
@@ -277,6 +219,7 @@ def easyphoto_infer_forward(
     multi_user_safecrop_ratio       = 1.0
     # Second diffusion hr scale
     default_hr_scale                = 1.5
+    need_mouth_fix                  = True
 
     logging.info("Start templates and user_ids preprocess.")
     for user_id in user_ids:
@@ -327,7 +270,7 @@ def easyphoto_infer_forward(
 
         template_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, template_image, multi_user_safecrop_ratio, "crop")
         if len(template_face_safe_boxes) == 0:
-            return "Please upload a template with face.", []
+            return "Please upload a template with face.", [], []
         template_detected_facenum = len(template_face_safe_boxes)
         
         # use some print/log to record mismatch of detectionface and user_ids
@@ -440,7 +383,8 @@ def easyphoto_infer_forward(
             
             # First diffusion, facial reconstruction
             logging.info("Start First diffusion.")
-            first_diffusion_output_image = inpaint_with_mask_face(input_image, input_mask, replaced_input_image, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+            controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+            first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
 
             if color_shift_middle:
                 # apply color shift
@@ -471,14 +415,18 @@ def easyphoto_infer_forward(
                 input_image = first_diffusion_output_image
 
             # Add mouth_mask to avoid some fault lips, close if you dont need
-            need_mouth_fix = True
             if need_mouth_fix:
                 logging.info("Start mouth detect.")
                 mouth_mask          = face_skin(input_image, retinaface_detection)
+                i_h, i_w, i_c = np.shape(input_mask)
+                m_h, m_w, m_c = np.shape(mouth_mask)
+                if i_h != m_h or i_w != m_w:
+                    input_mask = input_mask.resize([m_w, m_h])
                 input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask) + np.float32(mouth_mask), 0, 255)))
             
             logging.info("Start Second diffusion.")
-            second_diffusion_output_image = inpaint_only(input_image, input_mask, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, fusion_image=fusion_image, hr_scale=default_hr_scale, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+            controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
+            second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
 
             # use original template face area to shift generated face color at last
             if color_shift_last:
@@ -546,26 +494,31 @@ def easyphoto_infer_forward(
                 new_size        = (int(output_image.width//resize), int(output_image.height//resize))
                 output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                 # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
-                output_image    = inpaint_only(output_image, output_mask, input_prompt_without_lora, diffusion_steps=20 if not background_restore else 30, denoising_strength=0.30 if not background_restore else 0.10, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
-        except:
+                denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
+                controlnet_pairs    = [["canny", fusion_image, 1.00], ["color", fusion_image, 1.00]]
+                output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+        except Exception as e:
             torch.cuda.empty_cache()
-            logging.info("Background Restore Failed, Please check the ratio of height and width in template.")
-            return "Background Restore Failed, Please check the ratio of height and width in template.", outputs
-
+            logging.info(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
+            return f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}", outputs, []
+        
         try:
             logging.info("Start Skin Retouching.")
             # Skin Retouching is performed here. 
             output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        except:
-            logging.info("Skin Retouching error, but pass.")
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.error(f"Skin Retouching error: {e}")
+
         try:
             logging.info("Start Portrait enhancement.")
             h, w, c = np.shape(np.array(output_image))
             # Super-resolution is performed here. 
             if super_resolution:
                 output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        except:
-            logging.info("Portrait enhancement error, but pass.")
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.error(f"Portrait enhancement error: {e}")
 
         if total_processed_person == 0:
             output_image = template_image
@@ -574,10 +527,8 @@ def easyphoto_infer_forward(
         save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
     if not shared.opts.data.get("easyphoto_cache_model", True):
-        del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; 
-        retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None
-        face_recognition = None
-        face_analyser = None
+        del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; del face_recognition; del face_analyser
+        retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None; face_analyser = None
 
     torch.cuda.empty_cache()
     return "Success", outputs, face_id_outputs
