@@ -59,7 +59,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 #### a. 通过阿里云 DSW
 DSW 有免费 GPU 时间，用户可申请一次，申请后3个月内有效。
 
-只需点击下面的链接进入，按笔记本即可，大约3-5分钟即可启动。
+阿里云在[Freetier](https://free.aliyun.com/?product=9602825&crowd=enterprise&spm=5176.28055625.J_5831864660.1.e939154aRgha4e&scm=20140722.M_9974135.P_110.MO_1806-ID_9974135-MID_9974135-CID_30683-ST_8512-V_1)提供免费GPU时间，获取并在阿里云PAI-DSW中使用，3分钟内即可启动EasyPhoto
 
 [![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
