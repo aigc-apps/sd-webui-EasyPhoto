@@ -62,6 +62,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     face_angles     = []
     copy_jpgs       = []
     selected_paths  = []
+    sub_images =[]
     for index, jpg in enumerate(tqdm(jpgs)):
         try:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -92,6 +93,10 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             # face crop
             sub_image = image.crop(retinaface_box)
+            try:
+                sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            except:
+                logging.info("Skin Retouching model detect error, but pass.")
 
             # get embedding
             embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
@@ -102,6 +107,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             copy_jpgs.append(jpg)
             selected_paths.append(_image_path)
+            sub_images.append(sub_image)
         except:
             pass
     
@@ -122,28 +128,30 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     
     selected_jpgs   = []
     selected_scores = []
+    selected_sub_images = []
     for index in indexes:
         selected_jpgs.append(copy_jpgs[index])
         selected_scores.append(ref_total_scores[index])
+        selected_sub_images.append(sub_images[index])
         print("jpg:", copy_jpgs[index], "face_id_scores", ref_total_scores[index])
                              
     images              = []
     enhancement_num      = 0
     max_enhancement_num  = len(selected_jpgs) // 2
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
-        if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
-            continue
-        _image_path             = os.path.join(inputs_dir, jpg)
-        image                   = Image.open(_image_path)
-        retinaface_boxes, _, _  = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
-        retinaface_box          = retinaface_boxes[0]
-        # crop image
-        sub_image               = image.crop(retinaface_box)
-        try:
-            sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        except:
-            logging.info("Skin Retouching model detect error, but pass.")
-
+        # if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
+        #     continue
+        # _image_path             = os.path.join(inputs_dir, jpg)
+        # image                   = Image.open(_image_path)
+        # retinaface_boxes, _, _  = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+        # retinaface_box          = retinaface_boxes[0]
+        # # crop image
+        # sub_image               = image.crop(retinaface_box)
+        # try:
+        #     sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+        # except:
+        #     logging.info("Skin Retouching model detect error, but pass.")
+        sub_image = selected_sub_images[index]
         try:
             # Determine which images to enhance based on quality score and image size
             if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:

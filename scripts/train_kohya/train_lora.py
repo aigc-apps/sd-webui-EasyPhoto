@@ -59,7 +59,7 @@ from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 from collections import defaultdict
-
+torch.backends.cudnn.benchmark = True
 if is_wandb_available():
     import wandb
 
@@ -929,7 +929,7 @@ def main():
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
+    if args.allow_tf32 or os.environ.get('ENABLE_TF32') :
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.scale_lr:
@@ -948,7 +948,17 @@ def main():
 
         optimizer_class = bnb.optim.AdamW8bit
     else:
-        optimizer_class = torch.optim.AdamW
+        if os.environ.get('ENABLE_APEX_OPT'):
+            try:
+                import apex
+                optimizer_class=apex.optimizers.FusedAdam
+            except ImportError:
+                logger.warn(
+                    "To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex."
+                )
+                optimizer_class=torch.optim.AdamW
+        else:
+            optimizer_class = torch.optim.AdamW
 
     # Optimizer creation
     optimizer = optimizer_class(
@@ -1061,6 +1071,7 @@ def main():
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
+        persistent_workers=True,
     )
 
     # Scheduler and math around the number of training steps.
