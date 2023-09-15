@@ -10,7 +10,7 @@ English | [简体中文](./README_zh-CN.md)
 - [TODO List](#todo-list)
 - [Quick Start](#quick-start)
     - [1. Cloud usage: AliyunDSW/AutoDL/Docker](#1-cloud-usage-aliyundswautodldocker)
-    - [2. Local install: Environment Check/Downloading/Installation](#2-local-install-environment-checkdownloadinginstallation)
+    - [2. Local install: Check/Downloading/Installation](#2-local-install-environment-checkdownloadinginstallation)
 - [How to use](#how-to-use)
     - [1. Model Training](#1-model-training)
     - [2. Inference](#2-inference)
@@ -25,6 +25,7 @@ English | [简体中文](./README_zh-CN.md)
 
 # Introduction
 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.    
+
 Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).   
 
 If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
