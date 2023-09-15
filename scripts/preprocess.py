@@ -5,7 +5,6 @@ import os
 import sys
 import cv2
 import torch
-import insightface
 import numpy as np
 import platform
 from modelscope.outputs import OutputKeys
@@ -30,13 +29,8 @@ def compare_jpg_with_face_id(embedding_list):
 
 
 def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
-    # face embedding
-    providers           = ["CPUExecutionProvider"]
-    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"), providers=providers)
-    face_recognition.prepare(ctx_id=0)
-    
-    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", root=os.path.abspath(os.path.dirname(__file__)).replace("scripts", ""), providers=providers)
-    face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+    # embedding
+    face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
 
     # face detection
     retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
@@ -94,8 +88,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
             sub_image = image.crop(retinaface_box)
 
             # get embedding
-            embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
-            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+            embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
 
             face_id_scores.append(embedding)
             face_angles.append(angle)
