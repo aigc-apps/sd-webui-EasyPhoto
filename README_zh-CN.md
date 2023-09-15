@@ -7,8 +7,8 @@
 - [简介](#简介)
 - [TODO List](#todo-list)
 - [快速启动](#快速启动)
-    - [1. 云使用: AliyunDSW/AutoDL/Docker](#1-云使用:-AliyunDSW/AutoDL/Docker)
-    - [2. 本地安装: 环境检查/下载/安装](#2-本地安装:-环境检查/下载/安装)
+    - [1. 云使用: AliyunDSW/AutoDL/Docker](#1-云使用-aliyundswautodldocker)
+    - [2. 本地安装: 环境检查/下载/安装](#2-本地安装-环境检查下载安装)
 - [如何使用](#如何使用)
     - [1. 模型训练](#1-模型训练)
     - [2. 人物生成](#2-人物生成)
@@ -84,7 +84,7 @@ docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beiji
 python3 launch.py --port 7860
 ```
 
-### 2.本地安装: 环境检查/下载/安装
+### 2. 本地安装: 环境检查/下载/安装
 #### a. 环境检查
 我们已验证EasyPhoto可在以下环境中执行：  
 如果你遇到内存使用过高而导致WebUI进程自动被kill掉，请参考[ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21)，设置一些参数，例如num_threads=0，如果你也发现了其他解决的好办法，请及时联系我们。
