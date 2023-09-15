@@ -17,14 +17,6 @@ if not launch.is_installed("onnxruntime"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install onnxruntime", "requirements for onnxruntime")
 
-if not launch.is_installed("ifnude"):
-    print('Installing requirements for easyphoto-webui')
-    launch.run_pip("install ifnude", "requirements for ifnude")
-
-if not launch.is_installed("insightface"):
-    print('Installing requirements for easyphoto-webui')
-    launch.run_pip("install insightface==0.7", "requirements for insightface")
-
 if not launch.is_installed("modelscope"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install modelscope", "requirements for modelscope")
