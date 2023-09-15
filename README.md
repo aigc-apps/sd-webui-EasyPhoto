@@ -7,24 +7,15 @@
 - [Introduction](#introduction)
 - [TODO List](#todo-list)
 - [Quick Start](#quick-start)
-    - [1. From aliyun DSW](#1-from-aliyun-dsw)
-    - [2. From AutoDL](#2-from-autodl)
-    - [3. From docker](#3-from-docker)
-    - [4. Local install](#4-local-install)
-      - [a. Environment Check](#a-environment-check)
-      - [b.  Relevant Repositories \& Weights Downloading](#b--relevant-repositories--weights-downloading)
-      - [c. Plug-in Installation](#c-plug-in-installation)
+    - [1. Cloud usage: AliyunDSW/AutoDL/Docker](#1-Cloud-usage:-AliyunDSW/AutoDL/Docker)
+    - [2. Local install: Environment Check/Downloading/Installation](#2-Local-install:-Environment-Check/Downloading/Installation)
 - [How to use](#how-to-use)
     - [1. Model Training](#1-model-training)
     - [2. Inference](#2-inference)
-      - [a. single people](#a-single-people)
-      - [b. multi people](#b-multi-people)
 - [Algorithm Detailed](#algorithm-detailed)
-    - [1.Architectural Overview](#1architectural-overview)
-    - [2.Training Detailed](#2training-detailed)
-    - [3.Inference Detailed](#3inference-detailed)
-      - [a.First Diffusion:](#afirst-diffusion)
-      - [b.Second Diffusion:](#bsecond-diffusion)
+    - [1. Architectural Overview](#1-architectural-overview)
+    - [2. Training Detailed](#2-training-detailed)
+    - [3. Inference Detailed](#3-inference-detailed)
 - [Reference](#reference)
 - [Related Project](#Related-Project)
 - [License](#license)
@@ -64,14 +55,15 @@ Our ui interface is as follows:
 - Support high resolution.
 
 # Quick Start
-### 1. From aliyun DSW
+### 1. Cloud usage: AliyunDSW/AutoDL/Docker
+#### a. From AliyunDSW
 DSW has free GPU time, which can be claimed once by a user and is valid for 3 months after claiming.
 
 Just click the link below to enter and press Notebook to go, about 3-5mins to boot.
 
 DSW notebook: https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto
 
-### 2. From AutoDL
+#### b. From AutoDL
 If you are using AutoDL, you can quickly pull up the Stable DIffusion webui using the mirror we provide.
 
 You can select the desired mirror by filling in the following information in Community Mirrors.
@@ -79,7 +71,7 @@ You can select the desired mirror by filling in the following information in Com
 aigc-apps/sd-webui-EasyPhoto/sd-webui-EasyPhoto
 ```
 
-### 3. From docker 
+#### c. From docker 
 If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
 
 Then execute the following commands in this way:
@@ -100,7 +92,7 @@ git pull
 cd /workspace
 ```
 
-### 4. Local install
+### 2. Local install: Environment Check/Downloading/Installation
 #### a. Environment Check
 We have verified EasyPhoto execution on the following environment:  
 If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
@@ -197,13 +189,13 @@ If you want to set parameters, the parsing of each parameter is as follows:
 ![single_people](images/multi_people_2.jpg)
 # Algorithm Detailed
 
-### 1.Architectural Overview
+### 1. Architectural Overview
 
 ![overview](images/overview.jpg)
 
 In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference. 
 
-### 2.Training Detailed
+### 2. Training Detailed
 
 ![overview](images/train_detail.jpg)
 
@@ -213,11 +205,11 @@ During training, we utilize the template image for verification in real time, an
 
 In addition, we will choose the image that is most similar to the user in the validation as the face_id image, which will be used in Inference.
 
-### 3.Inference Detailed
-#### a.First Diffusion:  
+### 3. Inference Detailed
+#### a. First Diffusion:  
 First, we will perform face detection on our incoming template image to determine the mask that needs to be inpainted for stable diffusion. then we will use the template image to perform face fusion with the optimal user image. After the face fusion is completed, we use the above mask to inpaint (fusion_image) with the face fused image. In addition, we will affix the optimal face_id image obtained during training to the template image by affine transformation (replaced_image). Then we will apply Controlnets on it, we use canny with color to extract features for fusion_image and openpose for replaced_image to ensure the similarity and stability of the images. Then we will use Stable Diffusion combined with the user's digital split for generation.
 
-#### b.Second Diffusion:
+#### b. Second Diffusion:
 After getting the result of First Diffusion, we will fuse the result with the optimal user image for face fusion, and then we will use Stable Diffusion again with the user's digital doppelganger for generation. The second generation will use higher resolution.
 
 # Reference
