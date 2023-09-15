@@ -5,7 +5,6 @@
 
 # 目录
 - [简介](#简介)
-- [新功能](#新功能)
 - [TODO List](#todo-list)
 - [快速启动](#快速启动)
     - [1. 通过阿里云 DSW](#1-通过阿里云-dsw)
@@ -43,9 +42,11 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
-**新功能！！** 🔥🔥 我们目前支持多人生成。     
-**新功能！！** 🔥🔥🔥🔥 我们目前支持不同预测基础模型，见证不一样的自己。  
-**新功能！！** 🔥🔥🔥 我们支持对背景进行微调，并计算生成的图像与用户之间的相似度得分
+新特性：
+- **支持对背景进行微调，并计算生成的图像与用户之间的相似度得分。** [🔥🔥 2023.09.15]
+- **支持不同预测基础模型。** [🔥🔥 2023.09.08]
+- **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
+- 创建代码！现在支持 Windows 和 Linux。[🔥 2023.09.02]
 
 这些是我们的生成结果:
 ![results_1](images/results_1.jpg)
@@ -57,12 +58,6 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 ![train_ui](images/train_ui.jpg)
 **预测部分:**
 ![infer_ui](images/infer_ui.jpg)
-
-# 新功能
-- **支持对背景进行微调，并计算生成的图像与用户之间的相似度得分。** [🔥🔥 2023.09.15]
-- **支持不同预测基础模型。** [🔥🔥 2023.09.08]
-- **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
-- 创建代码！现在支持 Windows 和 Linux。[🔥 2023.09.02]
 
 # TODO List
 - 支持中文界面。
@@ -91,7 +86,7 @@ aigc-apps/sd-webui-EasyPhoto/sd-webui-EasyPhoto
 docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
 
 # 进入镜像
-docker run --rm -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
 
 # 启动webui
 python3 launch.py --port 7860

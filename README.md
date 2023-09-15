@@ -5,7 +5,6 @@
 
 # Table of Contents
 - [Introduction](#introduction)
-- [What's New](#whats-new)
 - [TODO List](#todo-list)
 - [Quick Start](#quick-start)
     - [1. From aliyun DSW](#1-from-aliyun-dsw)
@@ -40,29 +39,24 @@ Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](
 
 If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
 
-We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start)。
+We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start).
 
-**New features!!** 🔥🔥 We currently support multiple people generation.    
-**New features!!** 🔥🔥🔥🔥 We currently support different base models for training and inference.    
-**New features!!** 🔥🔥🔥 We now support fine-tuning the background and calculating the similarity score between the generated image and the user.   
+What's New: 
+- **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
+- **Support different base models for training and inference.** [🔥🔥 2023.09.08]
+- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
+- Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
 
 These are our generated results:
 ![results_1](images/results_1.jpg)
 ![results_2](images/results_2.jpg)
 ![results_3](images/results_3.jpg)
 
-
 Our ui interface is as follows:  
 **train part:**
 ![train_ui](images/train_ui.jpg)
 **inference part:**
 ![infer_ui](images/infer_ui.jpg)
-
-# What's New
-- **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
-- **Support different base models for training and inference.** [🔥🔥 2023.09.08]
-- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
-- Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
 
 # TODO List
 - Support chinese ui.
@@ -94,7 +88,7 @@ Then execute the following commands in this way:
 docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
 
 # enter image
-docker run --rm -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
 
 # launch webui
 python3 launch.py --port 7860
