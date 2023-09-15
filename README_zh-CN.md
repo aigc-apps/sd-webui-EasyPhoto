@@ -61,7 +61,7 @@ DSW 有免费 GPU 时间，用户可申请一次，申请后3个月内有效。
 
 只需点击下面的链接进入，按笔记本即可，大约3-5分钟即可启动。
 
-DSW Notebook：https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto
+[![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
 #### b. 通过AutoDL
 如果您正在使用 AutoDL，您可以使用我们提供的镜像快速启动 Stable DIffusion webui。

@@ -60,7 +60,7 @@ DSW has free GPU time, which can be claimed once by a user and is valid for 3 mo
 
 Just click the link below to enter and press Notebook to go, about 3-5mins to boot.
 
-DSW notebook: https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto
+[![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
 #### b. From AutoDL
 If you are using AutoDL, you can quickly pull up the Stable DIffusion webui using the mirror we provide.
