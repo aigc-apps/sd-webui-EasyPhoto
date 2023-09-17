@@ -202,5 +202,4 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     del skin_retouching
     del portrait_enhancement
     del face_recognition
-    del face_analyser
     torch.cuda.empty_cache()
