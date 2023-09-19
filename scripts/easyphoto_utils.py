@@ -6,6 +6,7 @@ from glob import glob
 import requests
 from modules.paths import models_path
 from scripts.easyphoto_config import data_path
+import hashlib
 
 # Set the level of the logger
 log_level = os.environ.get('LOG_LEVEL', 'INFO')
@@ -95,8 +96,49 @@ def check_files_exists_and_download():
     ]
     print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
-        if os.path.exists(filename):
+        if os.path.exists(filename) and check_weight_file(url,filename):
             continue
         print(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         urldownload_progressbar(url, filename)
+
+
+# check if the weight file has been downloaded completely
+def check_weight_file(url,filename):
+    if compare_hasd_link_file(url,filename) and compare_size_link_file(url, filename):
+        print("link and file all same ")
+        return True
+    else:
+        print("link and file  is different  ")
+        return False
+    
+
+#Calculate the hash value of the download link and downloaded_file by md5
+def compare_hasd_link_file(url, file_path):
+    hash_url = hashlib.md5(requests.get(url).content).hexdigest()
+    
+    hash_object = hashlib.md5()  
+    with open(file_path, 'rb') as file:  
+        buffer = file.read(4096) 
+        while len(buffer) > 0: 
+            hash_object.update(buffer)  
+            buffer = file.read(4096)  
+    hash_file=  hash_object.hexdigest()  
+    
+    if hash_url == hash_file:
+        print("link and file hash same ")
+        return True
+    else: 
+        print("link and file hash different ")
+        return False
+
+# Calculate the size of the download link and downloaded_file
+def compare_size_link_file(url, file_path):
+    size_url = requests.get(url).headers.get('Content-Length')
+    size_file = os.path.getsize(file_path)
+    if int(size_url) == int(size_file):
+        print("link and file size same ")
+        return True
+    else:
+        print("link and file size different ")
+        return False
