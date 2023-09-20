@@ -485,7 +485,7 @@ def easyphoto_infer_forward(
                 output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                 # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                 denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
-                controlnet_pairs    = [["canny", fusion_image, 1.00], ["color", fusion_image, 1.00]]
+                controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
                 output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
         except Exception as e:
             torch.cuda.empty_cache()
