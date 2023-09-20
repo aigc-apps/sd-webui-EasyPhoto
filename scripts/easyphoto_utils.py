@@ -32,7 +32,7 @@ def urldownload_progressbar(url, filepath):
     content_size = int(response.headers['content-length']) 
     try:
         if response.status_code == 200: 
-            print('Start download,[File size]:{size:.2f} MB'.format(size = content_size / chunk_size /1024))  
+            print('Start download,[File size]:{size:.2f} MB'.format(size = content_size / chunk_size / 1024))  
             with open(filepath,'wb') as file:  
                 for data in response.iter_content(chunk_size = chunk_size):
                     file.write(data)
@@ -101,14 +101,11 @@ def check_files_exists_and_download():
         print(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         urldownload_progressbar(url, filename)
-
        
-#Calculate the hash value of the download link and downloaded_file by sha256
-
+# Calculate the hash value of the download link and downloaded_file by sha256
 def compare_hasd_link_file(url, file_path):
-    
-    r = requests.head(url)
-    total_size = int(r.headers['Content-Length'])
+    r           = requests.head(url)
+    total_size  = int(r.headers['Content-Length'])
     
     res = requests.get(url, stream=True)
     remote_head_hash = hashlib.sha256(res.raw.read(1000)).hexdigest()  
@@ -121,18 +118,18 @@ def compare_hasd_link_file(url, file_path):
     res.close()
     
     with open(file_path,'rb') as f:
-      local_head_data = f.read(1000)
-      local_head_hash = hashlib.sha256(local_head_data).hexdigest()
+        local_head_data = f.read(1000)
+        local_head_hash = hashlib.sha256(local_head_data).hexdigest()
     
-      f.seek(end_pos)
-      local_end_data = f.read(1000) 
-      local_end_hash = hashlib.sha256(local_end_data).hexdigest()
+        f.seek(end_pos)
+        local_end_data = f.read(1000) 
+        local_end_hash = hashlib.sha256(local_end_data).hexdigest()
      
     if remote_head_hash == local_head_hash and remote_end_hash == local_end_hash:
         print(f"{file_path} : Hash match")
         return True
       
     else:
-      print(f" {file_path} :  Hash mismatch")
-      return  False
+        print(f" {file_path} :  Hash mismatch")
+        return False
       
