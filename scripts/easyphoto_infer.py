@@ -3,7 +3,6 @@ import glob
 import logging
 import os
 import torch
-import insightface
 import cv2
 import numpy as np
 from modelscope.pipelines import pipeline
@@ -145,7 +144,6 @@ skin_retouching = None
 portrait_enhancement = None
 face_skin = None
 face_recognition = None
-face_analyser = None
 
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
@@ -155,7 +153,7 @@ def easyphoto_infer_forward(
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download()
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, face_analyser
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition
     
     # create modelscope model
     if retinaface_detection is None:
@@ -179,13 +177,7 @@ def easyphoto_infer_forward(
     
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
-        name = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx")
-        face_recognition = insightface.model_zoo.get_model(name, providers=["CPUExecutionProvider"])
-        face_recognition.prepare(ctx_id=0)
-    if display_score and face_analyser is None:
-        root = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "")
-        face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", root=root, providers=["CPUExecutionProvider"])
-        face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+        face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
 
     # get random seed 
     if int(seed) == -1:
@@ -464,10 +456,8 @@ def easyphoto_infer_forward(
                 x1, y1, x2, y2 = loop_template_crop_safe_box
                 loop_output_image_face = loop_output_image[y1:y2, x1:x2]
 
-                embedding = face_recognition.get(np.array(loop_output_image_face), face_analyser.get(np.array(loop_output_image_face))[0])
-                embedding = np.array([embedding / np.linalg.norm(embedding, 2)])  # (512, 1)
-                roop_image_embedding = face_recognition.get(np.array(roop_images[index]), face_analyser.get(np.array(roop_images[index]))[0])
-                roop_image_embedding = np.array([roop_image_embedding / np.linalg.norm(roop_image_embedding, 2)])  # (512, 1)
+                embedding = face_recognition(dict(user=Image.fromarray(np.uint8(loop_output_image_face))))[OutputKeys.IMG_EMBEDDING]
+                roop_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(roop_images[index]))))[OutputKeys.IMG_EMBEDDING]
                 
                 loop_output_image_faceid = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
                 # Truncate the user id to ensure the full information showing in the Gradio Gallery.
@@ -495,7 +485,7 @@ def easyphoto_infer_forward(
                 output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                 # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                 denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
-                controlnet_pairs    = [["canny", fusion_image, 1.00], ["color", fusion_image, 1.00]]
+                controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
                 output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
         except Exception as e:
             torch.cuda.empty_cache()
@@ -527,8 +517,8 @@ def easyphoto_infer_forward(
         save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
     if not shared.opts.data.get("easyphoto_cache_model", True):
-        del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; del face_recognition; del face_analyser
-        retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None; face_analyser = None
+        del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; del face_recognition
+        retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None
 
     torch.cuda.empty_cache()
-    return "Success", outputs, face_id_outputs
+    return "Success", outputs, face_id_outputs  
