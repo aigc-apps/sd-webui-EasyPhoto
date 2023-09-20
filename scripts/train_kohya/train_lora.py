@@ -1058,13 +1058,16 @@ def main():
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
+    persistent_workers = True
+    if args.dataloader_num_workers == 0:
+        persistent_workers = False
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
-        persistent_workers=True,
+        persistent_workers=persistent_workers,
     )
 
     # Scheduler and math around the number of training steps.
