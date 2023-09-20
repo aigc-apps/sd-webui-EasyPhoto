@@ -15,6 +15,7 @@ from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.preprocess import preprocess_images
+from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
@@ -29,6 +30,9 @@ def easyphoto_train_forward(
     rank: int, network_alpha: int,
     validation: bool,
     instance_images: list,
+    enable_rl: bool,
+    max_rl_time: float,
+    timestep_fraction: float,
     *args
 ):  
     if user_id == "" or user_id is None:
@@ -44,8 +48,8 @@ def easyphoto_train_forward(
                 ids.append(_id)
     ids = sorted(ids)
 
-    if user_id in ids:
-        return "User id 不能重复。"
+    # if user_id in ids:
+    #     return "User id 不能重复。"
 
     check_files_exists_and_download()
     # 模板的地址
@@ -65,6 +69,10 @@ def easyphoto_train_forward(
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
     sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    if enable_rl:
+        ddpo_weight_save_path = os.path.join(user_id_outpath_samples, user_id, "ddpo_weights")
+        face_lora_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
+        ddpo_webui_save_path = os.path.join(models_path, f"Lora/ddpo_{user_id}.safetensors")
     
     os.makedirs(original_backup_path, exist_ok=True)
     os.makedirs(user_path, exist_ok=True)
@@ -90,6 +98,9 @@ def easyphoto_train_forward(
 
     train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     print("train_file_path : ", train_kohya_path)
+    if enable_rl:
+        train_ddpo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_ddpo.py")
+        print("train_ddpo_path : ", train_kohya_path)
     
     # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
     cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
@@ -135,6 +146,46 @@ def easyphoto_train_forward(
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
+        
+        # Reinforcement learning after LoRA training.
+        if enable_rl:
+            command = [
+                f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', '--main_process_port=4567', '--num_processes=1', f'{train_ddpo_path}',
+                f'--run_name={user_id}',
+                f'--logdir={os.path.relpath(ddpo_weight_save_path, pwd)}',
+                f'--cache_log_file={cache_log_file_path}',
+                f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
+                f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
+                f'--face_lora_path={os.path.relpath(face_lora_path, pwd)}',
+                f'--sample_batch_size=8',
+                f'--sample_num_batches_per_epoch=4',
+                f'--sample_num_steps=50',
+                f'--timestep_fraction={timestep_fraction}',
+                f'--train_batch_size=2',
+                f'--gradient_accumulation_steps=8',
+                f'--learning_rate=0.0003',
+                '--seed=42',
+                '--use_lora',
+                f'--rank=4',
+                f'--cfg',
+                f'--allow_tf32',
+                f'--num_epochs=200',
+                f'--save_freq=1',
+                f'--reward_fn=faceid_v2',
+                f'--target_image_dir={os.path.relpath(images_save_path, pwd)}',
+                f'--per_prompt_stat_tracking',
+            ]
+
+            try:
+                subprocess.run(command, check=True, timeout=max_rl_time * 3600)
+            except subprocess.TimeoutExpired as e:
+                print(e)
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing the command: {e}")
+            finally:
+                # The cached log file will be cleared when times out or errors occur.
+                with open(cache_log_file_path, "w") as _:
+                    pass
     else:
         command = [
             f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
@@ -174,12 +225,65 @@ def easyphoto_train_forward(
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
+        
+        # Reinforcement learning after LoRA training.
+        if enable_rl:
+            # The DDPO (LoRA) distributed training is unstable due to a known accelerate/diffusers issue. Set `num_processes` to 1.
+            # See https://github.com/kvablack/ddpo-pytorch/issues/10 for details.
+            command = [
+                f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', '--main_process_port=4567', '--num_processes=1', f'{train_ddpo_path}',
+                f'--run_name={user_id}',
+                f'--logdir={ddpo_weight_save_path}',
+                f'--cache_log_file={cache_log_file_path}',
+                f'--pretrained_model_name_or_path={sd15_save_path}',
+                f'--pretrained_model_ckpt={webui_load_path}', 
+                f'--face_lora_path={face_lora_path}',
+                f'--sample_batch_size=8',
+                f'--sample_num_batches_per_epoch=4',
+                f'--sample_num_steps=50',
+                f'--timestep_fraction={timestep_fraction}',
+                f'--train_batch_size=2',
+                f'--gradient_accumulation_steps=8',
+                f'--learning_rate=0.0003',
+                '--seed=42',
+                '--use_lora',
+                f'--rank=4',
+                f'--cfg',
+                f'--allow_tf32',
+                f'--num_epochs=200',
+                f'--save_freq=1',
+                f'--reward_fn=faceid_v2',
+                f'--target_image_dir={images_save_path}',
+                f'--per_prompt_stat_tracking',
+            ]
+            try:
+                subprocess.run(command, check=True, timeout=max_rl_time * 3600)
+            except subprocess.TimeoutExpired as e:
+                print(e)
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing the command: {e}")
+            finally:
+                # The cached log file will be cleared when times out or errors occur.
+                with open(cache_log_file_path, "w") as _:
+                    pass
     
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     if not os.path.exists(best_weight_path):
         return "Failed to obtain Lora after training, please check the training process."
 
     copyfile(best_weight_path, webui_save_path)
+
+    if enable_rl:
+        # Currently, the latest ddpo lora checkpoint will be selected and saved to the WebUI Lora folder.
+        output_dir = os.path.join(ddpo_weight_save_path, "checkpoints")
+        if not os.path.exists(output_dir):
+            return "Failed to obtain checkpoints after reinforcement learning, please check the training process."
+        sub_dirs = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
+        sub_dirs_with_ctime = {f: os.path.getctime(os.path.join(output_dir, f)) for f in sub_dirs}
+        sorted_sub_dirs = sorted(sub_dirs_with_ctime, key=lambda k: sub_dirs_with_ctime[k])
+        ddpo_lora_path = os.path.join(output_dir, sorted_sub_dirs[-1], "pytorch_lora_weights.bin")
+        convert_lora_to_safetensors(ddpo_lora_path, ddpo_webui_save_path)
+    
     # It has been abandoned and will be deleted later.
     # with open(id_path, "a") as f:
     #     f.write(f"{user_id}\n")

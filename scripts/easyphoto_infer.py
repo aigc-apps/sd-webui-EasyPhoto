@@ -15,6 +15,7 @@ from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 from scripts.face_process_utils import Face_Skin
 
 from modules.images import save_image
+from modules.paths import models_path
 from modules.shared import opts, state
 from modules import script_callbacks, shared
 
@@ -226,6 +227,10 @@ def easyphoto_infer_forward(
         else:
             # get prompt
             input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            # Add the ddpo LoRA into the input prompt if available.
+            lora_model_path = os.path.join(models_path, "Lora")
+            if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
+                input_prompt += "<lora:ddpo_{}>".format(user_id)
             
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
