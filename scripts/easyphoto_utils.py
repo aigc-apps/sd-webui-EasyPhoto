@@ -43,7 +43,7 @@ def urldownload_progressbar(url, filepath):
     except:
         print('Error!')
 
-def check_files_exists_and_download():
+def check_files_exists_and_download(check_hash):
     controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
     controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
     models_annotator_path               = os.path.join(data_path, "models")
@@ -96,8 +96,12 @@ def check_files_exists_and_download():
     ]
     print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
-        if os.path.exists(filename) and compare_hasd_link_file(url, filename):
-            continue
+        if not check_hash:
+            if os.path.exists(filename):
+                continue
+        else:
+            if os.path.exists(filename) and compare_hasd_link_file(url, filename):
+                continue
         print(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         urldownload_progressbar(url, filename)
@@ -130,6 +134,6 @@ def compare_hasd_link_file(url, file_path):
         return True
       
     else:
-        print(f" {file_path} :  Hash mismatch")
+        print(f" {file_path} : Hash mismatch")
         return False
       
