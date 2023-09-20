@@ -6,6 +6,7 @@ from glob import glob
 import requests
 from modules.paths import models_path
 from scripts.easyphoto_config import data_path
+import hashlib
 
 # Set the level of the logger
 log_level = os.environ.get('LOG_LEVEL', 'INFO')
@@ -95,8 +96,43 @@ def check_files_exists_and_download():
     ]
     print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
-        if os.path.exists(filename):
+        if os.path.exists(filename) and compare_hasd_link_file(url, filename):
             continue
         print(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         urldownload_progressbar(url, filename)
+
+       
+#Calculate the hash value of the download link and downloaded_file by sha256
+
+def compare_hasd_link_file(url, file_path):
+    
+    r = requests.head(url)
+    total_size = int(r.headers['Content-Length'])
+    
+    res = requests.get(url, stream=True)
+    remote_head_hash = hashlib.sha256(res.raw.read(1000)).hexdigest()  
+    res.close()
+    
+    end_pos = total_size - 1000
+    headers = {'Range': f'bytes={end_pos}-{total_size-1}'}
+    res = requests.get(url, headers=headers, stream=True)
+    remote_end_hash = hashlib.sha256(res.content).hexdigest()
+    res.close()
+    
+    with open(file_path,'rb') as f:
+      local_head_data = f.read(1000)
+      local_head_hash = hashlib.sha256(local_head_data).hexdigest()
+    
+      f.seek(end_pos)
+      local_end_data = f.read(1000) 
+      local_end_hash = hashlib.sha256(local_end_data).hexdigest()
+     
+    if remote_head_hash == local_head_hash and remote_end_hash == local_end_hash:
+        print(f"{file_path} : Hash match")
+        return True
+      
+    else:
+      print(f" {file_path} :  Hash mismatch")
+      return  False
+      
