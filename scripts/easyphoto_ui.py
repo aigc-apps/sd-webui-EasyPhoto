@@ -254,10 +254,23 @@ def on_ui_tabs():
                         with gr.TabItem("upload image") as upload_image_tab:
                             init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
                             
-                        model_selected_tabs = [template_images_tab, upload_image_tab]
+
+                        with gr.TabItem("upload dir") as upload_dir_tab:
+                            uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                            with gr.Row():
+                                upload_dir_button = gr.UploadButton(
+                                    "Upload Photos", file_types=["image"], file_count="multiple"
+                                )
+                                clear_dir_button = gr.Button("Clear Photos")
+                            clear_dir_button.click(fn=lambda: [], inputs=None, outputs=uploaded_template_images)
+
+                            upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
+
+                        model_selected_tabs = [template_images_tab, upload_image_tab, upload_dir_tab]
                         for i, tab in enumerate(model_selected_tabs):
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
-
+                        
                         with gr.Row():
                             def checkpoint_refresh_function():
                                 checkpoints = []
@@ -440,7 +453,7 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
+                    inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]

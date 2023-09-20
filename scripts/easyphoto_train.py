@@ -18,6 +18,7 @@ from scripts.preprocess import preprocess_images
 
 DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
 python_executable_path = sys.executable
+check_hash             = True
 
 # Attention! Output of js is str or list, not float or int
 def easyphoto_train_forward(
@@ -31,6 +32,8 @@ def easyphoto_train_forward(
     instance_images: list,
     *args
 ):  
+    global check_hash
+
     if user_id == "" or user_id is None:
         return "User id cannot be set to empty."
     if user_id == "none" :
@@ -47,7 +50,9 @@ def easyphoto_train_forward(
     if user_id in ids:
         return "User id 不能重复。"
 
-    check_files_exists_and_download()
+    check_files_exists_and_download(check_hash)
+    check_hash = False
+
     # 模板的地址
     training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
     # 原始数据备份

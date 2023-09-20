@@ -144,16 +144,19 @@ skin_retouching = None
 portrait_enhancement = None
 face_skin = None
 face_recognition = None
+check_hash = True
 
 def easyphoto_infer_forward(
-    sd_model_checkpoint, selected_template_images, init_image, additional_prompt, \
+    sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, tabs, *user_ids
 ): 
-    # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download()
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
+
+    # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
+    check_files_exists_and_download(check_hash)
+    check_hash = False
     
     # create modelscope model
     if retinaface_detection is None:
@@ -186,8 +189,10 @@ def easyphoto_infer_forward(
     # choose tabs select
     if tabs == 0:
         template_images = eval(selected_template_images)
-    else:
+    elif tabs == 1:
         template_images = [init_image]
+    else:
+        template_images = [file_d['name'] for file_d in uploaded_template_images]
     
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -255,7 +260,7 @@ def easyphoto_infer_forward(
     outputs, face_id_outputs = [], []
     for template_idx, template_image in enumerate(template_images):
         # open the template image
-        if tabs == 0:
+        if tabs == 0 or tabs == 2:
             template_image = Image.open(template_image).convert("RGB")
         else:
             template_image = Image.fromarray(template_image).convert("RGB")
