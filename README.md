@@ -32,6 +32,8 @@ If you meet some problems in the training, please refer to the [VQA](https://git
 
 We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start).
 
+Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
+
 What's New: 
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
 - **Support different base models for training and inference.** [🔥🔥 2023.09.08]
@@ -59,7 +61,7 @@ Our ui interface is as follows:
 #### a. From AliyunDSW
 DSW has free GPU time, which can be applied once by a user and is valid for 3 months after appling.
 
-Aliyun provide free GPU time in [Freetier](https://free.aliyun.com/?product=9602825&crowd=enterprise&spm=5176.28055625.J_5831864660.1.e939154aRgha4e&scm=20140722.M_9974135.P_110.MO_1806-ID_9974135-MID_9974135-CID_30683-ST_8512-V_1), get it and use in Aliyun PAI-DSW to start EasyPhoto within 3min!
+Aliyun provide free GPU time in [Freetier](https://help.aliyun.com/document_detail/2567864.html), get it and use in Aliyun PAI-DSW to start EasyPhoto within 3min!
 
 [![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
