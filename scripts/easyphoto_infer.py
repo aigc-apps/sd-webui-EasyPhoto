@@ -271,13 +271,13 @@ def easyphoto_infer_forward(
         template_detected_facenum = len(template_face_safe_boxes)
         
         # use some print/log to record mismatch of detectionface and user_ids
-        if template_detected_facenum > len(user_ids):
-            logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
-             the last {template_detected_facenum-len(user_ids)} face will remains")
+        if template_detected_facenum > len(user_ids) - len(passed_userid_list):
+            logging.info(f"User set {len(user_ids) - len(passed_userid_list)} face but detected {template_detected_facenum} face in template image,\
+             the last {template_detected_facenum-len(user_ids) - len(passed_userid_list)} face will remains")
         
-        if len(user_ids) > template_detected_facenum:
-            logging.info(f"User set {len(user_ids)} face but detected {template_detected_facenum} face in template image,\
-             the last {len(user_ids)-template_detected_facenum} set user_ids is useless")
+        if len(user_ids) - len(passed_userid_list) > template_detected_facenum:
+            logging.info(f"User set {len(user_ids) - len(passed_userid_list)} face but detected {template_detected_facenum} face in template image,\
+             the last {len(user_ids) - len(passed_userid_list)-template_detected_facenum} set user_ids is useless")
 
         if background_restore:
             output_image = np.array(copy.deepcopy(template_image))
@@ -288,7 +288,7 @@ def easyphoto_infer_forward(
                 output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 0
             output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
         else:
-            if min(template_detected_facenum, len(user_ids)) > 1:
+            if min(template_detected_facenum, len(user_ids) - len(passed_userid_list)) > 1:
                 output_image = np.array(copy.deepcopy(template_image))
                 output_mask  = np.ones_like(output_image)
 
@@ -303,7 +303,7 @@ def easyphoto_infer_forward(
                 output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
         total_processed_person = 0
-        for index in range(min(len(template_face_safe_boxes), len(user_ids))):
+        for index in range(min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list))):
             # pass this userid, not do anything
             if index in passed_userid_list:
                 continue
@@ -312,7 +312,7 @@ def easyphoto_infer_forward(
             loop_template_image = copy.deepcopy(template_image)
             
             # mask other people face use 255 in this term, to transfer multi user to single user situation
-            if min(len(template_face_safe_boxes), len(user_ids)) > 1:
+            if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1:
                 loop_template_image = np.array(loop_template_image)
                 for sub_index in range(len(template_face_safe_boxes)):
                     if index != sub_index:
@@ -469,7 +469,7 @@ def easyphoto_infer_forward(
                 face_id_outputs.append((roop_images[index], "{}, {:.2f}".format(user_ids[index][:10], loop_output_image_faceid)))
                 loop_output_image = Image.fromarray(loop_output_image)
             
-            if min(len(template_face_safe_boxes), len(user_ids)) > 1:
+            if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1:
                 logging.info("Start paste crop image to origin template in multi people.")
                 template_face_safe_box = template_face_safe_boxes[index]
                 output_image[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = np.array(loop_output_image, np.float32)[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]]
@@ -477,7 +477,7 @@ def easyphoto_infer_forward(
                 output_image = loop_output_image 
 
         try:
-            if min(len(template_face_safe_boxes), len(user_ids)) > 1 or background_restore:
+            if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1 or background_restore:
                 logging.info("Start Thirt diffusion for background.")
                 output_image    = Image.fromarray(np.uint8(output_image))
                 short_side      = min(output_image.width, output_image.height)
