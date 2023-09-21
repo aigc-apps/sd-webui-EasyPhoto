@@ -89,8 +89,9 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
             sub_image = image.crop(retinaface_box)
             try:
                 sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-            except:
-                logging.info("Skin Retouching model detect error, but pass.")
+            except Exception as e:
+                torch.cuda.empty_cache()
+                logging.info(f"Photo skin_retouching error, error info: {e}")
 
             # get embedding
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
@@ -101,8 +102,9 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
             copy_jpgs.append(jpg)
             selected_paths.append(_image_path)
             sub_images.append(sub_image)
-        except:
-            pass
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.info(f"Photo detect and count score error, error info: {e}")
     
     if len(face_id_scores) == 0:
         return "No faces detected. Please increase the size of the face in the upload photos."
@@ -132,52 +134,44 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     enhancement_num      = 0
     max_enhancement_num  = len(selected_jpgs) // 2
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
-        # if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
-        #     continue
-        # _image_path             = os.path.join(inputs_dir, jpg)
-        # image                   = Image.open(_image_path)
-        # retinaface_boxes, _, _  = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
-        # retinaface_box          = retinaface_boxes[0]
-        # # crop image
-        # sub_image               = image.crop(retinaface_box)
-        # try:
-        #     sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        # except:
-        #     logging.info("Skin Retouching model detect error, but pass.")
-        sub_image = selected_sub_images[index]
         try:
-            # Determine which images to enhance based on quality score and image size
-            if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
-                sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-                enhancement_num += 1
-        except:
-            logging.info("Portrait Enhancement model detect error, but pass.")
+            sub_image = selected_sub_images[index]
+            try:
+                if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
+                    sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                    enhancement_num += 1
+            except Exception as e:
+                torch.cuda.empty_cache()
+                logging.info(f"Photo enhance error, error info: {e}")
 
-        # Correct the mask area of the face
-        sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
-        sub_box     = sub_boxes[0]
-        sub_mask    = sub_masks[0]
+            # Correct the mask area of the face
+            sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
+            sub_box     = sub_boxes[0]
+            sub_mask    = sub_masks[0]
 
-        h, w, c     = np.shape(sub_mask)
-        face_width  = sub_box[2] - sub_box[0]
-        face_height = sub_box[3] - sub_box[1]
-        sub_box[0]  = np.clip(np.array(sub_box[0], np.int32) - face_width * 0.3, 1, w - 1)
-        sub_box[2]  = np.clip(np.array(sub_box[2], np.int32) + face_width * 0.3, 1, w - 1)
-        sub_box[1]  = np.clip(np.array(sub_box[1], np.int32) + face_height * 0.15, 1, h - 1)
-        sub_box[3]  = np.clip(np.array(sub_box[3], np.int32) + face_height * 0.15, 1, h - 1)
-        sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
-        sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
+            h, w, c     = np.shape(sub_mask)
+            face_width  = sub_box[2] - sub_box[0]
+            face_height = sub_box[3] - sub_box[1]
+            sub_box[0]  = np.clip(np.array(sub_box[0], np.int32) - face_width * 0.3, 1, w - 1)
+            sub_box[2]  = np.clip(np.array(sub_box[2], np.int32) + face_width * 0.3, 1, w - 1)
+            sub_box[1]  = np.clip(np.array(sub_box[1], np.int32) + face_height * 0.15, 1, h - 1)
+            sub_box[3]  = np.clip(np.array(sub_box[3], np.int32) + face_height * 0.15, 1, h - 1)
+            sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
+            sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
 
-        # Significance detection, merging facial masks
-        result      = salient_detect(sub_image)[OutputKeys.MASKS]
-        mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
+            # Significance detection, merging facial masks
+            result      = salient_detect(sub_image)[OutputKeys.MASKS]
+            mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
 
-        # Obtain the image after the mask
-        mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
-        mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
-        if np.sum(np.array(mask)) != 0:
-            images.append(mask_sub_image)
-
+            # Obtain the image after the mask
+            mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
+            mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
+            if np.sum(np.array(mask)) != 0:
+                images.append(mask_sub_image)
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.info(f"Photo face crop and salient_detect error, error info: {e}")
+        
     # write results
     for index, base64_pilimage in enumerate(images):
         image = base64_pilimage.convert("RGB")
