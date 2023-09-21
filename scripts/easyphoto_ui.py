@@ -213,7 +213,7 @@ def on_ui_tabs():
                     logs_out        = gr.Chatbot(label='Training Logs', height=700)
                     block           = gr.Blocks()
                     with block:
-                        block.load(refresh_display, None, logs_out, every=1)
+                        block.load(refresh_display, None, logs_out, every=10)
 
                     refresh_button.click(
                         fn = refresh_display,
@@ -311,18 +311,26 @@ def on_ui_tabs():
                                         ids.append(_id)
                                 ids = sorted(ids)
 
-                            uuids           = []
-                            num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
-                            for i in range(int(num_of_faceid)):
-                                if int(num_of_faceid) > 1:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"User_{i} id", visible=True)
-                                else:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="User id (The User id you provide while training)", visible=True)
+                            num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid")
 
+                            uuids           = []
+                            visibles        = [True, False, False, False, False]
+                            for i in range(int(5)):
+                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, label=f"User_{i} id", visible=visibles[i])
                                 uuids.append(uuid)
+
+                            def update_uuids(_num_of_faceid):
+                                _uuids = []
+                                for i in range(int(_num_of_faceid)):
+                                    _uuids.append(gr.update(value="none", visible=True))
+                                for i in range(int(5 - int(_num_of_faceid))):
+                                    _uuids.append(gr.update(value="none", visible=False))
+                                return _uuids
+                            
+                            num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
                             
                             refresh = ToolButton(value="\U0001f504")
-                            for i in range(int(num_of_faceid)):
+                            for i in range(int(5)):
                                 refresh.click(
                                     fn=select_function,
                                     inputs=[],
@@ -465,8 +473,6 @@ def on_ui_tabs():
 # 注册设置页的配置项
 def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
-    shared.opts.add_option("num_of_faceid", shared.OptionInfo(
-        1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
         True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
 
