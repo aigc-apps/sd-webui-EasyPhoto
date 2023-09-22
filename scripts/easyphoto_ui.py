@@ -197,14 +197,14 @@ def on_ui_tabs():
                                     step=0.5, label="max time (hours) of RL"
                                 )
                                 timestep_fraction = gr.Slider(
-                                    minimum=0.7, maximum=1, value=0.7,
+                                    minimum=0.7, maximum=1, value=1,
                                     step=0.05, label="timestep fraction"
                                 )
                             rl_notes = gr.Markdown(
                                 value = '''
                                 RL notes:
                                 - The RL is an experimental feature aiming to improve the face similarity score of generated photos w.r.t uploaded photos.
-                                - Setting (**max rl time** / **timestep fraction**) > 3 is recommended for a stable training result.
+                                - Setting (**max rl time** / **timestep fraction**) > 2 is recommended for a stable training result.
                                 - 16GB GPU memory is required at least.
                                 ''',
                                 visible=False

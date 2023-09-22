@@ -4,6 +4,7 @@
 # - Instead of `variance_noise`, it takes `prev_sample` as an optional argument. If `prev_sample` is provided,
 #   it uses it to compute the log prob.
 # - Timesteps can be a batched torch.Tensor.
+# Copied from https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/ddim_with_logprob.py.
 
 from typing import Optional, Tuple, Union
 

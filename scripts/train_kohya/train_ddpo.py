@@ -3,9 +3,11 @@ import contextlib
 import datetime
 import logging
 import os
+import signal
 import tempfile
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from functools import partial
 
 import numpy as np
@@ -32,8 +34,26 @@ import ddpo_pytorch.rewards
 from ddpo_pytorch.diffusers_patch.ddim_with_logprob import ddim_step_with_logprob
 from ddpo_pytorch.diffusers_patch.pipeline_with_logprob import pipeline_with_logprob
 from ddpo_pytorch.stat_tracking import PerPromptStatTracker
-from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 from train_lora import merge_lora
+from utils.model_utils import load_models_from_stable_diffusion_checkpoint
+
+
+class TimeoutException(Exception): pass
+
+
+@contextmanager
+def time_limit(seconds: int):
+    """The context manager to limit the execution time of a function call given `seconds`.
+    Borrowed from https://stackoverflow.com/questions/366682/how-to-limit-execution-time-of-a-function-call.
+    """
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out after {}!".format(seconds))
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
@@ -808,4 +828,11 @@ def main():
     accelerator.end_training()
 
 if __name__ == "__main__":
-    main()
+    torch.cuda.empty_cache()
+    MAX_RL_TIME = int(os.getenv("MAX_RL_TIME"))
+    try:
+        with time_limit(MAX_RL_TIME):
+            main()
+    except TimeoutException as e:
+        print("Reinforcement learning timed out after {}!".format(MAX_RL_TIME))
+    torch.cuda.empty_cache()

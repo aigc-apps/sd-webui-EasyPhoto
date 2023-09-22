@@ -3,6 +3,7 @@
 # - It uses the patched version of `ddim_step_with_logprob` from `ddim_with_logprob.py`. As such, it only supports the
 #   `ddim` scheduler.
 # - It returns all the intermediate latents of the denoising process as well as the log probs of each denoising step.
+# Copied from https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/pipeline_with_logprob.py.
 
 from typing import Any, Callable, Dict, List, Optional, Union
 

@@ -1,3 +1,7 @@
+"""This file defines customize reward funtions. The reward function which takes in a batch of images
+and corresponding prompts returns a batch of rewards each time it is called.
+"""
+
 from pathlib import Path
 from typing import Callable, List, Union, Tuple
 
@@ -20,8 +24,13 @@ def _convert_images(images: Union[List[Image.Image], np.array, torch.Tensor]) ->
     return images
 
 
-def faceid_v0(target_image_dir: str) -> Callable:
-    # This pipeline requires the extra package mmcv-full.
+def faceid_SCRFD(target_image_dir: str) -> Callable:
+    """The closure returns the Face ID reward function given a user ID. It uses SCRFD to detect the face and then 
+    use CurricularFace to extract the face feature. SCRFD requires the extra package mmcv-full.
+
+    Args:
+        target_image_dir (str): The directory of processed face image files (.jpg) given a user ID.
+    """
     face_recognition = pipeline(Tasks.face_recognition, model="damo/cv_ir101_facerecognition_cfglint")
     target_image_files = Path(target_image_dir).glob("*.jpg")
     target_images = [Image.open(f).convert("RGB") for f in target_image_files]
@@ -35,9 +44,10 @@ def faceid_v0(target_image_dir: str) -> Callable:
         for s in src_images:
             try:
                 emb = face_recognition(s)[OutputKeys.IMG_EMBEDDING][0]
-            except TypeError:
+            except Exception as e:  # TypeError
+                print("Catch Exception in the reward function faceid_retina: {}".format(e))
                 emb = np.array([0] * 512)
-                print("No face is detected or the size of the detected face size is not enough. Set FaceID to zero.")
+                print("No face is detected or the size of the detected face size is not enough. Set the embedding to zero.")
             finally:
                 src_embs.append(emb)
         faceid_list = np.dot(src_embs, target_mean_emb)
@@ -47,7 +57,14 @@ def faceid_v0(target_image_dir: str) -> Callable:
     return __call__
 
 
-def faceid_v2(target_image_dir: str) -> Callable:
+def faceid_retina(target_image_dir: str) -> Callable:
+    """The closure returns the Face ID reward function given a user ID. It uses RetinaFace to detect the face and then 
+    use CurricularFace to extract the face feature. As the detection capability of RetinaFace is weaker than SCRFD, 
+    many generated side faces cannot be detected.
+
+    Args:
+        target_image_dir (str): The directory of processed face image files (.jpg) given a user ID.
+    """
     # The retinaface detection is built into the face recognition pipeline.
     face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
     target_image_files = Path(target_image_dir).glob("*.jpg")
@@ -63,7 +80,8 @@ def faceid_v2(target_image_dir: str) -> Callable:
         for s in src_images:
             try:
                 emb = face_recognition(dict(user=s))[OutputKeys.IMG_EMBEDDING][0]
-            except:  # cv2.error; TypeError.
+            except Exception as e:  # cv2.error; TypeError.
+                print("Catch Exception in the reward function faceid_retina: {}".format(e))
                 emb = np.array([0] * 512)
                 print("No face is detected or the size of the detected face size is not enough. Set the embedding to zero.")
             finally:

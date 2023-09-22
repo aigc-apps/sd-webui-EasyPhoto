@@ -48,8 +48,8 @@ def easyphoto_train_forward(
                 ids.append(_id)
     ids = sorted(ids)
 
-    # if user_id in ids:
-    #     return "User id 不能重复。"
+    if user_id in ids:
+        return "User id 不能重复。"
 
     check_files_exists_and_download()
     # 模板的地址
@@ -157,13 +157,13 @@ def easyphoto_train_forward(
                 f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
                 f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
                 f'--face_lora_path={os.path.relpath(face_lora_path, pwd)}',
-                f'--sample_batch_size=8',
-                f'--sample_num_batches_per_epoch=4',
+                f'--sample_batch_size=4',
+                f'--sample_num_batches_per_epoch=2',
                 f'--sample_num_steps=50',
                 f'--timestep_fraction={timestep_fraction}',
-                f'--train_batch_size=2',
+                f'--train_batch_size=1',
                 f'--gradient_accumulation_steps=8',
-                f'--learning_rate=0.0003',
+                f'--learning_rate=0.0001',
                 '--seed=42',
                 '--use_lora',
                 f'--rank=4',
@@ -171,15 +171,16 @@ def easyphoto_train_forward(
                 f'--allow_tf32',
                 f'--num_epochs=200',
                 f'--save_freq=1',
-                f'--reward_fn=faceid_v2',
+                f'--reward_fn=faceid_retina',
                 f'--target_image_dir={os.path.relpath(images_save_path, pwd)}',
                 f'--per_prompt_stat_tracking',
             ]
-
+            max_rl_time = int(float(max_rl_time) * 60 * 60)
+            os.environ["MAX_RL_TIME"] = str(max_rl_time)
             try:
-                subprocess.run(command, check=True, timeout=max_rl_time * 3600)
-            except subprocess.TimeoutExpired as e:
-                print(e)
+                print("Start RL (reinforcement learning). The max time of RL is {}.".format(max_rl_time))
+                # Since `accelerate` spawns a new process, set `timeout` in `subprocess.run` does not take effects.
+                subprocess.run(command, check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
             finally:
@@ -238,13 +239,13 @@ def easyphoto_train_forward(
                 f'--pretrained_model_name_or_path={sd15_save_path}',
                 f'--pretrained_model_ckpt={webui_load_path}', 
                 f'--face_lora_path={face_lora_path}',
-                f'--sample_batch_size=8',
-                f'--sample_num_batches_per_epoch=4',
+                f'--sample_batch_size=4',
+                f'--sample_num_batches_per_epoch=2',
                 f'--sample_num_steps=50',
                 f'--timestep_fraction={timestep_fraction}',
-                f'--train_batch_size=2',
+                f'--train_batch_size=1',
                 f'--gradient_accumulation_steps=8',
-                f'--learning_rate=0.0003',
+                f'--learning_rate=0.0001',
                 '--seed=42',
                 '--use_lora',
                 f'--rank=4',
@@ -252,14 +253,16 @@ def easyphoto_train_forward(
                 f'--allow_tf32',
                 f'--num_epochs=200',
                 f'--save_freq=1',
-                f'--reward_fn=faceid_v2',
+                f'--reward_fn=faceid_retina',
                 f'--target_image_dir={images_save_path}',
                 f'--per_prompt_stat_tracking',
             ]
+            max_rl_time = int(float(max_rl_time) * 60 * 60)
+            os.environ["MAX_RL_TIME"] = str(max_rl_time)
             try:
-                subprocess.run(command, check=True, timeout=max_rl_time * 3600)
-            except subprocess.TimeoutExpired as e:
-                print(e)
+                print("Start RL (reinforcement learning). The max time of RL is {}.".format(max_rl_time))
+                # Since `accelerate` spawns a new process, set `timeout` in `subprocess.run` does not take effects.
+                subprocess.run(command, check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
             finally:
