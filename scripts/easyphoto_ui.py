@@ -38,7 +38,6 @@ def upload_file(files, current_files):
     return file_paths
 
 def refresh_display():
-    print("cache_log_file_path:", cache_log_file_path)
     if not os.path.exists(os.path.dirname(cache_log_file_path)):
         os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
     lines_limit = 3
@@ -215,7 +214,7 @@ def on_ui_tabs():
                     logs_out        = gr.Chatbot(label='Training Logs', height=200)
                     block           = gr.Blocks()
                     with block:
-                        block.load(refresh_display, None, logs_out, every=10)
+                        block.load(refresh_display, None, logs_out, every=3)
 
                     refresh_button.click(
                         fn = refresh_display,
