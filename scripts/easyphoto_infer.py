@@ -21,7 +21,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
-from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
+from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
 
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
