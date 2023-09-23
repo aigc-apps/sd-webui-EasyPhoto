@@ -191,9 +191,9 @@ def easyphoto_infer_forward(
     
     # create modelscope model
     if retinaface_detection is None:
-        retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
+        retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface', model_revision='v2.0.2')
     if image_face_fusion is None:
-        image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo')
+        image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo', model_revision='v1.3')
     if face_skin is None:
         face_skin               = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
     if skin_retouching is None:
@@ -201,13 +201,13 @@ def easyphoto_infer_forward(
             skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
         except Exception as e:
             torch.cuda.empty_cache()
-            logging.info(f"Skin Retouching model load error. Error Info: {e}")
+            logging.error(f"Skin Retouching model load error. Error Info: {e}")
     if portrait_enhancement is None:
         try:
-            portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
+            portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement', model_revision='v1.0.0')
         except Exception as e:
             torch.cuda.empty_cache()
-            logging.info(f"Portrait Enhancement model load error. Error Info: {e}")
+            logging.error(f"Portrait Enhancement model load error. Error Info: {e}")
     
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
@@ -267,8 +267,31 @@ def easyphoto_infer_forward(
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
-    outputs, face_id_outputs = [], []
+    outputs, face_id_outputs    = [], []
+    loop_message                = ""
     for template_idx, template_image in enumerate(template_images):
+        template_idx_info = f'''
+            Start Generate template                 : {str(template_idx + 1)};
+            user_ids                                : {str(user_ids)};
+            input_prompts                           : {str(input_prompts)};
+            before_face_fusion_ratio                : {str(before_face_fusion_ratio)}; 
+            after_face_fusion_ratio                 : {str(after_face_fusion_ratio)};
+            first_diffusion_steps                   : {str(first_diffusion_steps)}; 
+            first_denoising_strength                : {str(first_denoising_strength)}; 
+            second_diffusion_steps                  : {str(second_diffusion_steps)};
+            second_denoising_strength               : {str(second_denoising_strength)};
+            seed                                    : {str(seed)}
+            crop_face_preprocess                    : {str(crop_face_preprocess)}
+            apply_face_fusion_before                : {str(apply_face_fusion_before)}
+            apply_face_fusion_after                 : {str(apply_face_fusion_after)}
+            color_shift_middle                      : {str(color_shift_middle)}
+            color_shift_last                        : {str(color_shift_last)}
+            super_resolution                        : {str(super_resolution)}
+            display_score                           : {str(display_score)}
+            background_restore                      : {str(background_restore)}
+            background_restore_denoising_strength   : {str(background_restore_denoising_strength)}
+        '''
+        logging.info(template_idx_info)
         try:
             # open the template image
             if tabs == 0 or tabs == 2:
@@ -505,7 +528,7 @@ def easyphoto_infer_forward(
                     output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
             except Exception as e:
                 torch.cuda.empty_cache()
-                logging.info(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
+                logging.error(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
                 return f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}", outputs, []
             
             try:
@@ -531,14 +554,21 @@ def easyphoto_infer_forward(
             else:
                 outputs.append(output_image)
             save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+            
+            if loop_message != "":
+                loop_message += "\n"
+            loop_message += f"Template {str(template_idx + 1)} Success."
         except Exception as e:
             torch.cuda.empty_cache()
-            logging.error(f"Template {str(template_idx)} error: Error info is {e}, skip it.")
-        
+            logging.error(f"Template {str(template_idx + 1)} error: Error info is {e}, skip it.")
+
+            if loop_message != "":
+                loop_message += "\n"
+            loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
     if not shared.opts.data.get("easyphoto_cache_model", True):
         del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; del face_recognition
         retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None
 
     torch.cuda.empty_cache()
-    return "Success", outputs, face_id_outputs  
+    return loop_message, outputs, face_id_outputs  
