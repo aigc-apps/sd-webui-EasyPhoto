@@ -280,11 +280,11 @@ def on_ui_tabs():
                                 time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["daytime", "night"], label="Where is the time?", visible=True)
 
                             sd_xl_input_prompt = gr.Text(
-                                value="upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime", show_label=False, visible=True
+                                value="upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32", show_label=False, visible=True
                             )
 
                             def update_sd_xl_input_prompt(portrait_ratio, gender, cloth_color, cloth, doing, where, time_of_photo):
-                                input_prompt = f"{portrait_ratio}, look at viewer, one twenty years old {gender}, wear {cloth_color} {cloth}, {doing}, {where}, {time_of_photo}"
+                                input_prompt = f"{portrait_ratio}, look at viewer, one twenty years old {gender}, wear {cloth_color} {cloth}, {doing}, {where}, {time_of_photo}, f32"
                                 return input_prompt
 
                             prompt_inputs = [portrait_ratio, gender, cloth_color, cloth, doing, where, time_of_photo]

@@ -5,6 +5,7 @@ from modules.paths import data_path, models_path
 data_dir                        = data_path
 models_path                     = models_path
 easyphoto_img2img_samples       = os.path.join(data_dir, 'outputs/img2img-images')
+easyphoto_txt2img_samples       = os.path.join(data_dir, 'outputs/txt2img-images')
 easyphoto_outpath_samples       = os.path.join(data_dir, 'outputs/easyphoto-outputs')
 user_id_outpath_samples         = os.path.join(data_dir, 'outputs/easyphoto-user-id-infos')
 cache_log_file_path             = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_log.txt")

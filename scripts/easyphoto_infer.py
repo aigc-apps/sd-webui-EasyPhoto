@@ -16,7 +16,7 @@ from PIL import Image
 from scripts.easyphoto_config import (
     DEFAULT_NEGATIVE, DEFAULT_POSITIVE, easyphoto_img2img_samples,
     easyphoto_outpath_samples, models_path, user_id_outpath_samples,
-    validation_prompt)
+    validation_prompt, easyphoto_txt2img_samples)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
@@ -311,7 +311,7 @@ def easyphoto_infer_forward(
         template_images = txt2img(
             [], input_prompt = sd_xl_input_prompt, \
             diffusion_steps=20, width=1024, height=1024, \
-            default_positive_prompt=DEFAULT_POSITIVE, default_negative_prompt=DEFAULT_NEGATIVE, \
+            default_positive_prompt=DEFAULT_POSITIVE, default_negative_prompt="(bokeh:2)," + DEFAULT_NEGATIVE, \
             seed = seed, sd_model_checkpoint = "sd_xl_base_1.0.safetensors",
         )
         template_images = [np.uint8(template_images)]
