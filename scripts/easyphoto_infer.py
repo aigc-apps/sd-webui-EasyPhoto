@@ -187,7 +187,7 @@ def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
-    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
@@ -308,11 +308,12 @@ def easyphoto_infer_forward(
 
     if tabs == 3:
         logging.info(sd_xl_input_prompt)
+        sd_xl_resolution = eval(str(sd_xl_resolution))
         template_images = txt2img(
             [], input_prompt = sd_xl_input_prompt, \
-            diffusion_steps=20, width=1024, height=1024, \
+            diffusion_steps=20, width=sd_xl_resolution[0], height=sd_xl_resolution[1], \
             default_positive_prompt=DEFAULT_POSITIVE, default_negative_prompt="(bokeh:2)," + DEFAULT_NEGATIVE, \
-            seed = seed, sd_model_checkpoint = "sd_xl_base_1.0.safetensors",
+            seed = seed, sd_model_checkpoint = "SDXL_1.0_ArienMixXL_v2.0.safetensors",
         )
         template_images = [np.uint8(template_images)]
 

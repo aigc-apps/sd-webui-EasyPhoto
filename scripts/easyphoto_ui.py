@@ -268,19 +268,27 @@ def on_ui_tabs():
 
                             upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
 
-                        with gr.TabItem("generate from none") as generate_tab:
+                        with gr.TabItem("generate from prompts") as generate_tab:
+                            
+                            sd_xl_resolution  = gr.Dropdown(
+                                value="(1024, 1024)", elem_id='dropdown', 
+                                choices=[(704, 1408), (768, 1344), (832, 1216), (896, 1152), (960, 1088), (1024, 1024), (1088, 960), (1152, 896), (1216, 832), (1344, 768), (1408, 704), (1536, 640), (1664, 576)], 
+                                label="The Resolution of Photo.", visible=True
+                            )
+                            
                             with gr.Row():
-                                portrait_ratio  = gr.Dropdown(value="Half-body photo", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait ratio.", visible=True)
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The gender of the person.", visible=True)
-                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the cloth.", visible=True)
-                                cloth           = gr.Dropdown(value="shirt", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "coat", "vest"], label="The cloth on the person.", visible=True)
+                                portrait_ratio  = gr.Dropdown(value="Half-body photo", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio.", visible=True)
+                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person.", visible=True)
+                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth.", visible=True)
+                                cloth           = gr.Dropdown(value="shirt", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "coat", "vest"], label="The Cloth on the Person.", visible=True)
                             with gr.Row():
-                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does the person do?", visible=True)
-                                where           = gr.Dropdown(value="in the garden", elem_id='dropdown', choices=["in the garden", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge"], label="Where is the person?", visible=True)
-                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["daytime", "night"], label="Where is the time?", visible=True)
+                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does the Person do?", visible=True)
+                                where           = gr.Dropdown(value="in the garden", elem_id='dropdown', choices=["in the garden", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge"], label="Where is the Person?", visible=True)
+                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["daytime", "night"], label="Where is the Time?", visible=True)
 
                             sd_xl_input_prompt = gr.Text(
-                                value="upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32", show_label=False, visible=True
+                                label="Sd XL Input Prompt", interactive=False,
+                                value="upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32", visible=False
                             )
 
                             def update_sd_xl_input_prompt(portrait_ratio, gender, cloth_color, cloth, doing, where, time_of_photo):
@@ -288,7 +296,18 @@ def on_ui_tabs():
                                 return input_prompt
 
                             prompt_inputs = [portrait_ratio, gender, cloth_color, cloth, doing, where, time_of_photo]
-                            portrait_ratio.change(update_sd_xl_input_prompt, inputs=prompt_inputs, outputs=sd_xl_input_prompt)
+                            for prompt_input in prompt_inputs:
+                                prompt_input.change(update_sd_xl_input_prompt, inputs=prompt_inputs, outputs=sd_xl_input_prompt)
+                                
+                            gr.Markdown(
+                                value = '''
+                                Generate from prompts notes:
+                                - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
+                                - We use sd-xl generate template first and then do the portrait reconstruction. So we need to download another sdxl model.
+                                - 16GB GPU memory is required at least. 12GB GPU memory would be very slow because of the lack of GPU memory.
+                                ''',
+                                visible=True
+                            )
 
                         model_selected_tabs = [template_images_tab, upload_image_tab, upload_dir_tab, generate_tab]
                         for i, tab in enumerate(model_selected_tabs):
@@ -487,7 +506,7 @@ def on_ui_tabs():
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
-                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, model_selected_tab, *uuids],
+                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
