@@ -37,6 +37,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New: 
+- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory![🔥 🔥 🔥 2023.09.26]
 - We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
 - **Support different base models for training and inference.** [🔥🔥 2023.09.08]

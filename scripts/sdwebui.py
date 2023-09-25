@@ -1,4 +1,5 @@
 import os
+import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -232,7 +233,9 @@ def t2i_call(
     try:
         origin_sd_model_checkpoint  = opts.sd_model_checkpoint
         origin_sd_vae               = opts.sd_vae
-    except:
+    except Exception as e:
+        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in t2i_call, use None instead!"
+        logging.error(f"{message} with Error: {e}")
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 
@@ -355,7 +358,9 @@ def i2i_inpaint_call(
     try:
         origin_sd_model_checkpoint  = opts.sd_model_checkpoint
         origin_sd_vae               = opts.sd_vae
-    except:
+    except Exception as e:
+        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
+        logging.error(f"{message} with Error: {e}")
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 

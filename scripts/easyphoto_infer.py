@@ -14,7 +14,7 @@ from modules.images import save_image
 from modules.shared import opts, state
 from PIL import Image
 from scripts.easyphoto_config import (
-    DEFAULT_NEGATIVE, DEFAULT_POSITIVE, easyphoto_img2img_samples,
+    DEFAULT_NEGATIVE, DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL, DEFAULT_NEGATIVE_XL, SDXL_MODEL_NAME, easyphoto_img2img_samples,
     easyphoto_outpath_samples, models_path, user_id_outpath_samples,
     validation_prompt, easyphoto_txt2img_samples)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
@@ -316,9 +316,9 @@ def easyphoto_infer_forward(
         template_images = txt2img(
             [], input_prompt = sd_xl_input_prompt, \
             diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
-            default_positive_prompt="film photography, a clear face, minor acne, (high resolution detail of human skin texture:1.4, rough skin:1.2), (portrait, :1.8), (indirect lighting)", \
-            default_negative_prompt="(bokeh:2), cgi, illustration, cartoon, deformed, distorted, disfigured, poorly drawn, bad anatomy, wrong anatomy,ugly, deformed, blurry,Noisy, log, text", \
-            seed = seed, sd_model_checkpoint = "SDXL_1.0_ArienMixXL_v2.0.safetensors", 
+            default_positive_prompt=DEFAULT_POSITIVE_XL, \
+            default_negative_prompt=DEFAULT_NEGATIVE_XL, \
+            seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
             sampler = "DPM++ 2M SDE Karras"
         )
         template_images = [np.uint8(template_images)]
