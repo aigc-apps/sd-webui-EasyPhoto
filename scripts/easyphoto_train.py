@@ -149,6 +149,8 @@ def easyphoto_train_forward(
         
         # Reinforcement learning after LoRA training.
         if enable_rl:
+            # The DDPO (LoRA) distributed training is unstable due to a known accelerate/diffusers issue. Set `num_processes` to 1.
+            # See https://github.com/kvablack/ddpo-pytorch/issues/10 for details.
             command = [
                 f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', '--main_process_port=4567', '--num_processes=1', f'{train_ddpo_path}',
                 f'--run_name={user_id}',
@@ -277,14 +279,11 @@ def easyphoto_train_forward(
     copyfile(best_weight_path, webui_save_path)
 
     if enable_rl:
-        # Currently, the latest ddpo lora checkpoint will be selected and saved to the WebUI Lora folder.
-        output_dir = os.path.join(ddpo_weight_save_path, "checkpoints")
-        if not os.path.exists(output_dir):
+        # Currently, the best (reward_mean) ddpo lora checkpoint will be selected and saved to the WebUI Lora folder.
+        best_output_dir = os.path.join(ddpo_weight_save_path, "best_outputs")
+        if not os.path.exists(best_output_dir):
             return "Failed to obtain checkpoints after reinforcement learning, please check the training process."
-        sub_dirs = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
-        sub_dirs_with_ctime = {f: os.path.getctime(os.path.join(output_dir, f)) for f in sub_dirs}
-        sorted_sub_dirs = sorted(sub_dirs_with_ctime, key=lambda k: sub_dirs_with_ctime[k])
-        ddpo_lora_path = os.path.join(output_dir, sorted_sub_dirs[-1], "pytorch_lora_weights.bin")
+        ddpo_lora_path = os.path.join(best_output_dir, "pytorch_lora_weights.bin")
         convert_lora_to_safetensors(ddpo_lora_path, ddpo_webui_save_path)
     
     # It has been abandoned and will be deleted later.

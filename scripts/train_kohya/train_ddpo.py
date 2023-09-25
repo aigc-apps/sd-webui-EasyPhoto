@@ -1,10 +1,13 @@
+import _thread
 import argparse
 import contextlib
 import datetime
+import heapq
 import logging
 import os
-import signal
+import shutil
 import tempfile
+import threading
 import time
 from collections import defaultdict
 from contextlib import contextmanager
@@ -38,22 +41,25 @@ from train_lora import merge_lora
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 
 
-class TimeoutException(Exception): pass
+class TimeoutException(Exception):
+    def __init__(self, msg=""):
+        self.msg = msg
 
 
 @contextmanager
-def time_limit(seconds: int):
+def time_limit(seconds, msg=""):
     """The context manager to limit the execution time of a function call given `seconds`.
     Borrowed from https://stackoverflow.com/questions/366682/how-to-limit-execution-time-of-a-function-call.
     """
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out after {}!".format(seconds))
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
+    timer = threading.Timer(seconds, lambda: _thread.interrupt_main())
+    timer.start()
     try:
         yield
+    except KeyboardInterrupt:
+        raise TimeoutException("Timed out for operation {}".format(msg))
     finally:
-        signal.alarm(0)
+        # if the action ends in specified time, timer is canceled
+        timer.cancel()
 
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
@@ -454,6 +460,9 @@ def main():
 
     # set up diffusers-friendly checkpoint saving with Accelerate
 
+    reward_mean_list, reward_std_list = [], []
+    cur_best_reward_mean, reward_mean_heap = (float("-inf"), ""), []
+
     def save_model_hook(models, weights, output_dir):
         assert len(models) == 1
         if args.use_lora and isinstance(models[0], AttnProcsLayers):
@@ -665,6 +674,8 @@ def main():
         time_info = str(time.asctime(time.localtime(time.time())))
         log_line = "{}: reinforcement learning of {} at step {}. The mean and std of face similarity score " \
             "is {:.4f} and {:.4f}.\n".format(time_info, user_id, global_step, rewards.mean(), rewards.std())
+        reward_mean_list.append(rewards.mean())
+        reward_std_list.append(rewards.std())
         if accelerator.is_main_process:
             output_log.write(log_line)
             output_log.flush()
@@ -813,10 +824,52 @@ def main():
             # make sure we did an optimization step at the end of the inner epoch
             assert accelerator.sync_gradients
 
-        if epoch != 0 and epoch % args.save_freq == 0 and accelerator.is_main_process:
-            # save_directory = os.path.join(args.logdir, "checkpoint_{}".format(epoch))
-            # accelerator.save_model(trainable_layers, save_directory, safe_serialization=True)
+        # Save the best checkpoint and maintain a heap (except for epoch 0) with length `num_checkpoint_limit - 1`
+        # by `reward_mean`. Note that, `reward_mean` corresponds to the model saved in last epoch.
+        if epoch % args.save_freq == 0 and accelerator.is_main_process:
+            if reward_mean_list[-1] >= cur_best_reward_mean[0]:
+                # (reward_mean, -1) => baseline will not be copied to best_outputs.
+                cur_best_reward_mean = (reward_mean_list[-1], accelerator.save_iteration - 1)
+                best_ckpt_src_dir = os.path.join(
+                    args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1)
+                )
+                if os.path.exists(best_ckpt_src_dir):
+                    best_ckpt_dst_dir = os.path.join(args.logdir, "best_outputs")
+                    if os.path.exists(best_ckpt_dst_dir):
+                        shutil.rmtree(best_ckpt_dst_dir)
+                    shutil.copytree(best_ckpt_src_dir, best_ckpt_dst_dir)
+                    print(
+                        "Copy the checkpoint directory: {} with the highest reward {} to best_outputs"
+                        .format(best_ckpt_src_dir, cur_best_reward_mean)
+                    )
+            if len(reward_mean_heap) < args.num_checkpoint_limit - 1:
+                if accelerator.save_iteration > 0:
+                    heapq.heappush(reward_mean_heap, (reward_mean_list[-1], accelerator.save_iteration - 1))
+            else:
+                reward_save_iteration = (reward_mean_list[-1], accelerator.save_iteration - 1)
+                if reward_mean_list[-1] >= reward_mean_heap[0][0]:
+                    reward, save_iteration = heapq.heappushpop(reward_mean_heap, reward_save_iteration)
+                    popped_ckpt_dir = os.path.join(
+                        args.logdir, "checkpoints", "checkpoint_{}".format(save_iteration)
+                    )
+                    if os.path.exists(popped_ckpt_dir):
+                        shutil.rmtree(popped_ckpt_dir)
+                        print(
+                            "Delete the checkpoint directory: {} with the smallest reward {} in the heap"
+                            .format(popped_ckpt_dir, reward)
+                        )
+                else:
+                    last_ckpt_dir = os.path.join(
+                        args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1)
+                    )
+                    shutil.rmtree(last_ckpt_dir)
+                    print(
+                        "Delete last checkpoint directory: {} with smaller reward {}"
+                        .format(last_ckpt_dir, reward_mean_list[-1])
+                    )
             accelerator.save_state()
+            np.savetxt(os.path.join(args.logdir, "reward_mean.txt"), np.array(reward_mean_list), delimiter=",", fmt="%.4f")
+            np.savetxt(os.path.join(args.logdir, "reward_std.txt"), np.array(reward_std_list), delimiter=",", fmt="%.4f")
     
     # Save the lora layers
     accelerator.wait_for_everyone()
@@ -828,11 +881,12 @@ def main():
     accelerator.end_training()
 
 if __name__ == "__main__":
-    torch.cuda.empty_cache()
-    MAX_RL_TIME = int(os.getenv("MAX_RL_TIME"))
-    try:
-        with time_limit(MAX_RL_TIME):
-            main()
-    except TimeoutException as e:
-        print("Reinforcement learning timed out after {}!".format(MAX_RL_TIME))
-    torch.cuda.empty_cache()
+    if "MAX_RL_TIME" in os.environ:
+        MAX_RL_TIME = int(os.getenv("MAX_RL_TIME"))
+        try:
+            with time_limit(MAX_RL_TIME):
+                main()
+        except TimeoutException as e:
+            print("Reinforcement learning timed out after {}!".format(MAX_RL_TIME))
+    else:
+        main()
