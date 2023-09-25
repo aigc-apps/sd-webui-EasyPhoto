@@ -1,3 +1,5 @@
+import datetime
+import hashlib
 import logging
 import os
 import time
@@ -5,8 +7,9 @@ from glob import glob
 
 import requests
 from modules.paths import models_path
+from tqdm import tqdm
+
 from scripts.easyphoto_config import data_path
-import hashlib
 
 # Set the level of the logger
 log_level = os.environ.get('LOG_LEVEL', 'INFO')
@@ -24,24 +27,17 @@ def check_id_valid(user_id, user_id_outpath_samples, models_path):
         return False
     return True
 
-def urldownload_progressbar(url, filepath):
-    start = time.time() 
+def urldownload_progressbar(url, file_path):
     response = requests.get(url, stream=True)
-    size = 0 
-    chunk_size = 1024
-    content_size = int(response.headers['content-length']) 
-    try:
-        if response.status_code == 200: 
-            print('Start download,[File size]:{size:.2f} MB'.format(size = content_size / chunk_size / 1024))  
-            with open(filepath,'wb') as file:  
-                for data in response.iter_content(chunk_size = chunk_size):
-                    file.write(data)
-                    size +=len(data)
-                    print('\r'+'[下载进度]:%s%.2f%%' % ('>'*int(size*50/ content_size), float(size / content_size * 100)) ,end=' ')
-        end = time.time()
-        print('Download completed!,times: %.2f秒' % (end - start))
-    except:
-        print('Error!')
+    total_size = int(response.headers.get('content-length', 0))
+    progress_bar = tqdm(total=total_size, unit='B', unit_scale=True)
+    with open(file_path, 'wb') as f:
+        for chunk in response.iter_content(1024):
+            if chunk:
+                f.write(chunk)
+                progress_bar.update(len(chunk))
+
+    progress_bar.close()
 
 def check_files_exists_and_download(check_hash):
     controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
@@ -66,9 +62,6 @@ def check_files_exists_and_download(check_hash):
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/w600k_r50.onnx",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2d106det.onnx",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/det_10g.onnx",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
@@ -86,9 +79,6 @@ def check_files_exists_and_download(check_hash):
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "2d106det.onnx"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "buffalo_l", "det_10g.onnx"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
