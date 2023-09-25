@@ -242,7 +242,7 @@ def on_ui_tabs():
                     with gr.Column():
                         model_selected_tab = gr.State(0)
 
-                        with gr.TabItem("template images") as template_images_tab:
+                        with gr.TabItem("template gallery") as template_images_tab:
                             template_gallery_list = [(i, i) for i in preset_template]
                             gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
                             
@@ -252,11 +252,11 @@ def on_ui_tabs():
                             selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
                             gallery.select(select_function, None, selected_template_images)
                             
-                        with gr.TabItem("upload image") as upload_image_tab:
+                        with gr.TabItem("upload") as upload_image_tab:
                             init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
                             
 
-                        with gr.TabItem("upload dir") as upload_dir_tab:
+                        with gr.TabItem("batch upload") as upload_dir_tab:
                             uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                             with gr.Row():
@@ -268,7 +268,7 @@ def on_ui_tabs():
 
                             upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
 
-                        with gr.TabItem("generate from prompts") as generate_tab:
+                        with gr.TabItem("SDXL-beta") as generate_tab:
                             
                             sd_xl_resolution  = gr.Dropdown(
                                 value="(1344, 768)", elem_id='dropdown', 
