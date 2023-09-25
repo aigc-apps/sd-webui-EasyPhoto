@@ -3,6 +3,8 @@
 
 🦜 🦜 Welcome!
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/alibaba-pai/easyphoto)
+
 English | [简体中文](./README_zh-CN.md)
 
 # Table of Contents
