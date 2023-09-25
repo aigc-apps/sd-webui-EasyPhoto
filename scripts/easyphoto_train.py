@@ -15,7 +15,6 @@ from scripts.easyphoto_config import (easyphoto_outpath_samples, models_path, ca
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
-from scripts.preprocess import preprocess_images
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 
