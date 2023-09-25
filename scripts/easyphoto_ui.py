@@ -283,7 +283,7 @@ def on_ui_tabs():
                                 cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "coat", "vest"], label="The Cloth on the Person.", visible=True)
                             with gr.Row():
                                 doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does the Person do?", visible=True)
-                                where           = gr.Dropdown(value="on the lawn", elem_id='dropdown', choices=["in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person?", visible=True)
+                                where           = gr.Dropdown(value="in the garden with flowers", elem_id='dropdown', choices=["in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person?", visible=True)
                                 season          = gr.Dropdown(value="in the winter", elem_id='dropdown', choices=["in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season?", visible=True)
                                 time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["daytime", "night"], label="Where is the Time?", visible=True)
                             with gr.Row():
