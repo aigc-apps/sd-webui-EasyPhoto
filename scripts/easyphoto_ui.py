@@ -291,7 +291,7 @@ def on_ui_tabs():
 
                             sd_xl_input_prompt = gr.Text(
                                 label="Sd XL Input Prompt", interactive=False,
-                                value="upper-body, look at viewer, one twenty years old girl, wear white shit, standing, on the lawn, in the winter, daytime, snow, f32", visible=False
+                                value="upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32", visible=False
                             )
 
                             def update_sd_xl_input_prompt(portrait_ratio, gender, cloth_color, cloth, doing, where, season, time_of_photo, weather):
