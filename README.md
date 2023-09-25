@@ -37,6 +37,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New: 
+- We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
 - **Support different base models for training and inference.** [🔥🔥 2023.09.08]
 - **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
