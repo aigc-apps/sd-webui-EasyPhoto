@@ -391,7 +391,7 @@ def on_ui_tabs():
                             )
                             seed = gr.Textbox(
                                 label="Seed", 
-                                value=12345,
+                                value=-1,
                             )
                             with gr.Row():
                                 before_face_fusion_ratio = gr.Slider(
