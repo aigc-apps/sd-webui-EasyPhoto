@@ -102,6 +102,7 @@ def txt2img(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+    sampler = "Euler a",
 ):
     controlnet_units_list = []
 
@@ -124,6 +125,7 @@ def txt2img(
         controlnet_units=controlnet_units_list,
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_txt2img_samples,
+        sampler=sampler,
     )
 
     return image
@@ -140,6 +142,7 @@ def inpaint(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+    sampler = "Euler a",
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -171,6 +174,7 @@ def inpaint(
         controlnet_units=controlnet_units_list,
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_img2img_samples,
+        sampler=sampler,
     )
 
     return image
@@ -279,7 +283,7 @@ def easyphoto_infer_forward(
             face_id_retinaface_masks.append([])
         else:
             # get prompt
-            input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
             
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -311,9 +315,11 @@ def easyphoto_infer_forward(
         sd_xl_resolution = eval(str(sd_xl_resolution))
         template_images = txt2img(
             [], input_prompt = sd_xl_input_prompt, \
-            diffusion_steps=20, width=sd_xl_resolution[0], height=sd_xl_resolution[1], \
-            default_positive_prompt=DEFAULT_POSITIVE, default_negative_prompt="(bokeh:2)," + DEFAULT_NEGATIVE, \
-            seed = seed, sd_model_checkpoint = "SDXL_1.0_ArienMixXL_v2.0.safetensors",
+            diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
+            default_positive_prompt="film photography, a clear face, minor acne, (high resolution detail of human skin texture:1.4, rough skin:1.2), (portrait, :1.8), (indirect lighting)", \
+            default_negative_prompt="(bokeh:2), cgi, illustration, cartoon, deformed, distorted, disfigured, poorly drawn, bad anatomy, wrong anatomy,ugly, deformed, blurry,Noisy, log, text", \
+            seed = seed, sd_model_checkpoint = "SDXL_1.0_ArienMixXL_v2.0.safetensors", 
+            sampler = "DPM++ 2M SDE Karras"
         )
         template_images = [np.uint8(template_images)]
 

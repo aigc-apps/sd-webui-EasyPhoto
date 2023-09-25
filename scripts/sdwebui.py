@@ -215,7 +215,7 @@ def t2i_call(
         s_noise=1,
         override_settings={},
         override_settings_restore_afterwards=True,
-        sampler_index=None,  # deprecated: use sampler_name
+        sampler=None,  # deprecated: use sampler_name
         include_init_images=False,
 
         controlnet_units: List[ControlNetUnit] = [],
@@ -224,8 +224,8 @@ def t2i_call(
         sd_vae = None, 
         sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
-    if sampler_index is None:
-        sampler_index = 0
+    if sampler is None:
+        sampler = "Euler a"
     if steps is None:
         steps = 20
 
@@ -254,7 +254,7 @@ def t2i_call(
         subseed_strength=subseed_strength,
         seed_resize_from_h=seed_resize_from_h,
         seed_resize_from_w=seed_resize_from_w,
-        sampler_name=sd_samplers.samplers[sampler_index].name,
+        sampler_name=sampler,
         batch_size=batch_size,
         n_iter=n_iter,
         steps=steps,
@@ -338,7 +338,7 @@ def i2i_inpaint_call(
         s_noise=1,
         override_settings={},
         override_settings_restore_afterwards=True,
-        sampler_index=None,  # deprecated: use sampler_name
+        sampler=None, 
         include_init_images=False,
 
         controlnet_units: List[ControlNetUnit] = [],
@@ -347,8 +347,8 @@ def i2i_inpaint_call(
         sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
         sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
-    if sampler_index is None:
-        sampler_index = 0
+    if sampler is None:
+        sampler = "Euler a"
     if steps is None:
         steps = 20
 
@@ -378,7 +378,7 @@ def i2i_inpaint_call(
         subseed_strength=subseed_strength,
         seed_resize_from_h=seed_resize_from_h,
         seed_resize_from_w=seed_resize_from_w,
-        sampler_name=sd_samplers.samplers_for_img2img[sampler_index].name,
+        sampler_name=sampler,
         batch_size=batch_size,
         n_iter=n_iter,
         steps=steps,
