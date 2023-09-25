@@ -214,6 +214,9 @@ First, we will perform face detection on our incoming template image to determin
 #### b. Second Diffusion:
 After getting the result of First Diffusion, we will fuse the result with the optimal user image for face fusion, and then we will use Stable Diffusion again with the user's digital doppelganger for generation. The second generation will use higher resolution.
 
+# Special thanks
+Special thanks to DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen for their code contributions (in no particular order).
+
 # Reference
 - insightface：https://github.com/deepinsight/insightface    
 - cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary  

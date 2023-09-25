@@ -202,6 +202,9 @@ EasyPhoto训练界面如下：
 #### b. 第二次扩散：
 在得到第一次扩散的结果后，我们将把该结果与最佳用户图像进行人脸融合，然后再次使用稳定扩散与用户的数字二重身进行生成。第二次生成将使用更高的分辨率。
 
+# 特别感谢
+特别感谢DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen同学们的代码贡献（此排名不分先后）。
+
 # 参考文献
 - insightface：https://github.com/deepinsight/insightface    
 - cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary  
