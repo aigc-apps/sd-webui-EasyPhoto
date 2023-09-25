@@ -5,14 +5,23 @@ import time
 import gradio as gr
 import requests
 from modules import script_callbacks, shared
-from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
-                                      models_path, user_id_outpath_samples)
+
+from scripts.easyphoto_config import (cache_log_file_path, models_path,
+                                      user_id_outpath_samples)
 from scripts.easyphoto_infer import easyphoto_infer_forward
-from scripts.easyphoto_train import (DEFAULT_CACHE_LOG_FILE,
-                                     easyphoto_train_forward)
+from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
 
 gradio_compat = True
+
+try:
+    from distutils.version import LooseVersion
+
+    from importlib_metadata import version
+    if LooseVersion(version("gradio")) < LooseVersion("3.10"):
+        gradio_compat = False
+except ImportError:
+    pass
 
 def get_external_ckpts():
     external_checkpoints = []
@@ -24,32 +33,13 @@ def get_external_ckpts():
     return external_checkpoints
 external_checkpoints = get_external_ckpts()
 
-try:
-    from distutils.version import LooseVersion
-
-    from importlib_metadata import version
-    if LooseVersion(version("gradio")) < LooseVersion("3.10"):
-        gradio_compat = False
-except ImportError:
-    pass
-
-class ToolButton(gr.Button, gr.components.FormComponent):
-    """Small button with single emoji as text, fits inside gradio forms"""
-
-    def __init__(self, **kwargs):
-        super().__init__(variant="tool", 
-                         elem_classes=kwargs.pop('elem_classes', []) + ["cnet-toolbutton"], 
-                         **kwargs)
-
-    def get_block_name(self):
-        return "button"
-
 def upload_file(files, current_files):
     file_paths = [file_d['name'] for file_d in current_files] + [file.name for file in files]
     return file_paths
 
 def refresh_display():
-    cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
+    if not os.path.exists(os.path.dirname(cache_log_file_path)):
+        os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
     lines_limit = 3
     try:
         with open(cache_log_file_path, "r", newline="") as f:
@@ -71,6 +61,17 @@ def refresh_display():
             pass
         return None
 
+class ToolButton(gr.Button, gr.components.FormComponent):
+    """Small button with single emoji as text, fits inside gradio forms"""
+
+    def __init__(self, **kwargs):
+        super().__init__(variant="tool", 
+                         elem_classes=kwargs.pop('elem_classes', []) + ["cnet-toolbutton"], 
+                         **kwargs)
+
+    def get_block_name(self):
+        return "button"
+    
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
         with gr.TabItem('Train'):
@@ -236,10 +237,10 @@ def on_ui_tabs():
                 output_message  = gr.Markdown()
 
                 with gr.Box():
-                    logs_out        = gr.Chatbot(label='Training Logs', height=700)
+                    logs_out        = gr.Chatbot(label='Training Logs', height=200)
                     block           = gr.Blocks()
                     with block:
-                        block.load(refresh_display, None, logs_out, every=1)
+                        block.load(refresh_display, None, logs_out, every=3)
 
                     refresh_button.click(
                         fn = refresh_display,
@@ -281,10 +282,23 @@ def on_ui_tabs():
                         with gr.TabItem("upload image") as upload_image_tab:
                             init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
                             
-                        model_selected_tabs = [template_images_tab, upload_image_tab]
+
+                        with gr.TabItem("upload dir") as upload_dir_tab:
+                            uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                            with gr.Row():
+                                upload_dir_button = gr.UploadButton(
+                                    "Upload Photos", file_types=["image"], file_count="multiple"
+                                )
+                                clear_dir_button = gr.Button("Clear Photos")
+                            clear_dir_button.click(fn=lambda: [], inputs=None, outputs=uploaded_template_images)
+
+                            upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
+
+                        model_selected_tabs = [template_images_tab, upload_image_tab, upload_dir_tab]
                         for i, tab in enumerate(model_selected_tabs):
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
-
+                        
                         with gr.Row():
                             def checkpoint_refresh_function():
                                 checkpoints = []
@@ -325,18 +339,26 @@ def on_ui_tabs():
                                         ids.append(_id)
                                 ids = sorted(ids)
 
-                            uuids           = []
-                            num_of_faceid   = shared.opts.data.get("num_of_faceid", 1)
-                            for i in range(int(num_of_faceid)):
-                                if int(num_of_faceid) > 1:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label=f"User_{i} id", visible=True)
-                                else:
-                                    uuid = gr.Dropdown(value="none", choices=["none"] + ids, label="User id (The User id you provide while training)", visible=True)
+                            num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid")
 
+                            uuids           = []
+                            visibles        = [True, False, False, False, False]
+                            for i in range(int(5)):
+                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=140, label=f"User_{i} id", visible=visibles[i])
                                 uuids.append(uuid)
+
+                            def update_uuids(_num_of_faceid):
+                                _uuids = []
+                                for i in range(int(_num_of_faceid)):
+                                    _uuids.append(gr.update(value="none", visible=True))
+                                for i in range(int(5 - int(_num_of_faceid))):
+                                    _uuids.append(gr.update(value="none", visible=False))
+                                return _uuids
+                            
+                            num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
                             
                             refresh = ToolButton(value="\U0001f504")
-                            for i in range(int(num_of_faceid)):
+                            for i in range(int(5)):
                                 refresh.click(
                                     fn=select_function,
                                     inputs=[],
@@ -467,7 +489,7 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[sd_model_checkpoint, selected_template_images, init_image, additional_prompt, 
+                    inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
@@ -479,8 +501,6 @@ def on_ui_tabs():
 # 注册设置页的配置项
 def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
-    shared.opts.add_option("num_of_faceid", shared.OptionInfo(
-        1, "Num of faceid", gr.Slider, {"minimum": 1, "maximum": 4, "step": 1}, section=section))
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
         True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
 

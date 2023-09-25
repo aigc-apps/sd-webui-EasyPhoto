@@ -1,21 +1,67 @@
 import argparse
 import json
+import logging
 import math
 import os
-import sys
-import cv2
-import torch
-import numpy as np
 import platform
+import sys
+from shutil import copyfile
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
+import cv2
+import numpy as np
+import torch
+from face_process_utils import call_face_crop
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from PIL import Image
-from scripts.face_process_utils import call_face_crop
-from scripts.easyphoto_utils import logging
 from tqdm import tqdm
-from shutil import copyfile
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Simple example of a training script.")
+    parser.add_argument(
+        "--validation_prompt",
+        type=str,
+        default=None,
+        help=(
+            "The validation_prompt of the user."
+        ),
+    )
+    parser.add_argument(
+        "--ref_image_path",
+        type=str,
+        default=None,
+        help=(
+            "The ref_image_path."
+        ),
+    )
+    parser.add_argument(
+        "--images_save_path",
+        type=str,
+        default=None,
+        help=(
+            "The images_save_path."
+        ),
+    )
+    parser.add_argument(
+        "--json_save_path",
+        type=str,
+        default=None,
+        help=(
+            "The json_save_path."
+        ),
+    )
+    parser.add_argument(
+        "--inputs_dir",
+        type=str,
+        default=None,
+        help=(
+            "The inputs dir of the data for preprocessing."
+        ),
+    )
+    args = parser.parse_args()
+    return args
 
 def compare_jpg_with_face_id(embedding_list):
     embedding_array = np.vstack(embedding_list)
@@ -27,15 +73,20 @@ def compare_jpg_with_face_id(embedding_list):
     scores = [np.dot(emb, pivot_feature)[0][0] for emb in embedding_list]
     return scores
 
+if __name__ == "__main__":
+    args = parse_args()
+    images_save_path    = args.images_save_path
+    json_save_path      = args.json_save_path
+    validation_prompt   = args.validation_prompt
+    inputs_dir          = args.inputs_dir
+    ref_image_path      = args.ref_image_path
 
-def preprocess_images(images_save_path, json_save_path, validation_prompt, inputs_dir, ref_image_path):
     # embedding
-    face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
-
+    face_recognition        = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
     # face detection
-    retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
+    retinaface_detection    = pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface', model_revision='v2.0.2')
     # semantic segmentation
-    salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection')
+    salient_detect          = pipeline(Tasks.semantic_segmentation, 'damo/cv_u2net_salient-detection', model_revision='v1.0.0')
     # skin retouching
     try:
         skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
@@ -44,7 +95,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
         logging.info("Skin Retouching model load error, but pass.")
     # portrait enhancement
     try:
-        portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement')
+        portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement', model_revision='v1.0.0')
     except:
         portrait_enhancement = None
         logging.info("Portrait Enhancement model load error, but pass.")
@@ -56,6 +107,7 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     face_angles     = []
     copy_jpgs       = []
     selected_paths  = []
+    sub_images =[]
     for index, jpg in enumerate(tqdm(jpgs)):
         try:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -86,6 +138,11 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             # face crop
             sub_image = image.crop(retinaface_box)
+            try:
+                sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+            except Exception as e:
+                torch.cuda.empty_cache()
+                logging.error(f"Photo skin_retouching error, error info: {e}")
 
             # get embedding
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
@@ -95,12 +152,11 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
 
             copy_jpgs.append(jpg)
             selected_paths.append(_image_path)
-        except:
-            pass
+            sub_images.append(sub_image)
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.error(f"Photo detect and count score error, error info: {e}")
     
-    if len(face_id_scores) == 0:
-        return "No faces detected. Please increase the size of the face in the upload photos."
-
     # Filter reference faces based on scores, considering quality scores, similarity scores, and angle scores
     face_id_scores      = compare_jpg_with_face_id(face_id_scores)
     ref_total_scores    = np.array(face_angles) * np.array(face_id_scores)
@@ -115,61 +171,55 @@ def preprocess_images(images_save_path, json_save_path, validation_prompt, input
     
     selected_jpgs   = []
     selected_scores = []
+    selected_sub_images = []
     for index in indexes:
         selected_jpgs.append(copy_jpgs[index])
         selected_scores.append(ref_total_scores[index])
+        selected_sub_images.append(sub_images[index])
         print("jpg:", copy_jpgs[index], "face_id_scores", ref_total_scores[index])
                              
     images              = []
     enhancement_num      = 0
     max_enhancement_num  = len(selected_jpgs) // 2
     for index, jpg in tqdm(enumerate(selected_jpgs[::-1])):
-        if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
-            continue
-        _image_path             = os.path.join(inputs_dir, jpg)
-        image                   = Image.open(_image_path)
-        retinaface_boxes, _, _  = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
-        retinaface_box          = retinaface_boxes[0]
-        # crop image
-        sub_image               = image.crop(retinaface_box)
         try:
-            sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-        except:
-            logging.info("Skin Retouching model detect error, but pass.")
+            sub_image = selected_sub_images[index]
+            try:
+                if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
+                    sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                    enhancement_num += 1
+            except Exception as e:
+                torch.cuda.empty_cache()
+                logging.error(f"Photo enhance error, error info: {e}")
 
-        try:
-            # Determine which images to enhance based on quality score and image size
-            if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
-                sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-                enhancement_num += 1
-        except:
-            logging.info("Portrait Enhancement model detect error, but pass.")
+            # Correct the mask area of the face
+            sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
+            sub_box     = sub_boxes[0]
+            sub_mask    = sub_masks[0]
 
-        # Correct the mask area of the face
-        sub_boxes, _, sub_masks = call_face_crop(retinaface_detection, sub_image, 1, prefix="tmp")
-        sub_box     = sub_boxes[0]
-        sub_mask    = sub_masks[0]
+            h, w, c     = np.shape(sub_mask)
+            face_width  = sub_box[2] - sub_box[0]
+            face_height = sub_box[3] - sub_box[1]
+            sub_box[0]  = np.clip(np.array(sub_box[0], np.int32) - face_width * 0.3, 1, w - 1)
+            sub_box[2]  = np.clip(np.array(sub_box[2], np.int32) + face_width * 0.3, 1, w - 1)
+            sub_box[1]  = np.clip(np.array(sub_box[1], np.int32) + face_height * 0.15, 1, h - 1)
+            sub_box[3]  = np.clip(np.array(sub_box[3], np.int32) + face_height * 0.15, 1, h - 1)
+            sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
+            sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
 
-        h, w, c     = np.shape(sub_mask)
-        face_width  = sub_box[2] - sub_box[0]
-        face_height = sub_box[3] - sub_box[1]
-        sub_box[0]  = np.clip(np.array(sub_box[0], np.int32) - face_width * 0.3, 1, w - 1)
-        sub_box[2]  = np.clip(np.array(sub_box[2], np.int32) + face_width * 0.3, 1, w - 1)
-        sub_box[1]  = np.clip(np.array(sub_box[1], np.int32) + face_height * 0.15, 1, h - 1)
-        sub_box[3]  = np.clip(np.array(sub_box[3], np.int32) + face_height * 0.15, 1, h - 1)
-        sub_mask    = np.zeros_like(np.array(sub_mask, np.uint8))
-        sub_mask[sub_box[1]:sub_box[3], sub_box[0]:sub_box[2]] = 1
+            # Significance detection, merging facial masks
+            result      = salient_detect(sub_image)[OutputKeys.MASKS]
+            mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
 
-        # Significance detection, merging facial masks
-        result      = salient_detect(sub_image)[OutputKeys.MASKS]
-        mask        = np.float32(np.expand_dims(result > 128, -1)) * sub_mask
-
-        # Obtain the image after the mask
-        mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
-        mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
-        if np.sum(np.array(mask)) != 0:
-            images.append(mask_sub_image)
-
+            # Obtain the image after the mask
+            mask_sub_image = np.array(sub_image) * np.array(mask) + np.ones_like(sub_image) * 255 * (1 - np.array(mask))
+            mask_sub_image = Image.fromarray(np.uint8(mask_sub_image))
+            if np.sum(np.array(mask)) != 0:
+                images.append(mask_sub_image)
+        except Exception as e:
+            torch.cuda.empty_cache()
+            logging.error(f"Photo face crop and salient_detect error, error info: {e}")
+        
     # write results
     for index, base64_pilimage in enumerate(images):
         image = base64_pilimage.convert("RGB")

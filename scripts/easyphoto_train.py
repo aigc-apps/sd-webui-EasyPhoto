@@ -9,16 +9,18 @@ from glob import glob
 from shutil import copyfile
 
 from PIL import Image, ImageOps
-from scripts.easyphoto_config import (easyphoto_outpath_samples, id_path,
-                                      models_path, user_id_outpath_samples,
+
+from scripts.easyphoto_config import (easyphoto_outpath_samples, models_path, cache_log_file_path,
+                                      user_id_outpath_samples,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.preprocess import preprocess_images
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
-DEFAULT_CACHE_LOG_FILE = "train_kohya_log.txt"
+
 python_executable_path = sys.executable
+check_hash             = True
 
 # Attention! Output of js is str or list, not float or int
 def easyphoto_train_forward(
@@ -35,6 +37,8 @@ def easyphoto_train_forward(
     timestep_fraction: float,
     *args
 ):  
+    global check_hash
+
     if user_id == "" or user_id is None:
         return "User id cannot be set to empty."
     if user_id == "none" :
@@ -51,7 +55,9 @@ def easyphoto_train_forward(
     if user_id in ids:
         return "User id 不能重复。"
 
-    check_files_exists_and_download()
+    check_files_exists_and_download(check_hash)
+    check_hash = False
+
     # 模板的地址
     training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
     # 原始数据备份
@@ -85,11 +91,23 @@ def easyphoto_train_forward(
         image = Image.open(user_image['name'])
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
-        
-    sub_threading = threading.Thread(target=preprocess_images, args=(images_save_path, json_save_path, validation_prompt, original_backup_path, ref_image_path,))
-    sub_threading.start()
-    sub_threading.join()
 
+    # preprocess
+    preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
+    command = [
+            f'{python_executable_path}', f'{preprocess_path}',
+            f'--images_save_path={images_save_path}',
+            f'--json_save_path={json_save_path}', 
+            f'--validation_prompt={validation_prompt}',
+            f'--inputs_dir={original_backup_path}',
+            f'--ref_image_path={ref_image_path}'
+        ]
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing the command: {e}")
+    
+    # check preprocess results
     train_images = glob(os.path.join(images_save_path, "*.jpg"))
     if len(train_images) == 0:
         return "Failed to obtain preprocessed images, please check the preprocessing process"
@@ -103,8 +121,10 @@ def easyphoto_train_forward(
         print("train_ddpo_path : ", train_kohya_path)
     
     # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
-    cache_log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CACHE_LOG_FILE)
-    print("cache_log_file_path   : ", cache_log_file_path)
+    print("cache_log_file_path:", cache_log_file_path)
+    if not os.path.exists(os.path.dirname(cache_log_file_path)):
+        os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
+
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
@@ -277,7 +297,7 @@ def easyphoto_train_forward(
         return "Failed to obtain Lora after training, please check the training process."
 
     copyfile(best_weight_path, webui_save_path)
-
+    
     if enable_rl:
         # Currently, the best (reward_mean) ddpo lora checkpoint will be selected and saved to the WebUI Lora folder.
         best_output_dir = os.path.join(ddpo_weight_save_path, "best_outputs")
