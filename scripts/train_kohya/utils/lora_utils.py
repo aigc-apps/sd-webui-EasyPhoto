@@ -1265,3 +1265,29 @@ def merge_from_name_and_index(name, index_list, output_dir='output_dir/'):
         assert os.path.exists(l)==True
     merge_different_loras(loras_load_path, lora_save_path)
     return lora_save_path
+
+
+def convert_lora_to_safetensors(in_lora_file: str, out_lora_file: str):
+    """Converts the diffusers format (.bin/.pkl) lora file `in_lora_file` 
+    into the SD webUI format (.safetensors) lora file `out_lora_file`.
+    """
+    if torch.cuda.is_available():
+        checkpoint = torch.load(in_lora_file, map_location=torch.device('cuda'))
+    else:
+        # if on CPU or want to have maximum precision on GPU, use default full-precision setting
+        checkpoint = torch.load(in_lora_file, map_location=torch.device('cpu'))
+    
+    new_dict = dict()
+    for idx, key in enumerate(checkpoint):
+        new_key = re.sub('\.processor\.', '_', key)
+        new_key = re.sub('mid_block\.', 'mid_block_', new_key)
+        new_key = re.sub('_lora.up.', '.lora_up.', new_key)
+        new_key = re.sub('_lora.down.', '.lora_down.', new_key)
+        new_key = re.sub('\.(\d+)\.', '_\\1_', new_key)
+        new_key = re.sub('to_out', 'to_out_0', new_key)
+        new_key = 'lora_unet_' + new_key
+
+        new_dict[new_key] = checkpoint[key]
+
+    print("Convert {} to {}.".format(in_lora_file, out_lora_file))
+    safetensors.torch.save_file(new_dict, out_lora_file)
