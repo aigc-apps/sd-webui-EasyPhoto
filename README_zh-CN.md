@@ -3,6 +3,8 @@
 
 🦜 🦜 Welcome!
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/alibaba-pai/easyphoto)
+
 [English](./README.md) | 简体中文
 
 # 目录
@@ -33,6 +35,8 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 新特性：
+- 支持使用SDXL模型和一定的选项直接生成高清大图，不再需要上传模板，需要16GB显存。[🔥 🔥 🔥 2023.09.26]
+- 我们同样支持[Diffusers版本](https://github.com/aigc-apps/EasyPhoto/)。 [🔥 2023.09.25]
 - **支持对背景进行微调，并计算生成的图像与用户之间的相似度得分。** [🔥🔥 2023.09.15]
 - **支持不同预测基础模型。** [🔥🔥 2023.09.08]
 - **支持多人生成！添加缓存选项以优化推理速度。在UI上添加日志刷新。** [🔥🔥 2023.09.06]
@@ -201,6 +205,9 @@ EasyPhoto训练界面如下：
 
 #### b. 第二次扩散：
 在得到第一次扩散的结果后，我们将把该结果与最佳用户图像进行人脸融合，然后再次使用稳定扩散与用户的数字二重身进行生成。第二次生成将使用更高的分辨率。
+
+# 特别感谢
+特别感谢DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen同学们的代码贡献（此排名不分先后）。
 
 # 参考文献
 - insightface：https://github.com/deepinsight/insightface    

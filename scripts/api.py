@@ -94,6 +94,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         display_score               = datas.get("display_score", False)
         background_restore          = datas.get("background_restore", False)
         background_restore_denoising_strength = datas.get("background_restore", 0.35)
+        sd_xl_input_prompt          = datas.get("sd_xl_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32")
+        sd_xl_resolution            = datas.get("sd_xl_resolution", "(1024, 1024)")
         tabs                        = datas.get("tabs", 1)
 
         if type(user_ids) == str:
@@ -122,12 +124,13 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             )
         uploaded_template_images = _uploaded_template_images
 
+        tabs = int(tabs)
         try:
             comment, outputs, face_id_outputs = easyphoto_infer_forward(
                 sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
                 before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                 seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, \
-                background_restore_denoising_strength, tabs, *user_ids
+                background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
         except Exception as e:

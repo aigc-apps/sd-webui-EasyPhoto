@@ -15,14 +15,14 @@ from modules.paths import models_path
 from modules.shared import opts, state
 from PIL import Image
 from scripts.easyphoto_config import (
-    DEFAULT_NEGATIVE, DEFAULT_POSITIVE, easyphoto_img2img_samples,
+    DEFAULT_NEGATIVE, DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL, DEFAULT_NEGATIVE_XL, SDXL_MODEL_NAME, easyphoto_img2img_samples,
     easyphoto_outpath_samples, models_path, user_id_outpath_samples,
-    validation_prompt)
+    validation_prompt, easyphoto_txt2img_samples)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
-from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call
+from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -93,6 +93,44 @@ def get_controlnet_unit(unit, input_image, weight):
         )
     return control_unit
 
+def txt2img(
+    controlnet_pairs: list,
+    input_prompt = '1girl',
+    diffusion_steps = 50,
+    width: int = 1024,
+    height: int = 1024,
+    default_positive_prompt = DEFAULT_POSITIVE,
+    default_negative_prompt = DEFAULT_NEGATIVE,
+    seed: int = 123456,
+    sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+    sampler = "Euler a",
+):
+    controlnet_units_list = []
+
+    for pair in controlnet_pairs:
+        controlnet_units_list.append(
+            get_controlnet_unit(pair[0], pair[1], pair[2])
+        )
+
+    positive = f'{input_prompt}, {default_positive_prompt}'
+    negative = f'{default_negative_prompt}'
+
+    image = t2i_call(
+        steps=diffusion_steps,
+        cfg_scale=7,
+        width=width,
+        height=height,
+        seed=seed,
+        prompt=positive,
+        negative_prompt=negative,
+        controlnet_units=controlnet_units_list,
+        sd_model_checkpoint=sd_model_checkpoint,
+        outpath_samples=easyphoto_txt2img_samples,
+        sampler=sampler,
+    )
+
+    return image
+
 def inpaint(
     input_image: Image.Image,
     select_mask_input: Image.Image,
@@ -105,6 +143,7 @@ def inpaint(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+    sampler = "Euler a",
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -136,6 +175,7 @@ def inpaint(
         controlnet_units=controlnet_units_list,
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_img2img_samples,
+        sampler=sampler,
     )
 
     return image
@@ -151,7 +191,8 @@ check_hash = True
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, background_restore_denoising_strength, tabs, *user_ids
+    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
+    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
@@ -186,6 +227,8 @@ def easyphoto_infer_forward(
             template_images = [init_image]
         elif tabs == 2:
             template_images = [file_d['name'] for file_d in uploaded_template_images]
+        elif tabs == 3:
+            pass
     except Exception as e:
         torch.cuda.empty_cache()
         return "Please choose or upload a template.", [], []
@@ -246,6 +289,7 @@ def easyphoto_infer_forward(
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
+
             
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -271,6 +315,19 @@ def easyphoto_infer_forward(
             face_id_retinaface_boxes.append(_face_id_retinaface_box)
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
+
+    if tabs == 3:
+        logging.info(sd_xl_input_prompt)
+        sd_xl_resolution = eval(str(sd_xl_resolution))
+        template_images = txt2img(
+            [], input_prompt = sd_xl_input_prompt, \
+            diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
+            default_positive_prompt=DEFAULT_POSITIVE_XL, \
+            default_negative_prompt=DEFAULT_NEGATIVE_XL, \
+            seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
+            sampler = "DPM++ 2M SDE Karras"
+        )
+        template_images = [np.uint8(template_images)]
 
     outputs, face_id_outputs    = [], []
     loop_message                = ""

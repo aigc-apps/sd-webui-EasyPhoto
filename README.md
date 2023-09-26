@@ -3,6 +3,8 @@
 
 🦜 🦜 Welcome!
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/alibaba-pai/easyphoto)
+
 English | [简体中文](./README_zh-CN.md)
 
 # Table of Contents
@@ -35,6 +37,8 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New: 
+- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory![🔥 🔥 🔥 2023.09.26]
+- We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
 - **Support different base models for training and inference.** [🔥🔥 2023.09.08]
 - **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
@@ -213,6 +217,9 @@ First, we will perform face detection on our incoming template image to determin
 
 #### b. Second Diffusion:
 After getting the result of First Diffusion, we will fuse the result with the optimal user image for face fusion, and then we will use Stable Diffusion again with the user's digital doppelganger for generation. The second generation will use higher resolution.
+
+# Special thanks
+Special thanks to DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen for their code contributions (in no particular order).
 
 # Reference
 - insightface：https://github.com/deepinsight/insightface    
