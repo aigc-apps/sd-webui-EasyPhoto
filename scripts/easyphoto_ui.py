@@ -186,6 +186,32 @@ def on_ui_tabs():
                                     label="Validation",  
                                     value=True
                                 )
+                                enable_rl = gr.Checkbox(
+                                    label="Enable RL (Reinforcement Learning)",
+                                    value=False
+                                )
+                            
+                            # Reinforcement Learning Options
+                            with gr.Row(visible=False) as rl_option_row1:
+                                max_rl_time = gr.Slider(
+                                    minimum=1, maximum=12, value=1,
+                                    step=0.5, label="max time (hours) of RL"
+                                )
+                                timestep_fraction = gr.Slider(
+                                    minimum=0.7, maximum=1, value=1,
+                                    step=0.05, label="timestep fraction"
+                                )
+                            rl_notes = gr.Markdown(
+                                value = '''
+                                RL notes:
+                                - The RL is an experimental feature aiming to improve the face similarity score of generated photos w.r.t uploaded photos.
+                                - Setting (**max rl time** / **timestep fraction**) > 2 is recommended for a stable training result.
+                                - 16GB GPU memory is required at least.
+                                ''',
+                                visible=False
+                            )
+                            enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_option_row1])
+                            enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_notes])
 
                         gr.Markdown(
                             '''
@@ -228,6 +254,7 @@ def on_ui_tabs():
                                     sd_model_checkpoint, dummy_component,
                                     uuid,
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
+                                    enable_rl, max_rl_time, timestep_fraction
                                 ],
                                 outputs=[output_message])
                                 
