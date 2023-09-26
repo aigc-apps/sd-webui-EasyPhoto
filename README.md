@@ -32,7 +32,7 @@ If you meet some problems in the training, please refer to the [VQA](https://git
 
 We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start).
 
-Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
+Now you can experience EasyPhoto demo quickly on [ModelScope](https://modelscope.cn/studios/PAI/EasyPhoto/summary) and [Huggingface](https://huggingface.co/spaces/alibaba-pai/easyphoto)
 
 What's New: 
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
