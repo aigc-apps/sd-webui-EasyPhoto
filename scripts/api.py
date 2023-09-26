@@ -29,6 +29,11 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         network_alpha           = datas.get("network_alpha", 64)
         instance_images         = datas.get("instance_images", [])
         validation              = datas.get("validation", True)
+
+        enable_rl               = datas.get("enable_rl", False)
+        max_rl_time             = datas.get("max_rl_time", 1)
+        timestep_fraction       = datas.get("timestep_fraction", 1)
+        
         args                    = datas.get("args", []) 
 
         instance_images         = [api.decode_base64_to_image(init_image) for init_image in instance_images]
@@ -49,9 +54,8 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
                 user_id,
                 resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos,
                 train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, 
-                rank, network_alpha,
-                validation,
-                instance_images,
+                rank, network_alpha, validation, instance_images,
+                enable_rl, max_rl_time, timestep_fraction, 
                 *args
             )
         except Exception as e:
