@@ -15,24 +15,24 @@
 """Fine-tuning script for Stable Diffusion for text2image with support for LoRA."""
 import os
 import sys
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import argparse
 import logging
 import math
 import random
-import time
 import shutil
+import time
+from collections import defaultdict
 from glob import glob
 from pathlib import Path
-from typing import Dict
 from shutil import copyfile
+from typing import Dict
 
 import cv2
 import datasets
 import diffusers
-import insightface
 import numpy as np
-import requests
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -42,12 +42,11 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
-from diffusers import (DPMSolverMultistepScheduler, DDPMScheduler,
+from diffusers import (DDPMScheduler, DPMSolverMultistepScheduler,
                        StableDiffusionInpaintPipeline)
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
-from huggingface_hub import create_repo, upload_folder
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline as modelscope_pipeline
 from modelscope.utils.constant import Tasks
@@ -58,7 +57,8 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
-from collections import defaultdict
+
+torch.backends.cudnn.benchmark = True
 
 if is_wandb_available():
     import wandb
@@ -318,12 +318,7 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         - Select top_merge weights for merging based on generated validation images.
     """
     # embedding
-    providers           = ["CPUExecutionProvider"]
-    face_recognition    = insightface.model_zoo.get_model(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", "models"), "buffalo_l", "w600k_r50.onnx"), providers=providers)
-    face_recognition.prepare(ctx_id=0)
-    
-    face_analyser       = insightface.app.FaceAnalysis(name="buffalo_l", root=os.path.abspath(os.path.dirname(os.path.dirname(__file__))).replace("scripts", ""), providers=providers)
-    face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+    face_recognition = modelscope_pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
 
     # get ID list
     face_image_list     = glob(os.path.join(pivot_dir, '*.jpg')) + glob(os.path.join(pivot_dir, '*.JPG')) + \
@@ -334,8 +329,7 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     for img in face_image_list:
         try:
             image = Image.open(img)
-            embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
-            embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+            embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
             embedding_list.append(embedding)
         except Exception as e:
             print("error at:", str(e))
@@ -367,8 +361,7 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
             try:
                 # a average above all
                 image = Image.open(img)
-                embedding = face_recognition.get(np.array(image), face_analyser.get(np.array(image))[0])
-                embedding = np.array([embedding / np.linalg.norm(embedding, 2)])
+                embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
 
                 res = np.mean(np.dot(embedding, top10_embedding_array))
                 result_list.append([res, img])
@@ -929,7 +922,7 @@ def main():
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
+    if args.allow_tf32 or os.environ.get('ENABLE_TF32') :
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.scale_lr:
@@ -948,7 +941,17 @@ def main():
 
         optimizer_class = bnb.optim.AdamW8bit
     else:
-        optimizer_class = torch.optim.AdamW
+        if os.environ.get('ENABLE_APEX_OPT'):
+            try:
+                import apex
+                optimizer_class=apex.optimizers.FusedAdam
+            except ImportError:
+                logger.warn(
+                    "To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex."
+                )
+                optimizer_class=torch.optim.AdamW
+        else:
+            optimizer_class = torch.optim.AdamW
 
     # Optimizer creation
     optimizer = optimizer_class(
@@ -1055,12 +1058,16 @@ def main():
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
+    persistent_workers = True
+    if args.dataloader_num_workers == 0:
+        persistent_workers = False
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
+        persistent_workers=persistent_workers,
     )
 
     # Scheduler and math around the number of training steps.

@@ -1,4 +1,5 @@
 import os
+import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -8,7 +9,7 @@ import modules.scripts as scripts
 import numpy as np
 from modules import processing, scripts, sd_models, sd_samplers, shared, sd_vae
 from modules.api.models import *
-from modules.processing import StableDiffusionProcessingImg2Img
+from modules.processing import StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
 from modules.sd_models import get_closet_checkpoint_match, load_model
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
@@ -187,6 +188,121 @@ def reload_model(k, v):
     if k == 'sd_vae':
         sd_vae.reload_vae_weights()
 
+def t2i_call(
+        resize_mode=0,
+        prompt="",
+        styles=[],
+        seed=-1,
+        subseed=-1,
+        subseed_strength=0,
+        seed_resize_from_h=0,
+        seed_resize_from_w=0,
+
+        batch_size=1,
+        n_iter=1,
+        steps=None,
+        cfg_scale=7.0,
+        width=640,
+        height=768,
+        restore_faces=False,
+        tiling=False,
+        do_not_save_samples=False,
+        do_not_save_grid=False,
+        negative_prompt="",
+        eta=1.0,
+        s_churn=0,
+        s_tmax=0,
+        s_tmin=0,
+        s_noise=1,
+        override_settings={},
+        override_settings_restore_afterwards=True,
+        sampler=None,  # deprecated: use sampler_name
+        include_init_images=False,
+
+        controlnet_units: List[ControlNetUnit] = [],
+        use_deprecated_controlnet=False,
+        outpath_samples = "",
+        sd_vae = None, 
+        sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+):
+    if sampler is None:
+        sampler = "Euler a"
+    if steps is None:
+        steps = 20
+
+    try:
+        origin_sd_model_checkpoint  = opts.sd_model_checkpoint
+        origin_sd_vae               = opts.sd_vae
+    except Exception as e:
+        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in t2i_call, use None instead!"
+        logging.error(f"{message} with Error: {e}")
+        origin_sd_model_checkpoint  = ""
+        origin_sd_vae               = ""
+
+    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+    if sd_vae is not None:
+        sd_vae = os.path.basename(vae_near_checkpoint = find_vae_near_checkpoint(sd_vae))
+    else:
+        sd_vae = None
+
+    p_txt2img = StableDiffusionProcessingTxt2Img(
+        sd_model=origin_sd_model_checkpoint,
+        outpath_samples=outpath_samples,
+        outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        styles=[],
+        seed=seed,
+        subseed=subseed,
+        subseed_strength=subseed_strength,
+        seed_resize_from_h=seed_resize_from_h,
+        seed_resize_from_w=seed_resize_from_w,
+        sampler_name=sampler,
+        batch_size=batch_size,
+        n_iter=n_iter,
+        steps=steps,
+        cfg_scale=cfg_scale,
+        width=width,
+        height=height,
+        restore_faces=restore_faces,
+        tiling=tiling,
+        override_settings=override_settings
+    )
+
+    p_txt2img.scripts = scripts.scripts_img2img
+    p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
+
+    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+        if alwayson_scripts.name is None:
+            continue
+        if alwayson_scripts.name=='controlnet':
+            p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+    
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        reload_model('sd_model_checkpoint', sd_model_checkpoint)
+    
+    if origin_sd_vae != sd_vae:
+        reload_model('sd_vae', sd_vae)
+
+    processed = processing.process_images(p_txt2img)
+
+    if sd_model_checkpoint != origin_sd_model_checkpoint:
+        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
+    if origin_sd_vae != sd_vae:
+        reload_model('sd_vae', origin_sd_vae)
+
+    if len(processed.images) > 1:
+        # get the generate image!
+        h_0, w_0, c_0 = np.shape(processed.images[0])
+        h_1, w_1, c_1 = np.shape(processed.images[1])
+        if w_1 != w_0:
+            gen_image = processed.images[1]
+        else:
+            gen_image = processed.images[0]
+    else:
+        gen_image = processed.images[0]
+    return gen_image
+
 def i2i_inpaint_call(
         images=[],  
         resize_mode=0,
@@ -225,7 +341,7 @@ def i2i_inpaint_call(
         s_noise=1,
         override_settings={},
         override_settings_restore_afterwards=True,
-        sampler_index=None,  # deprecated: use sampler_name
+        sampler=None, 
         include_init_images=False,
 
         controlnet_units: List[ControlNetUnit] = [],
@@ -234,15 +350,17 @@ def i2i_inpaint_call(
         sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
         sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
 ):
-    if sampler_index is None:
-        sampler_index = 0
+    if sampler is None:
+        sampler = "Euler a"
     if steps is None:
         steps = 20
 
     try:
         origin_sd_model_checkpoint  = opts.sd_model_checkpoint
         origin_sd_vae               = opts.sd_vae
-    except:
+    except Exception as e:
+        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
+        logging.error(f"{message} with Error: {e}")
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 
@@ -265,7 +383,7 @@ def i2i_inpaint_call(
         subseed_strength=subseed_strength,
         seed_resize_from_h=seed_resize_from_h,
         seed_resize_from_w=seed_resize_from_w,
-        sampler_name=sd_samplers.samplers_for_img2img[sampler_index].name,
+        sampler_name=sampler,
         batch_size=batch_size,
         n_iter=n_iter,
         steps=steps,
