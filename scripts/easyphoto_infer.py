@@ -104,9 +104,7 @@ def txt2img(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    # sampler = "Euler a",
     sampler = "DPM++ 2M SDE Karras"
-
 ):
     controlnet_units_list = []
 
@@ -146,7 +144,6 @@ def inpaint(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    # sampler = "Euler a",
     sampler = "DPM++ 2M SDE Karras"
 ):
     assert input_image is not None, f'input_image must not be none'
