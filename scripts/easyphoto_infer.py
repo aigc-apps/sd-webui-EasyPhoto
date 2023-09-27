@@ -23,6 +23,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
+from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -188,6 +189,8 @@ face_skin = None
 face_recognition = None
 check_hash = True
 
+# this decorate is default to be closed, not every needs this, more for developers
+# @gpu_monitor_decorator() 
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \

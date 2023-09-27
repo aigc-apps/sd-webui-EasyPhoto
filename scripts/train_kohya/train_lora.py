@@ -56,7 +56,9 @@ from skimage import transform
 from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
+
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
+from utils.gpu_info import gpu_monitor_decorator
 
 torch.backends.cudnn.benchmark = True
 
@@ -807,6 +809,7 @@ def unet_attn_processors_state_dict(unet) -> Dict[str, torch.tensor]:
 
     return attn_processors_state_dict
 
+@gpu_monitor_decorator()
 def main():
     args = parse_args()
     logging_dir = Path(args.output_dir, args.logging_dir)
