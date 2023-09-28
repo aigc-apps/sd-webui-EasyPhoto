@@ -99,15 +99,28 @@ def plot_data(prefix):
     time_stamps, used_memory, gpu_utilization = zip(*data[1:])
     used_memory = [float(x) for x in used_memory]
     gpu_utilization = [float(x) for x in gpu_utilization]
-    tick_spacing = len(used_memory) // 10
+    if len(used_memory) >= 10:
+        tick_spacing = len(used_memory) // 10
+    else:
+        tick_spacing = 1
 
-    plot_graph(time_stamps, used_memory, 'Used Memory (GB)',
-               'Time', 'Used Memory (GB)', 'Used Memory Over Time',
-               tick_spacing, f'{prefix}_memory.png')
+    try:
+        plot_graph(time_stamps, used_memory, 'Used Memory (GB)',
+                'Time', 'Used Memory (GB)', 'Used Memory Over Time',
+                tick_spacing, f'{prefix}_memory.png')
+    except Exception as e:
+        message = f"plot_graph of Memory error, error info:{str(e)}"
+        print(message)
 
-    plot_graph(time_stamps, gpu_utilization, 'GPU Utilization (%)',
-               'Time', 'GPU Utilization (%)', 'GPU Utilization Over Time',
-               tick_spacing, f'{prefix}_utilization.png')
+    try:
+        plot_graph(time_stamps, gpu_utilization, 'GPU Utilization (%)',
+                'Time', 'GPU Utilization (%)', 'GPU Utilization Over Time',
+                tick_spacing, f'{prefix}_utilization.png')
+    except Exception as e:
+        message = f"plot_graph of Utilization error, error info:{str(e)}"
+        print(message)
+
+
 
 def plot_graph(x, y, label, xlabel, ylabel, title, tick_spacing, filename):
     """Generate and save a plot.
