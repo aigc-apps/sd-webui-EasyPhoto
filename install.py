@@ -1,4 +1,5 @@
 import launch
+import platform
 
 
 if not launch.is_installed("cv2"):
@@ -24,3 +25,8 @@ if not launch.is_installed("modelscope"):
 if not launch.is_installed("diffusers==0.18.2"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
+
+if platform.system() != 'Windows':
+    if not launch.is_installed("nvitop"):
+        print('Installing requirements for easyphoto-webui')
+        launch.run_pip("install nvitop==1.3.0", "requirements for tensorflow")

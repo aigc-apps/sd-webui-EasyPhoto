@@ -322,6 +322,13 @@ def on_ui_tabs():
                             )
 
                             def update_sd_xl_input_prompt(portrait_ratio, gender, cloth_color, cloth, doing, where, season, time_of_photo, weather):
+                                
+                                # first time add gender hack for XL prompt, suggest by Nenly
+                                gender_limit_prompt_girls = {'dress':'shirt'}
+                                if gender in ['boy', 'man']:
+                                    if cloth in list(gender_limit_prompt_girls.keys()):
+                                        cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
+                                        
                                 input_prompt = f"{portrait_ratio}, look at viewer, one twenty years old {gender}, wear {cloth_color} {cloth}, {doing}, {where}, {season}, {time_of_photo}, {weather}, f32"
                                 return input_prompt
 
