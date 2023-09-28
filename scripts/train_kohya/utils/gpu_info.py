@@ -133,29 +133,32 @@ def plot_graph(x, y, label, xlabel, ylabel, title, tick_spacing, filename):
 def gpu_monitor_decorator(prefix="result/gpu_info", display_log=False):
     def actual_decorator(func):
         def wrapper(*args, **kwargs):
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            dynamic_prefix = f"{prefix}/{func.__name__}_{timestamp}"
-
-            directory = path.dirname(dynamic_prefix)
-            if not path.exists(directory):
-                try:
-                    makedirs(directory)
-                except Exception as e:
-                    comment = f"GPU Info record need a result/gpu_info dir in your SDWebUI, now failed with {str(e)}"
-                    print(comment)
-                    dynamic_prefix=f"{func.__name__}_{timestamp}"
-
-            stop_flag = Value('b', False)
-
-            monitor_proc = Process(target=monitor_and_plot, args=(dynamic_prefix, display_log, stop_flag))
-            monitor_proc.start()
-
-            try:
+            # this wrapper is incompatible for Windows for Now
+            if platform.system='Windows':
                 result = func(*args, **kwargs)
-            finally:
-                stop_flag.value = True
-                monitor_proc.join()
+            else:
+                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                dynamic_prefix = f"{prefix}/{func.__name__}_{timestamp}"
 
+                directory = path.dirname(dynamic_prefix)
+                if not path.exists(directory):
+                    try:
+                        makedirs(directory)
+                    except Exception as e:
+                        comment = f"GPU Info record need a result/gpu_info dir in your SDWebUI, now failed with {str(e)}"
+                        print(comment)
+                        dynamic_prefix=f"{func.__name__}_{timestamp}"
+
+                stop_flag = Value('b', False)
+
+                monitor_proc = Process(target=monitor_and_plot, args=(dynamic_prefix, display_log, stop_flag))
+                monitor_proc.start()
+
+                try:
+                    result = func(*args, **kwargs)
+                finally:
+                    stop_flag.value = True
+                    monitor_proc.join()
             return result
 
         return wrapper
