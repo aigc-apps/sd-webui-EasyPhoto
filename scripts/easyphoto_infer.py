@@ -45,13 +45,15 @@ def resize_image(input_image, resolution, nearest = False, crop264 = True):
         img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_NEAREST)
     return img
 
+# Add control_mode=1 means Prompt is more important, to better control lips and eyes,
+# this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
 def get_controlnet_unit(unit, input_image, weight):
     if unit == "canny":
         control_unit = ControlNetUnit(
             input_image=input_image, module='canny',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=1, 
             resize_mode='Just Resize',
             threshold_a=100,
             threshold_b=200,
@@ -62,7 +64,7 @@ def get_controlnet_unit(unit, input_image, weight):
             input_image=input_image, module='openpose_full',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=1, 
             resize_mode='Just Resize',
             model='control_v11p_sd15_openpose'
         )
@@ -90,7 +92,7 @@ def get_controlnet_unit(unit, input_image, weight):
             input_image=input_image, module='tile_resample',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=1, 
             resize_mode='Just Resize',
             threshold_a=1,
             threshold_b=200,
@@ -497,7 +499,6 @@ def easyphoto_infer_forward(
                     first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
                         first_diffusion_output_image_face_area * face_skin_mask + first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] * (1 - face_skin_mask)
                     first_diffusion_output_image = Image.fromarray(first_diffusion_output_image)
-                    first_diffusion_output_image.save("1.jpg")
 
                 # Second diffusion
                 if roop_images[index] is not None and apply_face_fusion_after:
@@ -534,7 +535,22 @@ def easyphoto_infer_forward(
                     # scale box
                     rescale_retinaface_box = [int(i * default_hr_scale) for i in input_image_retinaface_box]
                     second_diffusion_output_image = np.array(second_diffusion_output_image)
-                    face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])), retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10]])[0]) > 128)
+                    
+                    # get face skin mask
+                    if 1:
+                        cropped_image_uint8 = np.uint8(second_diffusion_output_image[
+                            rescale_retinaface_box[1]:rescale_retinaface_box[3], 
+                            rescale_retinaface_box[0]:rescale_retinaface_box[2],
+                            :])
+                        cropped_image_object = Image.fromarray(cropped_image_uint8)
+                        #Apply the 'face_skin' function to get skin mask
+                        face_skin_result = face_skin(
+                            cropped_image_object, 
+                            retinaface_detection, 
+                            needs_index=[[1, 2, 3, 4, 5, 10]]
+                        )
+                        #Extract the first element from the face_skin result and cast to float32 and get mask by 128
+                        face_skin_mask = np.int32(np.float32(face_skin_result[0])) > 128
 
                     # apply color shift
                     second_diffusion_output_image_face_area = np.array(copy.deepcopy(second_diffusion_output_image))[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2], :] 
