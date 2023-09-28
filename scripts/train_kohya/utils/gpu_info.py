@@ -1,14 +1,16 @@
-from datetime import datetime
+import csv
 import multiprocessing
-from os import path, makedirs
-from multiprocessing import Process, Value
 import time
+import platform
+from datetime import datetime
+from multiprocessing import Process, Value
+from os import makedirs, path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from nvitop import Device
 
-import csv
+if platform.system() != 'Windows':
+    from nvitop import Device
 
 # Constants
 BYTES_PER_GB = 1024 * 1024 * 1024
@@ -133,39 +135,38 @@ def plot_graph(x, y, label, xlabel, ylabel, title, tick_spacing, filename):
 def gpu_monitor_decorator(prefix="result/gpu_info", display_log=False):
     def actual_decorator(func):
         def wrapper(*args, **kwargs):
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            dynamic_prefix = f"{prefix}/{func.__name__}_{timestamp}"
+            if platform.system() != 'Windows':
+                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                dynamic_prefix = f"{prefix}/{func.__name__}_{timestamp}"
 
-            directory = path.dirname(dynamic_prefix)
-            if not path.exists(directory):
+                directory = path.dirname(dynamic_prefix)
+                if not path.exists(directory):
+                    try:
+                        makedirs(directory)
+                    except Exception as e:
+                        comment = f"GPU Info record need a result/gpu_info dir in your SDWebUI, now failed with {str(e)}"
+                        print(comment)
+                        dynamic_prefix=f"{func.__name__}_{timestamp}"
+
+                stop_flag = Value('b', False)
+
+                monitor_proc = Process(target=monitor_and_plot, args=(dynamic_prefix, display_log, stop_flag))
+                monitor_proc.start()
+
                 try:
-                    makedirs(directory)
-                except Exception as e:
-                    comment = f"GPU Info record need a result/gpu_info dir in your SDWebUI, now failed with {str(e)}"
-                    print(comment)
-                    dynamic_prefix=f"{func.__name__}_{timestamp}"
-
-            stop_flag = Value('b', False)
-
-            monitor_proc = Process(target=monitor_and_plot, args=(dynamic_prefix, display_log, stop_flag))
-            monitor_proc.start()
-
-            try:
+                    result = func(*args, **kwargs)
+                finally:
+                    stop_flag.value = True
+                    monitor_proc.join()
+            else:
                 result = func(*args, **kwargs)
-            finally:
-                stop_flag.value = True
-                monitor_proc.join()
-
             return result
 
         return wrapper
 
     return actual_decorator
 
-
-
 if __name__ == '__main__':
-
     import sys
     # Display how to define a GPU infer function and wrap with gpu_monitor_decorator
     @gpu_monitor_decorator()
@@ -179,6 +180,5 @@ if __name__ == '__main__':
         for i in range(repeat):
             result = retina_face_detection([img_path] * 10)
         return
-
     if 1:
         execute_process(repeat=5)
