@@ -87,7 +87,8 @@ def check_files_exists_and_download(check_hash):
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
     ]
-    print("Start Downloading weights")
+    # This print will introduce some misundertand
+    # print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
         if not check_hash:
             if os.path.exists(filename):
