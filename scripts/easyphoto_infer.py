@@ -50,6 +50,7 @@ def get_controlnet_unit(unit, input_image, weight):
             input_image=input_image, module='canny',
             weight=weight,
             guidance_end=1,
+            control_mode=1,
             resize_mode='Just Resize',
             threshold_a=100,
             threshold_b=200,
@@ -60,6 +61,7 @@ def get_controlnet_unit(unit, input_image, weight):
             input_image=input_image, module='openpose_full',
             weight=weight,
             guidance_end=1,
+            control_mode=1,
             resize_mode='Just Resize',
             model='control_v11p_sd15_openpose'
         )
@@ -79,6 +81,7 @@ def get_controlnet_unit(unit, input_image, weight):
         control_unit = ControlNetUnit(input_image=color_image, module='none',
                                             weight=weight,
                                             guidance_end=1,
+                                            control_mode=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
     elif unit == "tile":
@@ -86,6 +89,7 @@ def get_controlnet_unit(unit, input_image, weight):
             input_image=input_image, module='tile_resample',
             weight=weight,
             guidance_end=1,
+            control_mode=1,
             resize_mode='Just Resize',
             threshold_a=1,
             threshold_b=200,
@@ -437,7 +441,7 @@ def easyphoto_infer_forward(
                 
                 # Detect the box where the face of the template image is located and obtain its corresponding small mask
                 logging.info("Start face detect.")
-                input_image_retinaface_boxes, input_image_retinaface_keypoints, input_masks = call_face_crop(retinaface_detection, input_image, 1.1, "template")
+                input_image_retinaface_boxes, input_image_retinaface_keypoints, input_masks = call_face_crop(retinaface_detection, input_image, 1.05, "template")
                 input_image_retinaface_box      = input_image_retinaface_boxes[0]
                 input_image_retinaface_keypoint = input_image_retinaface_keypoints[0]
                 input_mask                      = input_masks[0]
@@ -464,8 +468,8 @@ def easyphoto_infer_forward(
                 input_image_retinaface_box = np.int32(input_image_retinaface_box)
 
                 face_width                      = input_image_retinaface_box[2] - input_image_retinaface_box[0]
-                input_image_retinaface_box[0]   = np.clip(np.array(input_image_retinaface_box[0], np.int32) - face_width * 0.15, 0, w - 1)
-                input_image_retinaface_box[2]   = np.clip(np.array(input_image_retinaface_box[2], np.int32) + face_width * 0.15, 0, w - 1)
+                input_image_retinaface_box[0]   = np.clip(np.array(input_image_retinaface_box[0], np.int32) - face_width * 0.10, 0, w - 1)
+                input_image_retinaface_box[2]   = np.clip(np.array(input_image_retinaface_box[2], np.int32) + face_width * 0.10, 0, w - 1)
 
                 # get new input_mask
                 input_mask[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2]] = 255
@@ -482,18 +486,15 @@ def easyphoto_infer_forward(
                 if color_shift_middle:
                     # apply color shift
                     logging.info("Start color shift middle.")
+                    first_diffusion_output_image = np.array(first_diffusion_output_image)
+                    face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:])), retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]) > 128)
                     first_diffusion_output_image_face_area  = np.array(copy.deepcopy(first_diffusion_output_image))[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2], :] 
                     first_diffusion_output_image_face_area  = color_transfer(first_diffusion_output_image_face_area, template_image_original_face_area)
 
-                    first_diffusion_output_image    = np.array(first_diffusion_output_image)
-                    face_skin_mask                  = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:])), retinaface_detection, needs_index=[1, 2, 3, 4, 5, 10, 12, 13])) > 128)
-                    
                     first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
                         first_diffusion_output_image_face_area * face_skin_mask + first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] * (1 - face_skin_mask)
                     first_diffusion_output_image = Image.fromarray(first_diffusion_output_image)
-                    
-                # Obtain the mask of the area around the face
-                input_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(origin_input_mask), np.ones((96, 96), np.uint8), iterations=1) - cv2.erode(np.array(origin_input_mask), np.ones((48, 48), np.uint8), iterations=1)))
+                    first_diffusion_output_image.save("1.jpg")
 
                 # Second diffusion
                 if roop_images[index] is not None and apply_face_fusion_after:
@@ -510,12 +511,15 @@ def easyphoto_infer_forward(
                 # Add mouth_mask to avoid some fault lips, close if you dont need
                 if need_mouth_fix:
                     logging.info("Start mouth detect.")
-                    mouth_mask          = face_skin(input_image, retinaface_detection)
-                    i_h, i_w, i_c = np.shape(input_mask)
+                    mouth_mask, face_mask = face_skin(input_image, retinaface_detection, [[4, 5, 12, 13], [1, 2, 3, 4, 5, 10, 12, 13]])
+                    # Obtain the mask of the area around the face
+                    face_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(face_mask), np.ones((32, 32), np.uint8), iterations=1) - cv2.erode(np.array(face_mask), np.ones((16, 16), np.uint8), iterations=1)))
+
+                    i_h, i_w, i_c = np.shape(face_mask)
                     m_h, m_w, m_c = np.shape(mouth_mask)
                     if i_h != m_h or i_w != m_w:
-                        input_mask = input_mask.resize([m_w, m_h])
-                    input_mask          = Image.fromarray(np.uint8(np.clip(np.float32(input_mask) + np.float32(mouth_mask), 0, 255)))
+                        face_mask = face_mask.resize([m_w, m_h])
+                    input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
                 
                 logging.info("Start Second diffusion.")
                 controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
@@ -526,13 +530,13 @@ def easyphoto_infer_forward(
                     logging.info("Start color shift last.")
                     # scale box
                     rescale_retinaface_box = [int(i * default_hr_scale) for i in input_image_retinaface_box]
+                    second_diffusion_output_image = np.array(second_diffusion_output_image)
+                    face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])), retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10]])[0]) > 128)
+
                     # apply color shift
                     second_diffusion_output_image_face_area = np.array(copy.deepcopy(second_diffusion_output_image))[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2], :] 
                     second_diffusion_output_image_face_area = color_transfer(second_diffusion_output_image_face_area, template_image_original_face_area)
 
-                    second_diffusion_output_image = np.array(second_diffusion_output_image)
-                    face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])), retinaface_detection, needs_index=[1, 2, 3, 4, 5, 10, 12, 13])) > 128)
-                    
                     second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
                         second_diffusion_output_image_face_area * face_skin_mask + second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] * (1 - face_skin_mask)
                     second_diffusion_output_image = Image.fromarray(second_diffusion_output_image)
