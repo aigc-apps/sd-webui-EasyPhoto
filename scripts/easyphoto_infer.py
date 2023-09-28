@@ -491,14 +491,20 @@ def easyphoto_infer_forward(
                 if color_shift_middle:
                     # apply color shift
                     logging.info("Start color shift middle.")
-                    first_diffusion_output_image = np.array(first_diffusion_output_image)
-                    face_skin_mask = np.int32(np.float32(face_skin(Image.fromarray(np.uint8(first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:])), retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]) > 128)
-                    first_diffusion_output_image_face_area  = np.array(copy.deepcopy(first_diffusion_output_image))[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2], :] 
-                    first_diffusion_output_image_face_area  = color_transfer(first_diffusion_output_image_face_area, template_image_original_face_area)
-
-                    first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
-                        first_diffusion_output_image_face_area * face_skin_mask + first_diffusion_output_image[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] * (1 - face_skin_mask)
-                    first_diffusion_output_image = Image.fromarray(first_diffusion_output_image)
+                    first_diffusion_output_image_uint8 = np.uint8(np.array(first_diffusion_output_image))
+                    # crop image first
+                    first_diffusion_output_image_crop = Image.fromarray(first_diffusion_output_image_uint8[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:])
+                    
+                    # apply color shift
+                    first_diffusion_output_image_crop_color_shift = np.array(copy.deepcopy(first_diffusion_output_image_crop))
+                    first_diffusion_output_image_crop_color_shift = color_transfer(first_diffusion_output_image_crop_color_shift, template_image_original_face_area)
+                    
+                    # detect face area
+                    face_skin_mask = np.int32(np.float32(face_skin(first_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]) > 128)
+                    # paste back to photo
+                    first_diffusion_output_image_uint8[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
+                        first_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(first_diffusion_output_image_crop) * (1 - face_skin_mask)
+                    first_diffusion_output_image = Image.fromarray(np.uint8(first_diffusion_output_image_uint8))
 
                 # Second diffusion
                 if roop_images[index] is not None and apply_face_fusion_after:
@@ -534,31 +540,19 @@ def easyphoto_infer_forward(
                     logging.info("Start color shift last.")
                     # scale box
                     rescale_retinaface_box = [int(i * default_hr_scale) for i in input_image_retinaface_box]
-                    second_diffusion_output_image = np.array(second_diffusion_output_image)
-                    
-                    # get face skin mask
-                    if 1:
-                        cropped_image_uint8 = np.uint8(second_diffusion_output_image[
-                            rescale_retinaface_box[1]:rescale_retinaface_box[3], 
-                            rescale_retinaface_box[0]:rescale_retinaface_box[2],
-                            :])
-                        cropped_image_object = Image.fromarray(cropped_image_uint8)
-                        #Apply the 'face_skin' function to get skin mask
-                        face_skin_result = face_skin(
-                            cropped_image_object, 
-                            retinaface_detection, 
-                            needs_index=[[1, 2, 3, 4, 5, 10]]
-                        )
-                        #Extract the first element from the face_skin result and cast to float32 and get mask by 128
-                        face_skin_mask = np.int32(np.float32(face_skin_result[0])) > 128
+                    second_diffusion_output_image_uint8 = np.uint8(np.array(second_diffusion_output_image))
+                    second_diffusion_output_image_crop = Image.fromarray(second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])
 
                     # apply color shift
-                    second_diffusion_output_image_face_area = np.array(copy.deepcopy(second_diffusion_output_image))[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2], :] 
-                    second_diffusion_output_image_face_area = color_transfer(second_diffusion_output_image_face_area, template_image_original_face_area)
+                    second_diffusion_output_image_crop_color_shift = np.array(copy.deepcopy(second_diffusion_output_image_crop)) 
+                    second_diffusion_output_image_crop_color_shift = color_transfer(second_diffusion_output_image_crop_color_shift, template_image_original_face_area)
 
-                    second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
-                        second_diffusion_output_image_face_area * face_skin_mask + second_diffusion_output_image[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] * (1 - face_skin_mask)
-                    second_diffusion_output_image = Image.fromarray(second_diffusion_output_image)
+                    # detect face area
+                    face_skin_mask = np.int32(np.float32(face_skin(second_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10]])[0]) > 128)
+                    # paste back to photo
+                    second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
+                        second_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(second_diffusion_output_image_crop) * (1 - face_skin_mask)
+                    second_diffusion_output_image = Image.fromarray(second_diffusion_output_image_uint8)
                     
                 # If it is a large template for cutting, paste the reconstructed image back
                 if crop_face_preprocess:
