@@ -338,9 +338,22 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
 
     if len(embedding_list) == 0:
         return [], [], []
-        
-    embedding_array = np.vstack(embedding_list)
-    
+
+    # some modelscope update cause embedding_size = 1
+    try:
+        tsize_list = [a.size for a in embedding_list]
+        max_size = max(tsize_list)
+        tmp_embedding_list = []
+        for a in embedding_list:
+            if a.size == max_size:
+                tmp_embedding_list.append(a)
+        embedding_list = tmp_embedding_list
+        embedding_array = np.vstack(embedding_list)
+    except Exception as e:
+        print(f'vstack embedding failed, caused by {str(e)}')
+        return [], [], []
+
+
     #  mean, get pivot
     pivot_feature   = np.mean(embedding_array, axis=0)
     pivot_feature   = np.reshape(pivot_feature, [512, 1])
