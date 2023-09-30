@@ -332,27 +332,21 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         try:
             image = Image.open(img)
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
-            embedding_list.append(embedding)
+            if embedding is not None:
+                embedding_list.append(embedding)
         except Exception as e:
             print("error at:", str(e))
 
     if len(embedding_list) == 0:
+        print("Can't detect faces in processed images, return empty list")
         return [], [], []
 
-    # some modelscope update cause embedding_size = 1
+    # exception cause by embedding = None
     try:
-        tsize_list = [a.size for a in embedding_list]
-        max_size = max(tsize_list)
-        tmp_embedding_list = []
-        for a in embedding_list:
-            if a.size == max_size:
-                tmp_embedding_list.append(a)
-        embedding_list = tmp_embedding_list
         embedding_array = np.vstack(embedding_list)
     except Exception as e:
         print(f'vstack embedding failed, caused by {str(e)}')
         return [], [], []
-
 
     #  mean, get pivot
     pivot_feature   = np.mean(embedding_array, axis=0)
