@@ -332,15 +332,22 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         try:
             image = Image.open(img)
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
-            embedding_list.append(embedding)
+            if embedding is not None:
+                embedding_list.append(embedding)
         except Exception as e:
             print("error at:", str(e))
 
     if len(embedding_list) == 0:
+        print("Can't detect faces in processed images, return empty list")
         return [], [], []
-        
-    embedding_array = np.vstack(embedding_list)
-    
+
+    # exception cause by embedding = None
+    try:
+        embedding_array = np.vstack(embedding_list)
+    except Exception as e:
+        print(f'vstack embedding failed, caused by {str(e)}')
+        return [], [], []
+
     #  mean, get pivot
     pivot_feature   = np.mean(embedding_array, axis=0)
     pivot_feature   = np.reshape(pivot_feature, [512, 1])
