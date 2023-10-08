@@ -499,6 +499,9 @@ class Face_Skin(object):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
+    # index => label
+    # 1:'skin', 2:'nose', 3:'eye_g', 4:'left_eye', 5:'right_eye', 6:'left_brow', 7:'right_brow', 8:'left_ear', 
+    # 9:'right_ear', 10:'mouth', 11:'upper_lip', 12:'low_lip', 13:'hair'
     def __call__(self, image, retinaface_detection, needs_index=[[12, 13]]):
         # needs_index 12, 13 means seg the lip
         with torch.no_grad():
