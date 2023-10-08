@@ -489,19 +489,26 @@ class Face_Skin(object):
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
         self.model.eval()
 
+        self.cuda  = torch.cuda.is_available()
+        if self.cuda:
+            self.model.cuda()
+
         # transform for input image
         self.trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
+    # index => label
+    # 1:'skin', 2:'nose', 3:'eye_g', 4:'left_eye', 5:'right_eye', 6:'left_brow', 7:'right_brow', 8:'left_ear', 
+    # 9:'right_ear', 10:'mouth', 11:'upper_lip', 12:'low_lip', 13:'hair'
     def __call__(self, image, retinaface_detection, needs_index=[[12, 13]]):
         # needs_index 12, 13 means seg the lip
         with torch.no_grad():
             total_mask = np.zeros_like(np.uint8(image))
 
             # detect image
-            retinaface_boxes, _, _ = call_face_crop(retinaface_detection, image, 1.1, prefix="tmp")
+            retinaface_boxes, _, _ = call_face_crop(retinaface_detection, image, 1.5, prefix="tmp")
             retinaface_box = retinaface_boxes[0]
 
             # sub_face for seg skin
@@ -513,7 +520,8 @@ class Face_Skin(object):
             
             torch_img           = self.trans(PIL_img)
             torch_img           = torch.unsqueeze(torch_img, 0)
-
+            if self.cuda:
+                torch_img       = torch_img.cuda()
             out                 = self.model(torch_img)[0]
             model_mask          = out.squeeze(0).cpu().numpy().argmax(0)
             
