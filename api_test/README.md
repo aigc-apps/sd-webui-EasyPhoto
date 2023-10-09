@@ -1,7 +1,7 @@
 # Test & Profile-23/10/09
 ## 环境准备
 - 请搭建一个待测试的SDWebUI环境
-- 保证可以访问到上述环境的情况下，准备python环境，满足依赖 base64/json/numpy/cv2/
+- 保证可以访问到上述SDWebUI，准备python环境，满足依赖 base64/json/numpy/cv2
 
 ## 训练/推理测试代码
 - **post_train.py** 支持公网URL图片/本地图片读取

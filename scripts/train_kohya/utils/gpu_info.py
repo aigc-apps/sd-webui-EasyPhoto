@@ -10,7 +10,10 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 if platform.system() != 'Windows':
-    from nvitop import Device
+    try:
+        from nvitop import Device
+    except Exception as e:
+        Device = None
 
 # Constants
 BYTES_PER_GB = 1024 * 1024 * 1024
@@ -148,7 +151,7 @@ def plot_graph(x, y, label, xlabel, ylabel, title, tick_spacing, filename):
 def gpu_monitor_decorator(prefix="result/gpu_info", display_log=False):
     def actual_decorator(func):
         def wrapper(*args, **kwargs):
-            if platform.system() != 'Windows':
+            if platform.system() != 'Windows' and Device is not None:
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
                 dynamic_prefix = f"{prefix}/{func.__name__}_{timestamp}"
 
