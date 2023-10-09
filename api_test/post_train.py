@@ -1,10 +1,12 @@
 import base64
 import json
 import os
-import requests
-import time
 import sys
+import time
 from glob import glob
+from io import BytesIO
+
+import requests
 
 
 def post_train(encoded_images, url='http://0.0.0.0:7860'):
@@ -40,13 +42,19 @@ if __name__ == '__main__':
     # -------------------training procedure------------------- #
     # When there is no parameter input.
     if len(sys.argv) == 1:
-        img_src = [
+        img_list = [
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t1.jpg',
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t2.jpg',
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t3.jpg',
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t4.jpg',
         ]
-        outputs = post_train(img_src)
+        encoded_images = []
+        for idx, img_path in enumerate(img_list):
+            encoded_image = requests.get(img_path) 
+            encoded_image = base64.b64encode(BytesIO(encoded_image.content).read()).decode('utf-8')
+            encoded_images.append(encoded_image)
+
+        outputs = post_train(encoded_images)
         outputs = json.loads(outputs)
         print(outputs['message'])
     

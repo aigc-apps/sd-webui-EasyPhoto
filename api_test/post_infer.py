@@ -1,10 +1,13 @@
 import base64
 import json
+import sys
+import time
+from datetime import datetime
+from io import BytesIO
+
 import cv2
 import numpy as np
 import requests
-import time, sys
-from datetime import datetime
 
 
 def decode_image_from_base64jpeg(base64_image):
@@ -56,6 +59,9 @@ if __name__ == '__main__':
     # When there is no parameter input.
     if len(sys.argv) == 1:
         encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
+        encoded_image = requests.get(encoded_image) 
+        encoded_image = base64.b64encode(BytesIO(encoded_image.content).read()).decode('utf-8')
+
         outputs = post(encoded_image)
         outputs = json.loads(outputs)
         image = decode_image_from_base64jpeg(outputs["outputs"][0])
