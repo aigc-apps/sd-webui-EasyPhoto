@@ -52,24 +52,24 @@ def easyphoto_train_forward(
     ids = sorted(ids)
 
     if user_id in ids:
-        return "User id 不能重复。"
+        return "User id non-repeatability."
 
     check_files_exists_and_download(check_hash)
     check_hash = False
 
-    # 模板的地址
+    # Template address
     training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
-    # 原始数据备份
+    # Raw data backup
     original_backup_path    = os.path.join(user_id_outpath_samples, user_id, "original_backup")
-    # 人脸的参考备份
+    # Reference backup of face
     ref_image_path          = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
 
-    # 训练数据保存
+    # Training data retention
     user_path               = os.path.join(user_id_outpath_samples, user_id, "processed_images")
     images_save_path        = os.path.join(user_id_outpath_samples, user_id, "processed_images", "train")
     json_save_path          = os.path.join(user_id_outpath_samples, user_id, "processed_images", "metadata.jsonl")
 
-    # 训练权重保存
+    # Training weight saving
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
