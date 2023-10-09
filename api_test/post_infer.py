@@ -48,12 +48,21 @@ if __name__ == '__main__':
         The second: public link of readable picture
     '''
     
-    now_date = datetime.now()
-    time_start = time.time()  # initiate time
+    # initiate time
+    now_date    = datetime.now()
+    time_start  = time.time()  
     
-    ##      test infer         ##
-    # first 
-    if len(sys.argv) == 2:
+    # -------------------test infer------------------- #
+    # When there is no parameter input.
+    if len(sys.argv) == 1:
+        encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
+        outputs = post(encoded_image)
+        outputs = json.loads(outputs)
+        image = decode_image_from_base64jpeg(outputs["outputs"][0])
+        cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
+
+    # When selecting a local file as a parameter input.
+    elif len(sys.argv) == 2:
         with open(sys.argv[1], 'rb') as f:
             encoded_image = base64.b64encode(f.read()).decode('utf-8')
             outputs = post(encoded_image)
@@ -61,15 +70,10 @@ if __name__ == '__main__':
             image = decode_image_from_base64jpeg(outputs["outputs"][0])
             cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
 
-    elif len(sys.argv) == 1:
-        encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
-        outputs = post(encoded_image)
-        outputs = json.loads(outputs)
-        image = decode_image_from_base64jpeg(outputs["outputs"][0])
-        cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
-    
-    time_end = time.time()  # End of record time
-    time_sum = (time_end - time_start) % 60 # The calculated time difference is the execution time of the program, expressed in seconds / s
-    print('########################################################')
-    print(f"######      Total expenditure: {time_sum}  s    #######")
-    print('########################################################')
+    # End of record time
+    # The calculated time difference is the execution time of the program, expressed in seconds / s
+    time_end = time.time()  
+    time_sum = (time_end - time_start) % 60 
+    print('# --------------------------------------------------------- #')
+    print(f'#   Total expenditure: {time_sum}s')
+    print('# --------------------------------------------------------- #')

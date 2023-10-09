@@ -34,25 +34,12 @@ if __name__ == '__main__':
         The first: make sure the directory is full of readable images
         The second: public link of readable picture
     '''
-
-    time_start = time.time()  # initiate time
+    # initiate time
+    time_start = time.time()  
     
-    ##        Test training procedure      ##
-    ## The first
-    if len(sys.argv) == 2:
-        # 如需有不同格式的图片，可自行改下下方代码读取图片
-        img_list = glob(os.path.join(sys.argv[1], "*")) 
-        encoded_images = []
-        for idx, img_path in enumerate(img_list):
-            with open(img_path, 'rb') as f:
-                encoded_image = base64.b64encode(f.read()).decode('utf-8')
-                encoded_images.append(encoded_image)
-        outputs = post_train(encoded_images)
-        outputs = json.loads(outputs)
-        print(outputs['message'])
-    
-    ## The second:
-    elif len(sys.argv) == 1:
+    # -------------------training procedure------------------- #
+    # When there is no parameter input.
+    if len(sys.argv) == 1:
         img_src = [
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t1.jpg',
             'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t2.jpg',
@@ -62,14 +49,27 @@ if __name__ == '__main__':
         outputs = post_train(img_src)
         outputs = json.loads(outputs)
         print(outputs['message'])
-        
+    
+    # When selecting a folder as a parameter input.
+    elif len(sys.argv) == 2:
+        img_list = glob(os.path.join(sys.argv[1], "*")) 
+        encoded_images = []
+        for idx, img_path in enumerate(img_list):
+            with open(img_path, 'rb') as f:
+                encoded_image = base64.b64encode(f.read()).decode('utf-8')
+                encoded_images.append(encoded_image)
+        outputs = post_train(encoded_images)
+        outputs = json.loads(outputs)
+        print(outputs['message'])
+
     else:
         print("other modes except url and local read are not supported")
-        
-    time_end = time.time()  # End of record time
-    time_sum = (time_end - time_start) // 60  # The calculated time difference is the execution time of the program, expressed in minute / m
     
+    # End of record time
+    # The calculated time difference is the execution time of the program, expressed in minute / m
+    time_end = time.time()  
+    time_sum = (time_end - time_start) // 60  
     
-    print('########################################################')
-    print(f"##########      Total expenditure：{time_sum} minutes    ##########")
-    print('########################################################')
+    print('# --------------------------------------------------------- #')
+    print(f"#   Total expenditure：{time_sum} minutes ")
+    print('# --------------------------------------------------------- #')
