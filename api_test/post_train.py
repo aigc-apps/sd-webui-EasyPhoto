@@ -54,21 +54,10 @@ if __name__ == '__main__':
     ## The second:
     elif len(sys.argv) == 1:
         img_src = [
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi1.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi2.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi3.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi4.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi5.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi6.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi7.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi8.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi9.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi10.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi11.webp',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi12.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi13.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi14.jpeg',
-            'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/train_data/shishi/shishi/shi15.webp'
+            'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t1.jpg',
+            'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t2.jpg',
+            'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t3.jpg',
+            'http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t4.jpg',
         ]
         outputs = post_train(img_src)
         outputs = json.loads(outputs)
