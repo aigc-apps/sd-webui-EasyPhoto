@@ -3,7 +3,9 @@ import json
 import cv2
 import numpy as np
 import requests
-import time
+import time, sys
+from datetime import datetime
+
 
 def decode_image_from_base64jpeg(base64_image):
     image_bytes = base64.b64decode(base64_image)
@@ -13,7 +15,7 @@ def decode_image_from_base64jpeg(base64_image):
 
 def post(encoded_image, url='http://0.0.0.0:7860'):
     datas = json.dumps({
-        "user_ids"              : ["liushishi3"], 
+        "user_ids"              : ["test"], 
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "init_image"            : encoded_image, 
 
@@ -40,16 +42,34 @@ def post(encoded_image, url='http://0.0.0.0:7860'):
     return data
 
 if __name__ == '__main__':
-    time_start = time.time()  # 记录开始时间
-    # function()   执行的程序
-    # 测试训练
-    encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
-    outputs = post(encoded_image)
-    outputs = json.loads(outputs)
-    image = decode_image_from_base64jpeg(outputs["outputs"][0])
-    cv2.imwrite(str('liushishi') + ".jpg", image)
-    time_end = time.time()  # 记录结束时间
-    time_sum = (time_end - time_start) / 60  # 计算的时间差为程序的执行时间，单位为秒/s
+    '''
+    There are two ways to test:
+        The first: make sure the directory is full of readable images
+        The second: public link of readable picture
+    '''
+    
+    now_date = datetime.now()
+    time_start = time.time()  # initiate time
+    
+    ##      test infer         ##
+    # first 
+    if len(sys.argv) == 2:
+        with open(sys.argv[1], 'rb') as f:
+            encoded_image = base64.b64encode(f.read()).decode('utf-8')
+            outputs = post(encoded_image)
+            outputs = json.loads(outputs)
+            image = decode_image_from_base64jpeg(outputs["outputs"][0])
+            cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
+
+    elif len(sys.argv) == 1:
+        encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
+        outputs = post(encoded_image)
+        outputs = json.loads(outputs)
+        image = decode_image_from_base64jpeg(outputs["outputs"][0])
+        cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
+    
+    time_end = time.time()  # End of record time
+    time_sum = (time_end - time_start) % 60 # The calculated time difference is the execution time of the program, expressed in seconds / s
     print('########################################################')
-    print(f"######      总共花销：{time_sum} 分钟     #######")
+    print(f"######      Total expenditure: {time_sum}  s    #######")
     print('########################################################')
