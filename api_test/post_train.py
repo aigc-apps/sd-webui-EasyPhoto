@@ -15,13 +15,13 @@ def post_train(encoded_images, url='http://0.0.0.0:7860'):
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "resolution"            : 512,
         "val_and_checkpointing_steps" : 100,
-        "max_train_steps"       : 100, # Training batch
+        "max_train_steps"       : 800, # Training steps
         "steps_per_photos"      : 200,
         "train_batch_size"      : 1,
         "gradient_accumulation_steps" : 4,
         "dataloader_num_workers" : 16,
         "learning_rate"         : 1e-4,
-        "rank"                  : 64,
+        "rank"                  : 128,
         "network_alpha"         : 64,
         "instance_images"       : encoded_images, 
     })
