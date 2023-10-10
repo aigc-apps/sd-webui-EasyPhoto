@@ -183,8 +183,8 @@ EasyPhoto训练界面如下：
 ![single_people](images/multi_people_2.jpg)
 
 # 算法详细信息
-原理英文论文[arxiv](https://arxiv.org/abs/2310.04672)
-原理中文博客[这里](https://blog.csdn.net/weixin_44791964/article/details/132922309)
+- 英文论文[arxiv](https://arxiv.org/abs/2310.04672)
+- 中文博客[这里](https://blog.csdn.net/weixin_44791964/article/details/132922309)
 
 ### 1. 架构概述
 
