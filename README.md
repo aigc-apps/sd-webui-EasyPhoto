@@ -1,3 +1,4 @@
+![main](images/main.png)
 # 📷 EasyPhoto | Your Smart AI Photo Generator.
 🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. 
 
@@ -38,7 +39,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New: 
-- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory![🔥 🔥 🔥 2023.09.26]
+- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory! Specific details can go [here](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
 - We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
 - **Support different base models for training and inference.** [🔥🔥 2023.09.08]
@@ -195,7 +196,7 @@ If you want to set parameters, the parsing of each parameter is as follows:
 ![single_people](images/multi_people_1.jpg)
 ![single_people](images/multi_people_2.jpg)
 # Algorithm Detailed
-
+More detailed principles and details can be found [here](https://blog.csdn.net/weixin_44791964/article/details/132922309)
 ### 1. Architectural Overview
 
 ![overview](images/overview.jpg)
@@ -204,7 +205,7 @@ In the field of AI portraits, we expect model-generated images to be realistic a
 
 ### 2. Training Detailed
 
-![overview](images/train_detail.jpg)
+![overview](images/train_detail1.png)
 
 First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.   
 
