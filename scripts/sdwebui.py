@@ -269,10 +269,10 @@ def t2i_call(
         override_settings=override_settings
     )
 
-    p_txt2img.scripts = scripts.scripts_img2img
+    p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
-    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+    for alwayson_scripts in modules.scripts.scripts_txt2img.alwayson_scripts:
         if alwayson_scripts.name is None:
             continue
         if alwayson_scripts.name=='controlnet':
