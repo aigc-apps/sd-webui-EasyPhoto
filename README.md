@@ -1,4 +1,3 @@
-![main](images/main.png)
 # 📷 EasyPhoto | Your Smart AI Photo Generator.
 🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. 
 
@@ -39,6 +38,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New: 
+- EasyPhoto arxiv [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]
 - Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory! Specific details can go [here](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
 - We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
 - **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
@@ -196,7 +196,10 @@ If you want to set parameters, the parsing of each parameter is as follows:
 ![single_people](images/multi_people_1.jpg)
 ![single_people](images/multi_people_2.jpg)
 # Algorithm Detailed
-More detailed principles and details can be found [here](https://blog.csdn.net/weixin_44791964/article/details/132922309)
+- Arxiv paper EasyPhoto [arxiv](https://arxiv.org/abs/2310.04672)
+- More detailed principles and details can be found [BLOG](https://blog.csdn.net/weixin_44791964/article/details/132922309)
+
+
 ### 1. Architectural Overview
 
 ![overview](images/overview.jpg)
