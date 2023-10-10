@@ -119,7 +119,7 @@ Linux 的详细信息：
 我们需要使用 Controlnet 进行推理。相关软件源是[Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet)。在使用 EasyPhoto 之前，您需要安装这个软件源。
 
 此外，我们至少需要三个 Controlnets 用于推理。因此，您需要设置 **Multi ControlNet: Max models amount (requires restart)**。
-![controlnet_num](images/controlnet_num.png)
+![controlnet_num](images/controlnet_num.jpg)
 
 ##### ii. 其他依赖关系。
 我们与现有的 stable-diffusion-webui 环境相互兼容，启动 stable-diffusion-webui 时会安装相关软件源。
@@ -188,14 +188,14 @@ EasyPhoto训练界面如下：
 
 ### 1. 架构概述
 
-![overview](images/overview.png)
+![overview](images/overview.jpg)
 
 在人工智能肖像领域，我们希望模型生成的图像逼真且与用户相似，而传统方法会引入不真实的光照（如人脸融合或roop）。为了解决这种不真实的问题，我们引入了稳定扩散模型的图像到图像功能。生成完美的个人肖像需要考虑所需的生成场景和用户的数字分身。我们使用一个预先准备好的模板作为所需的生成场景，并使用一个在线训练的人脸 LoRA 模型作为用户的数字分身，这是一种流行的稳定扩散微调模型。我们使用少量用户图像来训练用户的稳定数字分身，并在推理过程中根据人脸 LoRA 模型和预期生成场景生成个人肖像图像。
 
 
 ### 2. 训练细节
 
-![overview](images/train_detail1.png)
+![overview](images/train_detail1.jpg)
 
 首先，我们对输入的用户图像进行人脸检测，确定人脸位置后，按照一定比例截取输入图像。然后，我们使用显著性检测模型和皮肤美化模型获得干净的人脸训练图像，该图像基本上只包含人脸。然后，我们为每张图像贴上一个固定标签。这里不需要使用标签器，而且效果很好。最后，我们对稳定扩散模型进行微调，得到用户的数字分身。  
 

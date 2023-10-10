@@ -130,7 +130,7 @@ We need about 60GB available on disk (for saving weights and datasets process), 
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
 In addition, we need at least three Controlnets for inference. So you need to set the **Multi ControlNet: Max models amount (requires restart)** in Setting.
-![controlnet_num](images/controlnet_num.png)
+![controlnet_num](images/controlnet_num.jpg)
 
 ##### ii. Other Dependencies.
 We are mutually compatible with the existing stable-diffusion-webui environment, and the relevant repositories are installed when starting stable-diffusion-webui.
@@ -208,7 +208,7 @@ In the field of AI portraits, we expect model-generated images to be realistic a
 
 ### 2. Training Detailed
 
-![overview](images/train_detail1.png)
+![overview](images/train_detail1.jpg)
 
 First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.   
 
