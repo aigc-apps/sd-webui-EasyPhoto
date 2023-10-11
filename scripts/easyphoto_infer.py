@@ -201,7 +201,7 @@ def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
-    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, skin_retouching_bool, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
@@ -629,7 +629,12 @@ def easyphoto_infer_forward(
             try:
                 logging.info("Start Skin Retouching.")
                 # Skin Retouching is performed here. 
-                output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                if skin_retouching_bool:
+                    output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                else:
+                    print("##########################################")
+                    print("#########   Don't use beauty   ##########")
+                    print("##########################################")
             except Exception as e:
                 torch.cuda.empty_cache()
                 logging.error(f"Skin Retouching error: {e}")

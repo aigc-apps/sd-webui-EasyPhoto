@@ -190,6 +190,11 @@ def on_ui_tabs():
                                     label="Enable RL (Reinforcement Learning)",
                                     value=False
                                 )
+                            with gr.Row():
+                                skin_retouching = gr.Checkbox(
+                                    label="Skin Retouching",
+                                    value=True
+                                )
                             
                             # Reinforcement Learning Options
                             with gr.Row(visible=False) as rl_option_row1:
@@ -219,7 +224,8 @@ def on_ui_tabs():
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
-                            - Final training step = Min(photo_num * max_steps_per_photos, max_train_steps)
+                            - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
+                            - **skin retouching** Whether to use beauty
                             '''
                         )
 
@@ -254,7 +260,7 @@ def on_ui_tabs():
                                     sd_model_checkpoint, dummy_component,
                                     uuid,
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
-                                    enable_rl, max_rl_time, timestep_fraction
+                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching
                                 ],
                                 outputs=[output_message])
                                 
@@ -490,6 +496,10 @@ def on_ui_tabs():
                                     label="Background Restore",  
                                     value=False
                                 )
+                                skin_retouching = gr.Checkbox(
+                                    label="Skin Retouching",  
+                                    value=True
+                                )
                             with gr.Row():
                                 background_restore_denoising_strength = gr.Slider(
                                     minimum=0.10, maximum=0.60, value=0.35,
@@ -509,6 +519,7 @@ def on_ui_tabs():
                                     5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
                                     6. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
                                     7. **Background Restore** represents whether to give a different background.
+                                    8. **skin retouching** Whether to use beauty.
                                     '''
                                 )
                             
@@ -543,7 +554,7 @@ def on_ui_tabs():
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
-                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
+                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, skin_retouching, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
