@@ -225,7 +225,7 @@ def on_ui_tabs():
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
                             - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
-                            - **skin retouching** Whether to use beauty
+                            - **skin retouching** Whether to use skin retouching to preprocess training data face
                             '''
                         )
 
@@ -488,6 +488,10 @@ def on_ui_tabs():
                                     value=True
                                 )
                             with gr.Row():
+                                skin_retouching = gr.Checkbox(
+                                    label="Skin Retouching",  
+                                    value=True
+                                )
                                 display_score = gr.Checkbox(
                                     label="Display Face Similarity Scores",  
                                     value=False
@@ -496,10 +500,7 @@ def on_ui_tabs():
                                     label="Background Restore",  
                                     value=False
                                 )
-                                skin_retouching = gr.Checkbox(
-                                    label="Skin Retouching",  
-                                    value=True
-                                )
+
                             with gr.Row():
                                 background_restore_denoising_strength = gr.Slider(
                                     minimum=0.10, maximum=0.60, value=0.35,
@@ -519,7 +520,7 @@ def on_ui_tabs():
                                     5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
                                     6. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
                                     7. **Background Restore** represents whether to give a different background.
-                                    8. **skin retouching** Whether to use beauty.
+                                    8. **skin retouching** Whether to use skin retouching to postprocess generate face.
                                     '''
                                 )
                             
