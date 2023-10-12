@@ -225,7 +225,7 @@ def on_ui_tabs():
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
                             - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
-                            - **skin retouching** Whether to use skin retouching to preprocess training data face
+                            - **Skin retouching** Whether to use skin retouching to preprocess training data face
                             '''
                         )
 
@@ -518,9 +518,9 @@ def on_ui_tabs():
                                     3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
                                     4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
                                     5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
-                                    6. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
-                                    7. **Background Restore** represents whether to give a different background.
-                                    8. **skin retouching** Whether to use skin retouching to postprocess generate face.
+                                    6. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
+                                    7. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
+                                    8. **Background Restore** represents whether to give a different background.
                                     '''
                                 )
                             
