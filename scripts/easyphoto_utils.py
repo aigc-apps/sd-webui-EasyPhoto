@@ -53,7 +53,6 @@ def check_files_exists_and_download(check_hash):
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
     urls        = [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
@@ -71,7 +70,6 @@ def check_files_exists_and_download(check_hash):
     ]
     filenames = [
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
-        os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
         os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
         os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
         os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
