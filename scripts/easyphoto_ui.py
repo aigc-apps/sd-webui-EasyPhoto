@@ -109,11 +109,16 @@ def on_ui_tabs():
                             with gr.Row():
                                 def checkpoint_refresh_function():
                                     checkpoints = []
-                                    for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                            checkpoints.append(_checkpoint)
+                                    models_dir = os.path.join(models_path, "Stable-diffusion")
+                                    
+                                    for root, dirs, files in os.walk(models_dir):
+                                        for _checkpoint in files:
+                                            if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                                rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
+                                                checkpoints.append(rel_path)
+                                    
                                     return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
-                                
+
                                 checkpoints = []
                                 for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                     if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
