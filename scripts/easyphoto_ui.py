@@ -190,8 +190,7 @@ def on_ui_tabs():
                                     label="Enable RL (Reinforcement Learning)",
                                     value=False
                                 )
-                            with gr.Row():
-                                skin_retouching = gr.Checkbox(
+                                skin_retouching_bool = gr.Checkbox(
                                     label="Skin Retouching",
                                     value=True
                                 )
@@ -260,7 +259,7 @@ def on_ui_tabs():
                                     sd_model_checkpoint, dummy_component,
                                     uuid,
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
-                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching
+                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool
                                 ],
                                 outputs=[output_message])
                                 
@@ -488,7 +487,7 @@ def on_ui_tabs():
                                     value=True
                                 )
                             with gr.Row():
-                                skin_retouching = gr.Checkbox(
+                                skin_retouching_bool = gr.Checkbox(
                                     label="Skin Retouching",  
                                     value=True
                                 )
@@ -554,8 +553,8 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, \
-                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, skin_retouching, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, skin_retouching_bool, display_score, \
+                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )

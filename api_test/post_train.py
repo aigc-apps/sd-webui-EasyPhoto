@@ -24,7 +24,7 @@ def post_train(encoded_images, url='http://0.0.0.0:7860'):
         "rank"                  : 128,
         "network_alpha"         : 64,
         "instance_images"       : encoded_images, 
-        "skin_retouching"       : False
+        "skin_retouching_bool"  : False
     })
     r = requests.post(f'{url}/easyphoto/easyphoto_train_forward', data=datas, timeout=1500)
     data = r.content.decode('utf-8')

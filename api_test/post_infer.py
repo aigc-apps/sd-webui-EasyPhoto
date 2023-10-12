@@ -37,8 +37,9 @@ def post(encoded_image, url='http://0.0.0.0:7860'):
         "color_shift_middle"        : True,
         "color_shift_last"          : True,
         "super_resolution"          : True,
+        "skin_retouching_bool"      : True,
+
         "background_restore"        : False,
-        "skin_retouching_bool"      : False,
         "tabs"                      : 1
     })
     r = requests.post(f'{url}/easyphoto/easyphoto_infer_forward', data=datas, timeout=1500)

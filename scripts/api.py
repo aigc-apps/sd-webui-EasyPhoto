@@ -33,7 +33,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         enable_rl               = datas.get("enable_rl", False)
         max_rl_time             = datas.get("max_rl_time", 1)
         timestep_fraction       = datas.get("timestep_fraction", 1)
-        skin_retouching         = datas.get("skin_retouching", False)
+        skin_retouching_bool    = datas.get("skin_retouching_bool", False)
         args                    = datas.get("args", []) 
 
         instance_images         = [api.decode_base64_to_image(init_image) for init_image in instance_images]
@@ -55,7 +55,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
                 resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos,
                 train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, 
                 rank, network_alpha, validation, instance_images,
-                enable_rl, max_rl_time, timestep_fraction, skin_retouching,
+                enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool,
                 *args
             )
         except Exception as e:
@@ -130,8 +130,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             comment, outputs, face_id_outputs = easyphoto_infer_forward(
                 sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
                 before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, display_score, background_restore, \
-                background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, skin_retouching_bool, *user_ids
+                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, \
+                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
         except Exception as e:
