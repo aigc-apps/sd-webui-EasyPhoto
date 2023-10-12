@@ -155,7 +155,7 @@ if __name__ == "__main__":
                     torch.cuda.empty_cache()
                     logging.error(f"Photo skin_retouching error, error info: {e}")
             else:
-                logging.error(f"closed photo skin_retouching in training data preprocess")
+                logging.info(f"closed photo skin_retouching in training data preprocess")
 
 
             # get embedding
