@@ -32,7 +32,6 @@ from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
-
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
     H = float(H)
