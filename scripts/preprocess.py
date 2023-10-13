@@ -60,6 +60,13 @@ def parse_args():
             "The inputs dir of the data for preprocessing."
         ),
     )
+    parser.add_argument(
+        "--skin_retouching_bool",
+        action="store_true",
+        help=(
+            "Whether to use beauty"
+        ),
+    )
     args = parser.parse_args()
     return args
 
@@ -80,7 +87,19 @@ if __name__ == "__main__":
     validation_prompt   = args.validation_prompt
     inputs_dir          = args.inputs_dir
     ref_image_path      = args.ref_image_path
+    skin_retouching_bool= args.skin_retouching_bool
 
+    logging.info(
+        f'''
+        preprocess params:
+        images_save_path     = {images_save_path}
+        json_save_path       = {json_save_path}
+        validation_prompt    = {validation_prompt}
+        inputs_dir           = {inputs_dir}
+        ref_image_path       = {ref_image_path}
+        skin_retouching_bool = {skin_retouching_bool}
+        '''
+    )
     # embedding
     face_recognition        = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
     # face detection
@@ -138,11 +157,12 @@ if __name__ == "__main__":
 
             # face crop
             sub_image = image.crop(retinaface_box)
-            try:
-                sub_image           = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-            except Exception as e:
-                torch.cuda.empty_cache()
-                logging.error(f"Photo skin_retouching error, error info: {e}")
+            if skin_retouching_bool:
+                try:
+                    sub_image = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                except Exception as e:
+                    torch.cuda.empty_cache()
+                    logging.error(f"Photo skin_retouching error, error info: {e}")
 
             # get embedding
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]

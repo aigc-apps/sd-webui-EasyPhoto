@@ -37,6 +37,8 @@ def post(encoded_image, url='http://0.0.0.0:7860'):
         "color_shift_middle"        : True,
         "color_shift_last"          : True,
         "super_resolution"          : True,
+        "skin_retouching_bool"      : True,
+
         "background_restore"        : False,
         "tabs"                      : 1
     })

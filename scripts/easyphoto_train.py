@@ -34,6 +34,7 @@ def easyphoto_train_forward(
     enable_rl: bool,
     max_rl_time: float,
     timestep_fraction: float,
+    skin_retouching_bool: bool,
     *args
 ):  
     global check_hash
@@ -90,7 +91,7 @@ def easyphoto_train_forward(
         image = Image.open(user_image['name'])
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
-
+    
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
     command = [
@@ -101,6 +102,8 @@ def easyphoto_train_forward(
             f'--inputs_dir={original_backup_path}',
             f'--ref_image_path={ref_image_path}'
         ]
+    if skin_retouching_bool:
+        command += ["--skin_retouching_bool"]
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
