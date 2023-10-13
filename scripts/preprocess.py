@@ -157,13 +157,12 @@ if __name__ == "__main__":
 
             # face crop
             sub_image = image.crop(retinaface_box)
-            try:
-                if skin_retouching_bool:
+            if skin_retouching_bool:
+                try:
                     sub_image = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-
-            except Exception as e:
-                torch.cuda.empty_cache()
-                logging.error(f"Photo skin_retouching error, error info: {e}")
+                except Exception as e:
+                    torch.cuda.empty_cache()
+                    logging.error(f"Photo skin_retouching error, error info: {e}")
 
             # get embedding
             embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]

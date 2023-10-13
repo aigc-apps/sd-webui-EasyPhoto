@@ -2,6 +2,7 @@ import copy
 import glob
 import logging
 import os
+import sys
 
 import cv2
 import numpy as np
@@ -24,7 +25,38 @@ from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
+sys.path.append("/root/zhoumo/AICamera/PSGAN")
+import argparse
+from pathlib import Path
 
+from PIL import Image
+from psgan import Inference
+from fire import Fire
+import numpy as np
+
+import faceutils as futils
+from psgan import PostProcess
+import argparse
+
+from psgan import get_config
+
+def setup_argparser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_file", default="/root/zhoumo/AICamera/PSGAN/configs/base.yaml", metavar="FILE", help="path to config file")
+    parser.add_argument(
+        "opts",
+        help="Modify config options using the command-line",
+        default=None,
+        nargs=argparse.REMAINDER,
+    )
+    return parser
+
+def setup_config(args):
+    config = get_config()
+    config.merge_from_file(args.config_file)
+    config.merge_from_list(args.opts)
+    config.freeze()
+    return config
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
@@ -265,6 +297,37 @@ def easyphoto_infer_forward(
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
         face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
+
+    parser = setup_argparser()
+    parser.add_argument(
+        "--source_path",
+        default="/root/zhoumo/AICamera/PSGAN/assets/images/non-makeup/xfsy_0106.png",
+        metavar="FILE",
+        help="path to source image")
+    parser.add_argument(
+        "--reference_dir",
+        default="/root/zhoumo/AICamera/PSGAN/assets/images/makeup",
+        help="path to reference images")
+    parser.add_argument(
+        "--speed",
+        action="store_true",
+        help="test speed")
+    parser.add_argument(
+        "--device",
+        default="cpu",
+        help="device used for inference")
+    parser.add_argument(
+        "--model_path",
+        default="/root/zhoumo/AICamera/PSGAN/assets/models/G.pth",
+        help="model for loading")
+
+    args = parser.parse_args()
+    config = setup_config(args)
+
+    # Using the second cpu
+    inference = Inference(
+        config, args.device, args.model_path)
+    postprocess = PostProcess(config)
 
     # params init
     input_prompts                   = []
@@ -507,7 +570,9 @@ def easyphoto_infer_forward(
                     first_diffusion_output_image_crop_color_shift = color_transfer(first_diffusion_output_image_crop_color_shift, template_image_original_face_area)
                     
                     # detect face area
-                    face_skin_mask = np.int32(np.float32(face_skin(first_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]) > 128)
+                    face_skin_mask = np.float32(face_skin(first_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0])
+                    face_skin_mask = cv2.blur(face_skin_mask, (32, 32)) / 255
+                    
                     # paste back to photo
                     first_diffusion_output_image_uint8[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2],:] = \
                         first_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(first_diffusion_output_image_crop) * (1 - face_skin_mask)
@@ -564,12 +629,14 @@ def easyphoto_infer_forward(
                     second_diffusion_output_image_crop_color_shift = color_transfer(second_diffusion_output_image_crop_color_shift, template_image_original_face_area)
 
                     # detect face area
-                    face_skin_mask = np.int32(np.float32(face_skin(second_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10]])[0]) > 128)
+                    face_skin_mask = np.float32(face_skin(second_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10]])[0])
+                    face_skin_mask = cv2.blur(face_skin_mask, (32, 32)) / 255
+
                     # paste back to photo
                     second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
                         second_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(second_diffusion_output_image_crop) * (1 - face_skin_mask)
                     second_diffusion_output_image = Image.fromarray(second_diffusion_output_image_uint8)
-                    
+
                 # If it is a large template for cutting, paste the reconstructed image back
                 if crop_face_preprocess:
                     logging.info("Start paste crop image to origin template.")
@@ -626,14 +693,14 @@ def easyphoto_infer_forward(
                 logging.error(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
                 return f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}", outputs, []
 
-            try:
-                if skin_retouching_bool:
+            if skin_retouching_bool:
+                try:
                     logging.info("Start Skin Retouching.")
                     # Skin Retouching is performed here. 
                     output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))  
-            except Exception as e:
-                torch.cuda.empty_cache()
-                logging.error(f"Skin Retouching error: {e}")
+                except Exception as e:
+                    torch.cuda.empty_cache()
+                    logging.error(f"Skin Retouching error: {e}")
 
             try:
                 logging.info("Start Portrait enhancement.")
