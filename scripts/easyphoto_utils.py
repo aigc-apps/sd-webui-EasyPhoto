@@ -45,10 +45,13 @@ def check_files_exists_and_download(check_hash):
     models_annotator_path               = os.path.join(data_path, "models")
     if os.path.exists(controlnet_extensions_path):
         controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
+        controlnet_cache_path = controlnet_extensions_path
     elif os.path.exists(controlnet_extensions_builtin_path):
         controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
+        controlnet_cache_path = controlnet_extensions_builtin_path
     else:
         controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
+        controlnet_cache_path = controlnet_extensions_path
 
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
     urls        = [
@@ -64,6 +67,8 @@ def check_files_exists_and_download(check_hash):
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/makeup_transfer.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
@@ -72,16 +77,18 @@ def check_files_exists_and_download(check_hash):
     filenames = [
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
-        os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
-        os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
-        os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
-        os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
+        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
+        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
+        [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
+        [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
         os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
@@ -90,15 +97,25 @@ def check_files_exists_and_download(check_hash):
     # This print will introduce some misundertand
     # print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
-        if not check_hash:
-            if os.path.exists(filename):
-                continue
-        else:
-            if os.path.exists(filename) and compare_hasd_link_file(url, filename):
-                continue
+        if type(filename) is str:
+            filename = [filename]
+        
+        exist_flag = False
+        for _filename in filename:
+            if not check_hash:
+                if os.path.exists(_filename):
+                    exist_flag = True
+                    break
+            else:
+                if os.path.exists(_filename) and compare_hasd_link_file(url, _filename):
+                    exist_flag = True
+                    break
+        if exist_flag:
+            continue
+
         print(f"Start Downloading: {url}")
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        urldownload_progressbar(url, filename)
+        os.makedirs(os.path.dirname(filename[0]), exist_ok=True)
+        urldownload_progressbar(url, filename[0])
        
 # Calculate the hash value of the download link and downloaded_file by sha256
 def compare_hasd_link_file(url, file_path):

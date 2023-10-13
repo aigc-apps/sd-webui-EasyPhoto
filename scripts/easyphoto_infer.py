@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import sys
+import traceback
 
 import cv2
 import numpy as np
@@ -15,16 +16,22 @@ from modules.images import save_image
 from modules.paths import models_path
 from modules.shared import opts, state
 from PIL import Image
-from scripts.easyphoto_config import (
-    DEFAULT_NEGATIVE, DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL, DEFAULT_NEGATIVE_XL, SDXL_MODEL_NAME, easyphoto_img2img_samples,
-    easyphoto_outpath_samples, models_path, user_id_outpath_samples,
-    validation_prompt, easyphoto_txt2img_samples)
+from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
+                                      DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL,
+                                      SDXL_MODEL_NAME,
+                                      easyphoto_img2img_samples,
+                                      easyphoto_outpath_samples,
+                                      easyphoto_txt2img_samples, models_path,
+                                      user_id_outpath_samples,
+                                      validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
+from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
+
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
@@ -193,6 +200,7 @@ skin_retouching = None
 portrait_enhancement = None
 face_skin = None
 face_recognition = None
+psgan_inference = None
 check_hash = True
 
 # this decorate is default to be closed, not every needs this, more for developers
@@ -201,10 +209,10 @@ def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, skin_retouching_bool, display_score, \
-    background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash)
@@ -240,6 +248,7 @@ def easyphoto_infer_forward(
             pass
     except Exception as e:
         torch.cuda.empty_cache()
+        traceback.print_exc()
         return "Please choose or upload a template.", [], []
     
     # create modelscope model
@@ -254,17 +263,23 @@ def easyphoto_infer_forward(
             skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
         except Exception as e:
             torch.cuda.empty_cache()
+            traceback.print_exc()
             logging.error(f"Skin Retouching model load error. Error Info: {e}")
     if portrait_enhancement is None:
         try:
             portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement', model_revision='v1.0.0')
         except Exception as e:
             torch.cuda.empty_cache()
+            traceback.print_exc()
             logging.error(f"Portrait Enhancement model load error. Error Info: {e}")
-    
+
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
         face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
+    
+    # psgan for transfer makeup
+    if makeup_transfer and psgan_inference is None:
+        psgan_inference = PSGAN_Inference("cuda", os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"), retinaface_detection, face_skin, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"))
 
     # params init
     input_prompts                   = []
@@ -573,6 +588,28 @@ def easyphoto_infer_forward(
                     second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
                         second_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(second_diffusion_output_image_crop) * (1 - face_skin_mask)
                     second_diffusion_output_image = Image.fromarray(second_diffusion_output_image_uint8)
+                
+                # use original template face area to transfer makeup
+                if makeup_transfer:
+                    rescale_retinaface_box                          = [int(i * default_hr_scale) for i in input_image_retinaface_box]
+                    second_diffusion_output_image_uint8             = np.uint8(np.array(second_diffusion_output_image))
+                    second_diffusion_output_image_crop              = Image.fromarray(second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:])
+                    template_image_original_face_area               = Image.fromarray(np.uint8(template_image_original_face_area))
+                    
+                    # makeup transfer
+                    second_diffusion_output_image_crop_makeup_transfer  = second_diffusion_output_image_crop.resize([256, 256])
+                    template_image_original_face_area                   = Image.fromarray(np.uint8(template_image_original_face_area)).resize([256, 256])
+                    second_diffusion_output_image_crop_makeup_transfer  = psgan_inference.transfer(second_diffusion_output_image_crop_makeup_transfer, template_image_original_face_area)
+                    second_diffusion_output_image_crop_makeup_transfer = second_diffusion_output_image_crop_makeup_transfer.resize([np.shape(second_diffusion_output_image_crop)[1], np.shape(second_diffusion_output_image_crop)[0]])
+
+                    # detect face area
+                    face_skin_mask = np.float32(face_skin(second_diffusion_output_image_crop, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0])
+                    face_skin_mask = cv2.blur(face_skin_mask, (32, 32)) / 255 * makeup_transfer_ratio
+
+                    # paste back to photo
+                    second_diffusion_output_image_uint8[rescale_retinaface_box[1]:rescale_retinaface_box[3], rescale_retinaface_box[0]:rescale_retinaface_box[2],:] = \
+                        np.array(second_diffusion_output_image_crop_makeup_transfer) * face_skin_mask + np.array(second_diffusion_output_image_crop) * (1 - face_skin_mask)
+                    second_diffusion_output_image = Image.fromarray(np.uint8(np.clip(second_diffusion_output_image_uint8, 0, 255)))
 
                 # If it is a large template for cutting, paste the reconstructed image back
                 if crop_face_preprocess:
@@ -627,6 +664,7 @@ def easyphoto_infer_forward(
                     output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
             except Exception as e:
                 torch.cuda.empty_cache()
+                traceback.print_exc()
                 logging.error(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
                 return f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}", outputs, []
 
@@ -637,6 +675,7 @@ def easyphoto_infer_forward(
                     output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))  
                 except Exception as e:
                     torch.cuda.empty_cache()
+                    traceback.print_exc()
                     logging.error(f"Skin Retouching error: {e}")
 
             try:
@@ -647,6 +686,7 @@ def easyphoto_infer_forward(
                     output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
             except Exception as e:
                 torch.cuda.empty_cache()
+                traceback.print_exc()
                 logging.error(f"Portrait enhancement error: {e}")
 
             if total_processed_person == 0:
@@ -660,6 +700,7 @@ def easyphoto_infer_forward(
             loop_message += f"Template {str(template_idx + 1)} Success."
         except Exception as e:
             torch.cuda.empty_cache()
+            traceback.print_exc()
             logging.error(f"Template {str(template_idx + 1)} error: Error info is {e}, skip it.")
 
             if loop_message != "":
