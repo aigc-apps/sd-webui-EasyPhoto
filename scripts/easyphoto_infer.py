@@ -266,37 +266,6 @@ def easyphoto_infer_forward(
     if display_score and face_recognition is None:
         face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
 
-    parser = setup_argparser()
-    parser.add_argument(
-        "--source_path",
-        default="/root/zhoumo/AICamera/PSGAN/assets/images/non-makeup/xfsy_0106.png",
-        metavar="FILE",
-        help="path to source image")
-    parser.add_argument(
-        "--reference_dir",
-        default="/root/zhoumo/AICamera/PSGAN/assets/images/makeup",
-        help="path to reference images")
-    parser.add_argument(
-        "--speed",
-        action="store_true",
-        help="test speed")
-    parser.add_argument(
-        "--device",
-        default="cpu",
-        help="device used for inference")
-    parser.add_argument(
-        "--model_path",
-        default="/root/zhoumo/AICamera/PSGAN/assets/models/G.pth",
-        help="model for loading")
-
-    args = parser.parse_args()
-    config = setup_config(args)
-
-    # Using the second cpu
-    inference = Inference(
-        config, args.device, args.model_path)
-    postprocess = PostProcess(config)
-
     # params init
     input_prompts                   = []
     face_id_images                  = []
