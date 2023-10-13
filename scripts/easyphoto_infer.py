@@ -25,38 +25,6 @@ from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
-sys.path.append("/root/zhoumo/AICamera/PSGAN")
-import argparse
-from pathlib import Path
-
-from PIL import Image
-from psgan import Inference
-from fire import Fire
-import numpy as np
-
-import faceutils as futils
-from psgan import PostProcess
-import argparse
-
-from psgan import get_config
-
-def setup_argparser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config_file", default="/root/zhoumo/AICamera/PSGAN/configs/base.yaml", metavar="FILE", help="path to config file")
-    parser.add_argument(
-        "opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-    return parser
-
-def setup_config(args):
-    config = get_config()
-    config.merge_from_file(args.config_file)
-    config.merge_from_list(args.opts)
-    config.freeze()
-    return config
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
