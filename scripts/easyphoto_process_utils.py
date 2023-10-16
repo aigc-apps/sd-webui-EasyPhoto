@@ -272,13 +272,17 @@ def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = Fal
     mask1 = rotate_resize_image(mask1, angle, ratio)
     cv2.imwrite('rotate_img1.jpg',img1)
     rotate_img1 = copy.deepcopy(img1)
-    print('crop and paste:',rotate_img1.shape)
+    print('crop and paste (after rotate):',rotate_img1.shape)
 
     # use local
     if use_local:
         img2 = paste_image_center(img2, img1)
         mask2 = paste_image_center(mask2, mask1)
 
+    print(img1.shape)
+    print(img2.shape)
+    print(mask1.shape)
+    
     cv2.imwrite('align_img1.jpg',img1)
     cv2.imwrite('align_mask1.jpg',mask1)
     cv2.imwrite('align_img2.jpg',img2)
@@ -286,7 +290,6 @@ def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = Fal
 
     # paste to mask2
     result_img,iou,mask1 = paste_image_centered_at(img1, img2, mask1, mask2, x, y)
-
 
     return result_img, rotate_img1, iou, mask1, mask2
 
@@ -423,9 +426,9 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         resized_mask1 = resize_and_stretch(mask1,target_size=(mask2.shape[1],mask2.shape[0]))
         resized_mask1 = resized_mask1[:,:,0]
 
-    print('align and overlay:',resized_img1.shape)
-    print('align and overlay:',resized_mask1.shape)
-    print('align and overlay:',img2.shape)
+    print('align and overlay (resized img1):',resized_img1.shape)
+    print('align and overlay (resized mask1):',resized_mask1.shape)
+    print('align and overlay (resized img2):',img2.shape)
 
     # find optimal angle, ratio
     if box2:
@@ -433,8 +436,8 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
     else:
         x, y = img2.shape[1]/2, img2.shape[0]/2
     
-    ious = []
     max_iou = 0
+
     if find_param:
         angle_low   = find_param.get('angle_low', -60)
         angle_high  = find_param.get('angle_high', 60)
@@ -449,7 +452,8 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         for angle in angles:
             for ratio in ratios:
                 res_img, rotate_img1 ,iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
-                ious.append(iou)
+                print(f'iou: {iou}, angle: {angle}, ratio: {ratio}')
+
                 if iou > max_iou:
                     max_iou = iou
                     final_res = res_img
@@ -458,7 +462,24 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
 
     return final_res, rotate_img1, mask1, mask2
 
-def crop_image(img, box):
+def expand_roi(box, ratio, max_box, eps=5):
+    centerx = (box[0] + box[2]) / 2
+    centery = (box[1] + box[3]) / 2
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+
+    nw = w * ratio + eps
+    nh = h * ratio + eps
+
+    b0 = int(max(centerx - nw / 2, max_box[0]))
+    b1 = int(max(centery - nh / 2, max_box[1]))
+    b2 = int(min(centerx + nw / 2, max_box[2]))
+    b3 = int(min(centery + nh / 2, max_box[3]))
+
+    return [b0, b1, b2, b3]
+
+
+def crop_image(img, box, expand_ratio=1.5):
     """
     使用OpenCV裁剪图像
 
@@ -469,10 +490,14 @@ def crop_image(img, box):
     返回:
     numpy.ndarray: 裁剪后的图像
     """
-    left, upper, right, lower = box
-    cropped_img = img[upper:lower, left:right]
+    W, H = img.shape[1], img.shape[0]
+    print(W,H)
+    x1,y1,x2,y2 = expand_roi(box,ratio=expand_ratio,max_box=[0,0,W,H])
+
+    cropped_img = img[y1:y2, x1:x2]
     
     return cropped_img
+
 
 def calculate_average_distance(original_points, new_points):
     """计算K个点的平均移动距离。
