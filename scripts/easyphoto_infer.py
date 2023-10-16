@@ -25,7 +25,7 @@ from scripts.easyphoto_process_utils import (align_and_overlay_images,
                                              calculate_average_distance, calculate_polygon_iou,
                                              expand_polygon_vertex, adjust_B_to_match_A,
                                              mask_to_polygon, draw_vertex_polygon, mask_to_box, draw_box_on_image,
-                                             seg_by_box,apply_mask_to_image, merge_with_inner_canny)
+                                             seg_by_box,apply_mask_to_image, merge_with_inner_canny,crop_image)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
@@ -211,21 +211,6 @@ def inpaint(
     return image
 
 
-def crop_image(img, box):
-    """
-    使用OpenCV裁剪图像
-
-    参数:
-    img (numpy.ndarray): 输入的图像 (使用cv2读取的图像)
-    box (tuple): 裁剪框的坐标 (left, upper, right, lower)
-
-    返回:
-    numpy.ndarray: 裁剪后的图像
-    """
-    left, upper, right, lower = box
-    cropped_img = img[upper:lower, left:right]
-    
-    return cropped_img
 
 
 retinaface_detection = None
@@ -324,12 +309,16 @@ def easyphoto_infer_forward(
     cv2.imwrite('mask2_input.jpg',mask2)
     draw_box_on_image(img2, box_template,'box2.jpg')
 
-    img1            = crop_image(np.array(img1), box_main)
-    mask1           = crop_image(np.array(mask1), box_main)
-    img2            = crop_image(np.array(img2), box_template)
-    mask2           = crop_image(np.array(mask2), box_template)
+    img1            = crop_image(np.array(img1), box_main, expand_ratio=1.05)
+    mask1           = crop_image(np.array(mask1), box_main, expand_ratio=1.05)
+    img2            = crop_image(np.array(img2), box_template, expand_ratio=1.05)
+    mask2           = crop_image(np.array(mask2), box_template, expand_ratio=1.05)
 
-    cv2.imwrite('crooped_img2.jpg',img2)
+    cv2.imwrite('croped_img1.jpg',img1)
+    cv2.imwrite('croped_img2.jpg',img2)
+    cv2.imwrite('croped_mask1.jpg',mask1)
+    cv2.imwrite('croped_mask2.jpg',mask2)
+
     if optimize_angle_and_ratio:
         find_param = {
             'angle_low':angle_low,
