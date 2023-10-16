@@ -415,6 +415,8 @@ if __name__ == "__main__":
             cv2.imwrite(ref_image_path, sub_image[:, :, ::-1])
             cv2.imwrite(os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), sub_mask[:, :, ::-1])
 
+
+
     with open(json_save_path, 'w', encoding="utf-8") as f:
         for root, dirs, files in os.walk(images_save_path, topdown=False):
             for file in files:
