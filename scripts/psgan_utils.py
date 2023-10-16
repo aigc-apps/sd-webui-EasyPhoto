@@ -467,7 +467,6 @@ def l2normalize(v, eps=1e-12):
 class SpectralNorm(object):
     def __init__(self):
         self.name = "weight"
-        #print(self.name)
         self.power_iterations = 1
 
     def compute_weight(self, module):

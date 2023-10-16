@@ -10,11 +10,30 @@ from modules.paths import models_path
 from tqdm import tqdm
 
 from scripts.easyphoto_config import data_path
+from modelscope.utils.logger import get_logger as ms_get_logger
 
-# Set the level of the logger
-log_level = os.environ.get('LOG_LEVEL', 'INFO')
-logging.getLogger().setLevel(log_level)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')  
+# Ms logger set
+ms_logger = ms_get_logger()
+ms_logger.setLevel(logging.ERROR)
+
+# ep logger set
+ep_logger_name = __name__.split('.')[0]
+ep_logger = logging.getLogger(ep_logger_name)
+ep_logger.propagate = False
+
+for handler in ep_logger.root.handlers:
+    if type(handler) is logging.StreamHandler:
+        handler.setLevel(logging.ERROR)
+
+stream_handler = logging.StreamHandler()
+handlers = [stream_handler]
+
+for handler in handlers:
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(message)s'))
+    handler.setLevel("INFO")
+    ep_logger.addHandler(handler)
+
+ep_logger.setLevel("INFO")
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
     face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
@@ -113,7 +132,7 @@ def check_files_exists_and_download(check_hash):
         if exist_flag:
             continue
 
-        print(f"Start Downloading: {url}")
+        ep_logger.info(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename[0]), exist_ok=True)
         urldownload_progressbar(url, filename[0])
        
@@ -141,10 +160,10 @@ def compare_hasd_link_file(url, file_path):
         local_end_hash = hashlib.sha256(local_end_data).hexdigest()
      
     if remote_head_hash == local_head_hash and remote_end_hash == local_end_hash:
-        print(f"{file_path} : Hash match")
+        ep_logger.info(f"{file_path} : Hash match")
         return True
       
     else:
-        print(f" {file_path} : Hash mismatch")
+        ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
