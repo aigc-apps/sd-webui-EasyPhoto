@@ -216,21 +216,23 @@ def paste_image_centered_at(img1, img2, mask1, mask2, x, y, is_canny = True):
     result_img[merge_mask == 255] = expand_img1[merge_mask == 255]
     result_img[merge_mask == 0] = img2[merge_mask == 0]
 
-    expand_region_mask = mask2[merge_mask==255]=0
+    expand_region_mask = copy.deepcopy(mask2)
+    expand_region_mask[merge_mask==255]=0
 
-    cv2.imwrite('result_img.jpg',result_img)
-    cv2.imwrite('expand_img.jpg',expand_img1)
-    cv2.imwrite('mask2.jpg',mask2)
-    cv2.imwrite('merge_mask.jpg',merge_mask)
-    cv2.imwrite('expnad_region_mask.jpg',expand_region_mask)
+    # cv2.imwrite('result_img.jpg',result_img)
+    # cv2.imwrite('expand_img.jpg',expand_img1)
+    # cv2.imwrite('mask2.jpg',mask2)
+    # cv2.imwrite('merge_mask.jpg',merge_mask)
+    # cv2.imwrite('expnad_region_mask.jpg',expand_region_mask)
 
-    print(result_img.shape)
-    print(expand_img1.shape)
-    print(mask2.shape)
-    print(merge_mask.shape)
+    # print(result_img.shape)
+    # print(expand_img1.shape)
+    # print(mask2.shape)
+    # print(merge_mask.shape)
 
-    # expand 
-    # result_img = add_background(result_img, expand_img1, expand_ratio=1.5)
+    # expand
+    expand_ratio=1.5 
+    result_img = blend_images(result_img, expand_img1, expand_ratio, expand_region_mask)
 
     return result_img,iou,expand_mask1
     
@@ -726,3 +728,35 @@ def merge_with_inner_canny(image, mask1, mask2):
     print('after canny:',canny_image.shape, resize_image.shape)
     return canny_image_inner
      
+
+def blend_images(img1, img2, expand_ratio, mask):
+    # 获取图像的高度和宽度
+    height, width = img1.shape[:2]
+
+    # 将img2中心放大expand_ratio
+    new_height = int(height * expand_ratio)
+    new_width = int(width * expand_ratio)
+    resized_img2 = cv2.resize(img2, (new_width, new_height))
+
+    # 计算对齐后的坐标
+    align_x = (new_width-width) // 2
+    align_y = (new_height-height) // 2
+
+    # 裁剪resized_img2到与result_img相同的大小
+    cropped_resized_img2 = resized_img2[align_y:align_y+height, align_x:align_x+width]
+
+    print(cropped_resized_img2.shape)
+    # 创建一个蒙版，将img1的mask为白色的区域设置为1，其余为0
+    mask = mask / 255
+
+    # 创建一个与img1相同大小的掩码，将img1的mask为白色的区域保留，其余部分用cropped_resized_img2替换
+    result_img = img1.copy()
+    for c in range(img1.shape[2]):
+        result_img[:, :, c] = result_img[:, :, c] * (1 - mask) + cropped_resized_img2[:, :, c] * mask
+
+    # 使用高斯模糊对边缘进行平滑处理
+    # ksize = 15  # 调整高斯核的大小
+    # sigma = 10  # 调整高斯核的标准差
+    # result_img = cv2.GaussianBlur(result_img, (ksize, ksize), sigma)
+
+    return result_img
