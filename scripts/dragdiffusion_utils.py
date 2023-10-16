@@ -1011,6 +1011,13 @@ def run_drag(
         ).to("cuda")
         merge_lora(model, lora_path, 0.3, from_safetensor=True, device="cuda", dtype=weight_dtype)
         model.unet.set_default_attn_processor()
+
+        try:
+            import xformers
+            model.enable_xformers_memory_efficient_attention()
+        except:
+            logging.warning('No module named xformers. Infer without using xformers. You can run pip install xformers to install it.')
+
     else:
         logging.info("applying lora: " + lora_path)
         model = DragPipeline.from_pretrained(model_path, scheduler=scheduler).to(device)

@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from shapely.geometry import Polygon
-
+import torch
 import cv2
 import copy
 import numpy as np
@@ -44,12 +44,6 @@ def mask_to_polygon(mask, epsilon_multiplier):
         cv2.circle(polygon_image, (x, y), 3, (255, 255, 255), -1)  # 绘制红色的圆点
         cv2.putText(polygon_image, str(i), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-    # 计算IoU（如果需要）
-
-    # 显示图像
-    plt.imshow(polygon_image)
-    plt.title('Polygon with Labels')
-    plt.show()
 
     return approx_polygon
     
@@ -96,9 +90,9 @@ def mask_to_polygon_with_labels(mask, epsilon_multiplier, iou_threshold):
     # 计算IoU（如果需要）
 
     # 显示图像
-    plt.imshow(polygon_image)
-    plt.title('Polygon with Labels')
-    plt.show()
+    # plt.imshow(polygon_image)
+    # plt.title('Polygon with Labels')
+    # plt.show()
 
     # 如果IoU小于阈值，则返回None
     # if iou < iou_threshold:
@@ -151,7 +145,7 @@ def calculate_box_center(box):
 
 def resize_and_stretch(img, target_size, is_mask = False, white_back = False):
     """
-        crop img，mask by box, resize to target size
+        crop img, mask by box, resize to target size
     """
     if isinstance(img, np.ndarray):
         img = Image.fromarray(img)
@@ -222,8 +216,26 @@ def paste_image_centered_at(img1, img2, mask1, mask2, x, y, is_canny = True):
     result_img[merge_mask == 255] = expand_img1[merge_mask == 255]
     result_img[merge_mask == 0] = img2[merge_mask == 0]
 
+    expand_region_mask = mask2[merge_mask==255]=0
+
+    cv2.imwrite('result_img.jpg',result_img)
+    cv2.imwrite('expand_img.jpg',expand_img1)
+    cv2.imwrite('mask2.jpg',mask2)
+    cv2.imwrite('merge_mask.jpg',merge_mask)
+    cv2.imwrite('expnad_region_mask.jpg',expand_region_mask)
+
+    print(result_img.shape)
+    print(expand_img1.shape)
+    print(mask2.shape)
+    print(merge_mask.shape)
+
+    # expand 
+    # result_img = add_background(result_img, expand_img1, expand_ratio=1.5)
+
     return result_img,iou,expand_mask1
     
+# def add_background(img_inner, img_background):
+#     img_background = Image
 
 def rotate_resize_image(array, angle, scale_ratio):
     """
@@ -256,15 +268,23 @@ def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = Fal
     # rotate and resize img1 mask1
     img1 = rotate_resize_image(img1, angle, ratio)
     mask1 = rotate_resize_image(mask1, angle, ratio)
+    cv2.imwrite('rotate_img1.jpg',img1)
     rotate_img1 = copy.deepcopy(img1)
+    print('crop and paste:',rotate_img1.shape)
 
     # use local
     if use_local:
         img2 = paste_image_center(img2, img1)
         mask2 = paste_image_center(mask2, mask1)
 
+    cv2.imwrite('align_img1.jpg',img1)
+    cv2.imwrite('align_mask1.jpg',mask1)
+    cv2.imwrite('align_img2.jpg',img2)
+    cv2.imwrite('align_mask2.jpg',mask2)
+
     # paste to mask2
     result_img,iou,mask1 = paste_image_centered_at(img1, img2, mask1, mask2, x, y)
+
 
     return result_img, rotate_img1, iou, mask1, mask2
 
@@ -401,6 +421,10 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         resized_mask1 = resize_and_stretch(mask1,target_size=(mask2.shape[1],mask2.shape[0]))
         resized_mask1 = resized_mask1[:,:,0]
 
+    print('align and overlay:',resized_img1.shape)
+    print('align and overlay:',resized_mask1.shape)
+    print('align and overlay:',img2.shape)
+
     # find optimal angle, ratio
     if box2:
         x, y = calculate_box_center(box2)
@@ -513,3 +537,192 @@ def adjust_B_to_match_A(A, B):
     adjusted_B = np.roll(B, -nearest_point_index, axis=0)
 
     return adjusted_B
+
+def draw_vertex_polygon(image, polygon, name):
+    # image = np.zeros((1008, 512, 3))
+    polygon = np.array(polygon, dtype=np.int32)
+    cv2.polylines(image, [polygon], isClosed=True, color=(0, 0, 255), thickness=2)
+    
+    # 标注顶点序号
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    for i, (x, y) in enumerate(polygon):
+        cv2.putText(image, str(i), (x, y), font, 0.5, (255, 255, 255), 2)
+    
+    cv2.imwrite(f'{name}.jpg',image)
+
+
+def mask_to_box(mask):
+    """
+        get the only largest componet and return the bouding box
+    """
+    # Find connected components
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+
+    # Find the largest connected component
+    largest_label = np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1  # Ignore the background label
+
+    # Create a new mask with only the largest connected component
+    largest_connected_component_mask = np.zeros_like(mask)
+    largest_connected_component_mask[labels == largest_label] = 255
+
+    # Find the bounding box for the largest connected component
+    x, y, width, height = cv2.boundingRect(largest_connected_component_mask)
+
+    # Set all regions outside of the bounding box to black
+    largest_connected_component_mask[:y, :] = 0
+    largest_connected_component_mask[y+height:, :] = 0
+    largest_connected_component_mask[:, :x] = 0
+    largest_connected_component_mask[:, x+width:] = 0
+
+    return largest_connected_component_mask, (x, y, x + width, y + height)
+
+
+def draw_box_on_image(image, box, det_path):
+   
+    plot_image = image.copy()
+    height, width, _ = image.shape
+
+    x1,y1,x2,y2 = box
+    x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
+    # plot
+    cv2.rectangle(plot_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+    cv2.imwrite(det_path, plot_image)
+
+
+def seg_by_box(raw_image_rgb, boxes_filt, segmentor,point_coords=None):
+    h, w = raw_image_rgb.shape[:2]
+    # [1,2,3,4]
+
+    segmentor.set_image(raw_image_rgb)
+    transformed_boxes   = segmentor.transform.apply_boxes_torch(torch.from_numpy(np.expand_dims(boxes_filt, 0)), (h, w)).cuda()
+
+    masks, scores, _    = segmentor.predict_torch(point_coords=None, point_labels=None, boxes=transformed_boxes, multimask_output=True)
+
+    # muilt mask
+    mask = masks[0]
+    mask = torch.sum(mask, dim=0)
+    mask = mask.cpu().numpy().astype(np.uint8)
+    mask_image = mask * 255
+
+    return mask_image
+
+
+def apply_mask_to_image(img, mask):
+    """
+    根据掩码将图像中的像素保留，其他地方设为白色
+
+    参数:
+    img (numpy.ndarray): 输入的图像
+    mask (numpy.ndarray): 掩码图像，值为255的像素将被保留，其他地方将变为白色
+
+    返回:
+    numpy.ndarray: 处理后的图像
+    """
+    # 创建一个白色背景
+    white_background = np.full_like(img, 255, dtype=np.uint8)
+
+    # 使用掩码来保留图像中值为255的像素
+    result = cv2.bitwise_and(img, img, mask=mask)
+
+    # 将未被掩码保留的区域设置为白色
+    result[np.where(mask == 0)] = [255, 255, 255]
+
+    return result
+
+
+def resize_image_with_pad(input_image, resolution, skip_hwc3=False):
+    if skip_hwc3:
+        img = input_image
+    else:
+        img = HWC3(input_image)
+    H_raw, W_raw, _ = img.shape
+    k = float(resolution) / float(min(H_raw, W_raw))
+    interpolation = cv2.INTER_CUBIC if k > 1 else cv2.INTER_AREA
+    H_target = int(np.round(float(H_raw) * k))
+    W_target = int(np.round(float(W_raw) * k))
+    img = cv2.resize(img, (W_target, H_target), interpolation=interpolation)
+    H_pad, W_pad = pad64(H_target), pad64(W_target)
+    img_padded = np.pad(img, [[0, H_pad], [0, W_pad], [0, 0]], mode='edge')
+
+    def remove_pad(x):
+        return safer_memory(x[:H_target, :W_target])
+
+    return safer_memory(img_padded), remove_pad
+
+def canny(img, res=512, thr_a=100, thr_b=200, **kwargs):
+    l, h = thr_a, thr_b
+    img, remove_pad = resize_image_with_pad(img, res)
+    # global model_canny
+    # if model_canny is None:
+    model_canny = apply_canny
+    result = model_canny(img, l, h)
+    return remove_pad(result), remove_pad(img)
+
+def HWC3(x):
+    x=x.astype(np.uint8)
+    assert x.dtype == np.uint8
+    if x.ndim == 2:
+        x = x[:, :, None]
+    assert x.ndim == 3
+    H, W, C = x.shape
+    assert C == 1 or C == 3 or C == 4
+    if C == 3:
+        return x
+    if C == 1:
+        return np.concatenate([x, x, x], axis=2)
+    if C == 4:
+        color = x[:, :, 0:3].astype(np.float32)
+        alpha = x[:, :, 3:4].astype(np.float32) / 255.0
+        y = color * alpha + 255.0 * (1.0 - alpha)
+        y = y.clip(0, 255).astype(np.uint8)
+        return y
+
+def pad64(x):
+    return int(np.ceil(float(x) / 64.0) * 64 - x)
+
+def apply_canny(img, low_threshold, high_threshold):
+    return cv2.Canny(img, low_threshold, high_threshold)
+
+def safer_memory(x):
+    # Fix many MAC/AMD problems
+    return np.ascontiguousarray(x.copy()).copy()
+
+def fill_mask(mask):
+    # fill in the logo
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    filled_mask = np.zeros_like(mask)
+    
+    for contour in contours:
+        cv2.drawContours(filled_mask, [contour], 0, (255), -1)
+    
+    return filled_mask
+
+def remove_outline(img, outline_mask):
+    inverted_outline = np.logical_not(outline_mask)
+    
+    filtered_img = np.multiply(img, inverted_outline)
+    return filtered_img
+
+
+
+def merge_with_inner_canny(image, mask1, mask2):
+    print(image.shape)
+    print(mask1.shape)
+    print(mask2.shape)
+    canny_image, resize_image = canny(image)
+    cv2.imwrite('canny_image.jpg', canny_image)
+    _, resize_mask1 = canny(mask1)
+    _, resize_mask2 = canny(mask2)
+
+    mask1_outline  = np.uint8(cv2.dilate(np.array(resize_mask1), np.ones((10, 10), np.uint8), iterations=1) - cv2.erode(np.array(resize_mask1), np.ones((5, 5), np.uint8), iterations=1))
+    cv2.imwrite('mask1_outline.jpg', mask1_outline)
+    
+    mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
+    canny_image_inner = remove_outline(canny_image, mask1_outline)
+    cv2.imwrite('canny_image_inner.jpg', canny_image_inner)
+    
+    print('after canny:',canny_image.shape, resize_image.shape)
+    return canny_image_inner
+     

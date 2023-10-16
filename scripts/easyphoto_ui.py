@@ -277,8 +277,8 @@ def on_ui_tabs():
                 with gr.Row():
                     with gr.Column():
                         model_selected_tab = gr.State(0)
-                        
-                        init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
+                        init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload", tool='sketch')
+                        # init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
                         
                         with gr.Row():
                             def checkpoint_refresh_function():
@@ -366,6 +366,64 @@ def on_ui_tabs():
                                     minimum=0.40, maximum=1.00, value=0.70,
                                     step=0.05, label='Diffusion denoising strength'
                                 )
+
+                            with gr.Row():
+                                angle = gr.Slider(
+                                    minimum=-90, maximum=90, value=0.0,
+                                    step=1, label='Angle'
+                                )
+                                ratio = gr.Slider(
+                                    minimum=0.5, maximum=5.5, value=1.0,
+                                    step=0.1, label='Ratio'
+                                )
+
+                            with gr.Row():
+                                angle_low = gr.Slider(
+                                    minimum=-90, maximum=90, value=-30,
+                                    step=1, label='Angle Low'
+                                )
+                                angle_high = gr.Slider(
+                                    minimum=-90, maximum=90, value=30,
+                                    step=1, label='Angle High'
+                                )
+
+                            with gr.Row():
+                                ratio_low = gr.Slider(
+                                    minimum=0.1, maximum=5, value=0.5,
+                                    step=0.1, label='Ratio Low'
+                                )
+                                ratio_high = gr.Slider(
+                                    minimum=0.1, maximum=5, value=2.0,
+                                    step=1, label='Ratio High'
+                                )
+
+                            with gr.Row():
+                                angle_num = gr.Slider(
+                                    minimum=1, maximum=10, value=5,
+                                    step=1, label='Angle Num'
+                                )
+                                ratio_num = gr.Slider(
+                                    minimum=1, maximum=10, value=3,
+                                    step=1, label='Ratio Num'
+                                )
+
+                            with gr.Row():
+                                refine_input_mask = gr.Checkbox(
+                                    label="Refine Input Mask",  
+                                    value=True
+                                )
+                                optimize_angle_and_ratio = gr.Checkbox(
+                                    label="Optimize Angle and Ratio", 
+                                    value=False
+                                )
+                                optimize_shape = gr.Checkbox(
+                                    label="Optimize Shape",  
+                                    value=True
+                                )
+                                use_dragdiffusion = gr.Checkbox(
+                                    label="Use Dragdiffusion",  
+                                    value=True
+                                )
                             
                         display_button = gr.Button('Start Generation')
 
@@ -386,7 +444,8 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-                            model_selected_tab, *uuids],
+                            angle, ratio, angle_low, angle_high, ratio_low, ratio_high, angle_num, ratio_num, refine_input_mask, \
+                            optimize_angle_and_ratio, optimize_shape, use_dragdiffusion, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )

@@ -15,7 +15,8 @@ from scripts.easyphoto_config import (models_path, cache_log_file_path,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
-
+from scripts.easyphoto_process_utils import seg_by_box
+import cv2
 
 python_executable_path = sys.executable
 check_hash             = True
@@ -85,6 +86,9 @@ def easyphoto_train_forward(
         image = Image.open(user_image['name'])
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
+
+    # save main img & mask for infer
+    # Image.open(main_image).save(ref_image_path)
 
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
