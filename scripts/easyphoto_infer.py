@@ -25,7 +25,8 @@ from scripts.easyphoto_process_utils import (align_and_overlay_images,
                                              calculate_average_distance, calculate_polygon_iou,
                                              expand_polygon_vertex, adjust_B_to_match_A,
                                              mask_to_polygon, draw_vertex_polygon, mask_to_box, draw_box_on_image,
-                                             seg_by_box,apply_mask_to_image, merge_with_inner_canny,crop_image)
+                                             seg_by_box,apply_mask_to_image, merge_with_inner_canny,crop_image,
+                                             resize_image_with_pad, copy_white_mask_to_template)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
@@ -304,15 +305,20 @@ def easyphoto_infer_forward(
         mask2       = mask2_input
 
     # for final paste
+    _, box_template = mask_to_box(mask2)
     template_copy   = copy.deepcopy(img2)
 
     cv2.imwrite('mask2_input.jpg',mask2)
     draw_box_on_image(img2, box_template,'box2.jpg')
 
-    img1            = crop_image(np.array(img1), box_main, expand_ratio=1.05)
-    mask1           = crop_image(np.array(mask1), box_main, expand_ratio=1.05)
-    img2            = crop_image(np.array(img2), box_template, expand_ratio=1.05)
-    mask2           = crop_image(np.array(mask2), box_template, expand_ratio=1.05)
+    # img1            = crop_image(np.array(img1), box_main, expand_ratio=1.02)
+    # mask1           = crop_image(np.array(mask1), box_main, expand_ratio=1.01)
+    # img2            = crop_image(np.array(img2), box_template, expand_ratio=1.02)
+    # mask2           = crop_image(np.array(mask2), box_template, expand_ratio=1.02)
+    img1            = crop_image(np.array(img1), box_main)
+    mask1           = crop_image(np.array(mask1), box_main)
+    img2            = crop_image(np.array(img2), box_template)
+    mask2           = crop_image(np.array(mask2), box_template)
 
     cv2.imwrite('croped_img1.jpg',img1)
     cv2.imwrite('croped_img2.jpg',img2)
@@ -347,6 +353,7 @@ def easyphoto_infer_forward(
     cv2.imwrite('mask1.jpg',mask1)
     cv2.imwrite('mask2.jpg',mask2)
     result_img.save('first_paste_result_img.jpg')
+    first_paste = copy.deepcopy(result_img)
 
     if optimize_shape: 
         epsilon_multiplier = 0.005
@@ -451,29 +458,49 @@ def easyphoto_infer_forward(
         print('after_resize:',result_img.size)
         result_img.save('after_drag_paste.jpg')
 
-    # merge mask is the mask for img1 in final_res
-    res_canny = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask1, mask2)
-    cv2.imwrite('res_canny.jpg',res_canny)
+    # merge mask is the mask for img1 in final_res (resize)
+    resize_image, res_canny = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask1, mask2)
+    resize_mask2, remove_pad = resize_image_with_pad(mask2, resolution=512)
+    resize_mask2 = remove_pad(resize_mask2)
+
+    print('after canny:',resize_image.shape, res_canny.shape, resize_mask2.shape)
+    cv2.imwrite('after_canny_res_canny.jpg',res_canny)
+    cv2.imwrite('after_canny_res_image.jpg',resize_image)
+    cv2.imwrite('after_canny_res_mask.jpg',resize_mask2)
+    
     # first diffusion
     logging.info("Start First diffusion.")
     controlnet_pairs = [["canny", res_canny, 0.5]]
-    mask2 = Image.fromarray(np.uint8(np.clip((np.float32(mask2) * 255), 0, 255)))
-    mask2.save('final_mask2.jpg')
-    result_img.save('final_res_img.jpg')
 
-    result_img = inpaint(result_img, mask2, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+    mask2 = Image.fromarray(np.uint8(np.clip((np.float32(resize_mask2) * 255), 0, 255)))
+    mask2.save('final_mask2.jpg')
+    resize_image = Image.fromarray(resize_image)
+    resize_image.save('final_res_img.jpg')
+
+    result_img = inpaint(resize_image, mask2, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
     
+
+    print('inpaint:', result_img.size)
     # resize diffusion results
     target_width = box_template[2] - box_template[0]
     target_height = box_template[3] - box_template[1]
     result_img = result_img.resize((target_width, target_height))
+    resize_mask2 = mask2.resize((target_width,target_height))
 
+    result_img.save('inpaint_res_resize.jpg')
+    resize_mask2.save('inpaint_res_mask.jpg')
+
+    print('resize:',result_img.size)
+    print(box_template)
+    
     # copy back
     template_copy = np.array(template_copy, np.uint8)
-    template_copy[box_template[1]:box_template[3], box_template[0]:box_template[2]] = np.array(result_img, np.uint8)
+    template_copy = copy_white_mask_to_template(np.array(result_img),np.array(np.uint8(resize_mask2))[:,:,0], template_copy, box_template)
+    # print(box_template)
+    # template_copy[box_template[1]:box_template[3], box_template[0]:box_template[2]][np.array(resize_mask2)==255] = np.array(result_img, np.uint8)
     template_copy = Image.fromarray(np.uint8(template_copy))
 
     # add portrait enhancement
     # template_copy = Image.fromarray(cv2.cvtColor(portrait_enhancement(template_copy)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
     # template_copy = Image.fromarray(cv2.cvtColor(template_copy[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-    return "Success", [template_copy]
+    return "Success", [template_copy, first_paste]
