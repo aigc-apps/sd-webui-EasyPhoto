@@ -37,7 +37,8 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
-What's New: 
+What's New:
+- ComfyUI Support at [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), thanks to [THtianhao](https://github.com/THtianhao) great work![🔥 🔥 🔥 2023.10.17]
 - EasyPhoto arxiv [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]
 - Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory! Specific details can go [here](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
 - We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
