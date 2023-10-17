@@ -7,6 +7,7 @@ import gradio as gr
 import modules
 import modules.scripts as scripts
 import numpy as np
+from scripts.easyphoto_utils import ep_logger
 from modules import processing, scripts, sd_models, sd_samplers, shared, sd_vae
 from modules.api.models import *
 from modules.processing import StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
@@ -235,7 +236,7 @@ def t2i_call(
         origin_sd_vae               = opts.sd_vae
     except Exception as e:
         message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in t2i_call, use None instead!"
-        logging.error(f"{message} with Error: {e}")
+        ep_logger.error(f"{message} with Error: {e}")
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 
@@ -360,7 +361,7 @@ def i2i_inpaint_call(
         origin_sd_vae               = opts.sd_vae
     except Exception as e:
         message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
-        logging.error(f"{message} with Error: {e}")
+        ep_logger.error(f"{message} with Error: {e}")
         origin_sd_model_checkpoint  = ""
         origin_sd_vae               = ""
 

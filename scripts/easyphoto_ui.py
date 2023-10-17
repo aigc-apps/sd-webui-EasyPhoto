@@ -410,7 +410,7 @@ def on_ui_tabs():
                             uuids           = []
                             visibles        = [True, False, False, False, False]
                             for i in range(int(5)):
-                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=140, label=f"User_{i} id", visible=visibles[i])
+                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=80, label=f"User_{i} id", visible=visibles[i])
                                 uuids.append(uuid)
 
                             def update_uuids(_num_of_faceid):
@@ -509,14 +509,31 @@ def on_ui_tabs():
                                     label="Background Restore",  
                                     value=False
                                 )
+                            with gr.Row():
+                                makeup_transfer = gr.Checkbox(
+                                    label="MakeUp Transfer",
+                                    value=False
+                                )
 
                             with gr.Row():
+                                super_resolution_method = gr.Dropdown(
+                                    value="gpen", \
+                                    choices=list(["gpen", "realesrgan"]), label="The super resolution way you use.", visible=True
+                                )
                                 background_restore_denoising_strength = gr.Slider(
                                     minimum=0.10, maximum=0.60, value=0.35,
-                                    step=0.05, label='Background restore denoising strength',
+                                    step=0.05, label='Background Restore Denoising Strength',
                                     visible=False
                                 )
+                                makeup_transfer_ratio = gr.Slider(
+                                    minimum=0.00, maximum=1.00, value=0.50,
+                                    step=0.05, label='Makeup Transfer Ratio',
+                                    visible=False
+                                )
+                                
+                                super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
+                                makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -563,8 +580,8 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, skin_retouching_bool, display_score, \
-                            background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
+                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
