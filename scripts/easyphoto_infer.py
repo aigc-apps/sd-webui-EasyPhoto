@@ -284,7 +284,7 @@ def easyphoto_infer_forward(
         try: 
             makeup_transfer_model_path  = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth")
             face_landmarks_model_path   = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth")
-            psgan_inference = PSGAN_Inference("cuda", makeup_transfer_path, retinaface_detection, face_skin, face_landmarks_model_path)
+            psgan_inference = PSGAN_Inference("cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path)
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
