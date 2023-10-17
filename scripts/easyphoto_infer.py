@@ -122,6 +122,14 @@ def get_controlnet_unit(unit, input_image, weight):
             threshold_b=200,
             model='control_v11f1e_sd15_tile'
         )
+
+    elif unit == "depth":
+        control_unit = ControlNetUnit(input_image=input_image, module='depth_midas',
+                                            weight=weight,
+                                            guidance_end=1,
+                                            control_mode=1,
+                                            resize_mode='Just Resize',
+                                            model='control_v11f1p_sd15_depth')
     return control_unit
 
 def txt2img(
@@ -273,7 +281,7 @@ def easyphoto_infer_forward(
 
     # prompt init
     prompt                  = validation_prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_ids[0]}:0.8>"
+    input_prompt            = f"{validation_prompt}, <lora:{user_ids[0]}:0.7>"
 
     # model init
     sam                 = sam_model_registry['vit_l']()
@@ -346,6 +354,7 @@ def easyphoto_infer_forward(
     print(result_img.shape)
     print(mask1.shape)
     print(mask2.shape)
+    print(np.array(img2).shape)
 
     result_img = Image.fromarray(np.uint8(result_img))
 
@@ -463,24 +472,31 @@ def easyphoto_infer_forward(
     resize_mask2, remove_pad = resize_image_with_pad(mask2, resolution=512)
     resize_mask2 = remove_pad(resize_mask2)
 
-    print('after canny:',resize_image.shape, res_canny.shape, resize_mask2.shape)
+    resize_img2, remove_pad = resize_image_with_pad(img2, resolution=512)
+    resize_img2 = remove_pad(resize_img2)
+
+    print('after canny:',resize_image.shape, res_canny.shape, resize_mask2.shape, resize_img2.shape)
     cv2.imwrite('after_canny_res_canny.jpg',res_canny)
-    cv2.imwrite('after_canny_res_image.jpg',resize_image)
+    cv2.imwrite('after_canny_res_image.jpg',resize_image[:,:,::-1])
     cv2.imwrite('after_canny_res_mask.jpg',resize_mask2)
-    
+    cv2.imwrite('after_canny_res_image_ori.jpg',resize_img2[:,:,::-1])
+
     # first diffusion
     logging.info("Start First diffusion.")
-    controlnet_pairs = [["canny", res_canny, 0.5]]
+    controlnet_pairs = [["canny", res_canny, 1.0],["depth", resize_img2, 1.0]]
 
     mask2 = Image.fromarray(np.uint8(np.clip((np.float32(resize_mask2) * 255), 0, 255)))
     mask2.save('final_mask2.jpg')
     resize_image = Image.fromarray(resize_image)
     resize_image.save('final_res_img.jpg')
 
+    # first diffusion
     result_img = inpaint(resize_image, mask2, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
-    
-
     print('inpaint:', result_img.size)
+    result_img.save('inpaint_res1.jpg')
+
+    # second diffusion to fix boundary
+    
     # resize diffusion results
     target_width = box_template[2] - box_template[0]
     target_height = box_template[3] - box_template[1]

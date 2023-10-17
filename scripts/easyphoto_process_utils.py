@@ -277,33 +277,68 @@ def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
 
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
     # return result_img,expand_mask1
-    
 
 
-def rotate_resize_image(array, angle, scale_ratio):
+def rotate_resize_image(array, angle=0.0, scale_ratio=1.0, use_white_bg=False):
     """
-        rotate img with angle and scale by scale_ratio
+    Rotate img with angle and scale by scale_ratio and set excess border to white.
     """
     height, width = array.shape[:2]
     image_center = (width / 2, height / 2)
 
-    rotation_mat = cv2.getRotationMatrix2D(image_center, int(angle), 1)
+    rotation_mat = cv2.getRotationMatrix2D(image_center, angle, scale_ratio)
 
-    # resize the output image to save corner
+    # Calculate the size of the new image to accommodate the rotated image
     radians = math.radians(angle)
     sin = math.sin(radians)
     cos = math.cos(radians)
     bound_w = int((height * abs(sin)) + (width * abs(cos)))
     bound_h = int((height * abs(cos)) + (width * abs(sin)))
 
+    # Adjust the rotation matrix to translate to the center of the new image
     rotation_mat[0, 2] += (bound_w - width) / 2
     rotation_mat[1, 2] += (bound_h - height) / 2
 
     rotated_mat = cv2.warpAffine(array, rotation_mat, (bound_w, bound_h))
 
-     # scale
+    if use_white_bg:
+        # Create a white background with the same size
+        white_bg = np.zeros_like(rotated_mat)
+        white_bg.fill(255)  # Set the background to white
+
+        # Combine the rotated image and the white background using a mask
+        mask = (rotated_mat == 0)
+        rotated_mat = np.where(mask, white_bg, rotated_mat)
+
+    # Scale
     scaled_mat = cv2.resize(rotated_mat, None, fx=scale_ratio, fy=scale_ratio, interpolation=cv2.INTER_LINEAR)
+
     return scaled_mat
+
+# def rotate_resize_image(array, angle=0.0, scale_ratio=1.0):
+#     """
+#         rotate img with angle and scale by scale_ratio
+#     """
+#     height, width = array.shape[:2]
+#     image_center = (width / 2, height / 2)
+
+#     rotation_mat = cv2.getRotationMatrix2D(image_center, int(angle), 1)
+
+#     # resize the output image to save corner
+#     radians = math.radians(angle)
+#     sin = math.sin(radians)
+#     cos = math.cos(radians)
+#     bound_w = int((height * abs(sin)) + (width * abs(cos)))
+#     bound_h = int((height * abs(cos)) + (width * abs(sin)))
+
+#     rotation_mat[0, 2] += (bound_w - width) / 2
+#     rotation_mat[1, 2] += (bound_h - height) / 2
+
+#     rotated_mat = cv2.warpAffine(array, rotation_mat, (bound_w, bound_h))
+
+#      # scale
+#     scaled_mat = cv2.resize(rotated_mat, None, fx=scale_ratio, fy=scale_ratio, interpolation=cv2.INTER_LINEAR)
+#     return scaled_mat
 
     
 @timing_decorator
@@ -439,39 +474,6 @@ def paste_image_center(img1, img2):
 
     return result_img
 
-
-# def paste_image_center(img1, img2):
-#     """
-#     将图像1粘贴在图像2的中心，不调整图像1的大小
-
-#     参数:
-#     img1 (numpy.ndarray): 要粘贴的图像
-#     img2 (numpy.ndarray): 目标图像
-
-#     返回:
-#     numpy.ndarray: 结果图像
-#     """
-#     # 获取图像2的宽度和高度
-#     width2, height2 = img2.shape[1], img2.shape[0]
-
-#     # 计算将图像1放置在图像2中心的坐标
-#     left = (width2 - img1.shape[1]) // 2
-#     upper = (height2 - img1.shape[0]) // 2
-#     right = left + img1.shape[1]
-#     lower = upper + img1.shape[0]
-
-#     # 确保坐标是非负的
-#     left = max(left, 0)
-#     upper = max(upper, 0)
-
-#     # 从图像2中复制相应区域
-#     # centered_image = img2.copy()
-#     # centered_image = np.full(img2.shape, 255, dtype=np.uint8)
-#     centered_image = np.zeros_like(img2)
-
-#     centered_image[upper:lower, left:right] = img1
-
-#     return centered_image
     
 
 def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box2=None, find_param={}):
@@ -518,12 +520,12 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
                 # res_img, rotate_img1 ,iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
                 res_img, res_img1, res_img2, res_mask1, res_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
 
-                print(f'iou: {iou}, angle: {angle}, ratio: {ratio}')
-                print(res_img.shape)
-                print(res_img1.shape)
-                print(res_img2.shape)
-                print(res_mask1.shape)
-                print(res_mask2.shape)
+                # print(f'iou: {iou}, angle: {angle}, ratio: {ratio}')
+                # print(res_img.shape)
+                # print(res_img1.shape)
+                # print(res_img2.shape)
+                # print(res_mask1.shape)
+                # print(res_mask2.shape)
 
                 if iou > max_iou:
                     max_iou = iou
@@ -531,6 +533,7 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
                     final_img1 = res_img1
                     final_mask1 = res_mask1
                     final_mask2 = res_mask2
+                    print(f'update iou! iou: {iou}, angle: {angle}, ratio: {ratio}')
     else:
         final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
         # final_res, rotate_img1, iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
