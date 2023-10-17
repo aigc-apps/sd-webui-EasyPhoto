@@ -516,7 +516,7 @@ def on_ui_tabs():
                                 )
 
                             with gr.Row():
-                                super_resolution_way = gr.Dropdown(
+                                super_resolution_method = gr.Dropdown(
                                     value="gpen", \
                                     choices=list(["gpen", "realesrgan"]), label="The super resolution way you use.", visible=True
                                 )
@@ -531,7 +531,7 @@ def on_ui_tabs():
                                     visible=False
                                 )
                                 
-                                super_resolution.change(lambda x: super_resolution_way.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_way])
+                                super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
 
@@ -580,7 +580,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_way, skin_retouching_bool, display_score, \
+                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                             background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 

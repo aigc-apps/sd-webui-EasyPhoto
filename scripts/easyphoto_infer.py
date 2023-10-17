@@ -114,7 +114,7 @@ def txt2img(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    sampler = "DPM++ SDE Karras"
+    sampler = "DPM++ 2M SDE Karras"
 ):
     controlnet_units_list = []
 
@@ -154,7 +154,7 @@ def inpaint(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    sampler = "DPM++ SDE Karras"
+    sampler = "DPM++ 2M SDE Karras"
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -195,7 +195,7 @@ retinaface_detection = None
 image_face_fusion = None
 skin_retouching = None
 portrait_enhancement = None
-old_super_resolution_way = None
+old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
@@ -206,11 +206,11 @@ check_hash = True
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_way, skin_retouching_bool, display_score, \
+    seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_way, face_skin, face_recognition, psgan_inference, check_hash
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash)
@@ -263,13 +263,13 @@ def easyphoto_infer_forward(
             torch.cuda.empty_cache()
             traceback.print_exc()
             ep_logger.error(f"Skin Retouching model load error. Error Info: {e}")
-    if portrait_enhancement is None or old_super_resolution_way != super_resolution_way:
+    if portrait_enhancement is None or old_super_resolution_method != super_resolution_method:
         try: 
-            if super_resolution_way == "gpen":
+            if super_resolution_method == "gpen":
                 portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model='damo/cv_gpen_image-portrait-enhancement', model_revision='v1.0.0')
-            elif super_resolution_way == "realesrgan":
+            elif super_resolution_method == "realesrgan":
                 portrait_enhancement = pipeline('image-super-resolution-x2', model='bubbliiiing/cv_rrdb_image-super-resolution_x2', model_revision="v1.0.2")
-            old_super_resolution_way = super_resolution_way
+            old_super_resolution_method = super_resolution_method
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -351,7 +351,7 @@ def easyphoto_infer_forward(
             default_positive_prompt=DEFAULT_POSITIVE_XL, \
             default_negative_prompt=DEFAULT_NEGATIVE_XL, \
             seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
-            sampler = "DPM++ SDE Karras"
+            sampler = "DPM++ 2M SDE Karras"
         )
         template_images = [np.uint8(template_images)]
 
