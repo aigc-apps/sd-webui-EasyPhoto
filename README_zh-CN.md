@@ -36,7 +36,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 新特性：
-- ComfyUI 支持 [仓库地址](https://github.com/THtianhao/ComfyUI-Portrait-Maker), 感谢[THtianhao](https://github.com/THtianhao)的精彩工作![🔥 🔥 🔥 2023.10.17]
+- ComfyUI 支持 [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), 感谢[THtianhao](https://github.com/THtianhao)的精彩工作![🔥 🔥 🔥 2023.10.17]
 - EasyPhoto 论文地址 [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]
 - 支持使用SDXL模型和一定的选项直接生成高清大图，不再需要上传模板，需要16GB显存。具体细节可以前往[这里](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
 - 我们同样支持[Diffusers版本](https://github.com/aigc-apps/EasyPhoto/)。 [🔥 2023.09.25]
