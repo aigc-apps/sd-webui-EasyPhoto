@@ -281,7 +281,14 @@ def easyphoto_infer_forward(
     
     # psgan for transfer makeup
     if makeup_transfer and psgan_inference is None:
-        psgan_inference = PSGAN_Inference("cuda", os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"), retinaface_detection, face_skin, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"))
+        try: 
+            makeup_transfer_model_path  = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth")
+            face_landmarks_model_path   = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth")
+            psgan_inference = PSGAN_Inference("cuda", makeup_transfer_path, retinaface_detection, face_skin, face_landmarks_model_path)
+        except Exception as e:
+            torch.cuda.empty_cache()
+            traceback.print_exc()
+            ep_logger.error(f"MakeUp Transfer model load error. Error Info: {e}")
 
     # params init
     input_prompts                   = []
@@ -495,8 +502,12 @@ def easyphoto_infer_forward(
                 if input_mask_face_part_only:
                     face_width = input_image_retinaface_box[2] - input_image_retinaface_box[0]
                     input_mask = face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]
-                    input_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), np.ones((int(face_width//10), int(face_width//10)), np.uint8), iterations=1)))
-                    input_mask = Image.fromarray(np.uint8(cv2.erode(cv2.dilate(np.array(input_mask), np.ones((32, 32), np.uint8), iterations=1), np.ones((32, 32), np.uint8), iterations=1)))
+                    
+                    kernel_size = np.ones((int(face_width//10), int(face_width//10)), np.uint8)
+                    # Fill small holes with a close operation
+                    input_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(input_mask), cv2.MORPH_CLOSE, kernel_size)))
+                    # Use dilate to reconstruct the surrounding area of the face
+                    input_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(input_mask), kernel_size, iterations=1)))
                 else:
                     # Expand the template image in the x-axis direction to include the ears.
                     h, w, c     = np.shape(input_mask)
