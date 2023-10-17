@@ -103,7 +103,7 @@ cd /workspace
 ### 2. Local install: Environment Check/Downloading/Installation
 #### a. Environment Check
 We have verified EasyPhoto execution on the following environment:  
-If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
+If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some `num_threads` to `0` and report other fix to us, thanks.
 
 The detailed of Windows 10:  
 - OS: Windows10
@@ -138,7 +138,7 @@ We are mutually compatible with the existing stable-diffusion-webui environment,
 The weights we need will be downloaded automatically when you start training first time.
 
 #### c. Plug-in Installation
-Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
+We now support installing EasyPhoto from git. The url of our Repository is `https://github.com/aigc-apps/sd-webui-EasyPhoto`.
 
 We will support installing EasyPhoto from **Available** in the future.
 
@@ -149,49 +149,49 @@ We will support installing EasyPhoto from **Available** in the future.
 ### 1. Model Training
 The EasyPhoto training interface is as follows:
 
-- On the left is the training image. Simply click Upload Photos to upload the image, and click Clear Photos to delete the uploaded image;
+- On the left is the training image. Simply click `Upload Photos` to upload the image, and click `Clear Photos` to delete the uploaded image;
 - On the right are the training parameters, which cannot be adjusted for the first training.
 
-After clicking Upload Photos, we can start uploading images. **It is best to upload 5 to 20 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
+After clicking `Upload Photos`, we can start uploading images. **It is best to upload 5 to 20 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
 ![train_1](images/train_1.jpg)
 
-Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
+Then we click on `Start Training` below, and at this point, we need to fill in the `User ID` above, such as the user's name, to start training.
 ![train_2](images/train_2.jpg)
 
-After the model starts training, the webui will automatically refresh the training log. If there is no refresh, click Refresh Log button.
+After the model starts training, the webui will automatically refresh the training log. If there is no refresh, click `Refresh Log` button.
 ![train_3](images/train_3.jpg)
 
 If you want to set parameters, the parsing of each parameter is as follows:
 
 |Parameter Name | Meaning|
 |--|--|
-|Resolution | The size of the image fed into the network during training, with a default value of 512|
-|Validation & save steps | The number of steps between validating the image and saving intermediate weights, with a default value of 100, representing verifying the image every 100 steps and saving the weights|
-|Max train steps | Maximum number of training steps, default value is 800|
-|Max steps per photos | The maximum number of training sessions per image, default to 200|
-|Train batch size | The batch size of the training, with a default value of 1|
-|Gradient accumulation steps | Whether to perform gradient accumulation. The default value is 4. Combined with the train batch size, each step is equivalent to feeding four images|
+|Resolution | The size of the image fed into the network during training, with a default value of `512`|
+|Validation & save steps | The number of steps between validating the image and saving intermediate weights, with a default value of `100`, representing verifying the image every `100` steps and saving the weights|
+|Max train steps | Maximum number of training steps, default value is `800`|
+|Max steps per photos | The maximum number of training sessions per image, default to `200`|
+|Train batch size | The batch size of the training, with a default value of `1`|
+|Gradient accumulation steps | Whether to perform gradient accumulation. The default value is `4`. Combined with the train batch size, each step is equivalent to feeding four images|
 |Dataloader num workers | The number of jobs loaded with data, which does not take effect under Windows because an error will be reported if set, but is set normally on Linux|
-|Learning rate | Train Lora's learning rate, default to 1e-4|
-|Rank Lora | The feature length of the weight, default to 128|
-|Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to 64|
+|Learning rate | Train Lora's learning rate, default to `1e-4`|
+|Rank Lora | The feature length of the weight, default to `128`|
+|Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to `64`|
 
 ### 2. Inference 
 #### a. single people
 - Step 1: Click the refresh button to query the model corresponding to the trained user ID.
-- Step 2: Select the user ID.
+- Step 2: Select the `user ID`.
 - Step 3: Select the template that needs to be generated.
 - Step 4: Click the Generate button to generate the results.
 
 ![single_people](images/single_people.jpg)
 
 #### b. multi people
-- Step 1: Go to the settings page of EasyPhoto and set num_of_faceid is greater than 1.
+- Step 1: Go to the settings page of EasyPhoto and set `num_of_faceid` is greater than `1`.
 - Step 2: Apply settings.
 - Step 3: Restart the ui interface of the webui.
 - Step 4: Return to EasyPhoto and upload the two person template.
 - Step 5: Select the user IDs of two people.
-- Step 6: Click the Generate button. Perform image generation.
+- Step 6: Click the `Generate` button. Perform image generation.
 
 ![single_people](images/multi_people_1.jpg)
 ![single_people](images/multi_people_2.jpg)
@@ -254,7 +254,7 @@ We've also listed some great open source projects as well as any extensions you 
 This project is licensed under the [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 # ContactUS
-1. Use [Dingding](https://www.dingtalk.com/) to search group 38250008552 or Scan to join
+1. Use [Dingding](https://www.dingtalk.com/) to search group `38250008552` or Scan to join
 2. Since the WeChat group is full, you need to scan the image on the right to add this student as a friend first, and then join the WeChat group.
 
 <figure>
