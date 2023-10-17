@@ -151,7 +151,6 @@ def resize_and_stretch(img, target_size, is_mask = False, white_back = False):
         img = Image.fromarray(img)
           
     # crop main
-    # img = img.crop((box[0], box[1], box[2], box[3]))
     img.thumbnail(target_size)
 
     if is_mask:
@@ -168,8 +167,46 @@ def resize_and_stretch(img, target_size, is_mask = False, white_back = False):
     resized_img = np.array(resized_img)
     return resized_img
 
+# def paste_image_centered_at(img1, img2, mask1, mask2, x, y):
+#     """
+#     Paste img1 onto img2 at the specified (x, y) coordinates with mask filtering.
+#     """
+#     h1, w1 = img1.shape[:2]
+#     h2, w2 = img2.shape[:2]
 
-def paste_image_centered_at(img1, img2, mask1, mask2, x, y, is_canny = True):
+#     # Calculate the coordinates to place img1 at the specified (x, y) location
+#     paste_x = int(x - w1 // 2)
+#     paste_y = int(y - h1 // 2)
+
+#     # Ensure img1 is within the bounds of img2
+#     if paste_x < 0:
+#         paste_x2 = min(w1, w2)
+#         paste_x1 = 0
+#     else:
+#         paste_x2 = min(w1, w2 - paste_x)
+#         paste_x1 = paste_x
+#     if paste_y < 0:
+#         paste_y2 = min(h1, h2)
+#         paste_y1 = 0
+#     else:
+#         paste_y2 = min(h1, h2 - paste_y)
+#         paste_y1 = paste_y
+
+#     # Create an empty result image
+#     result_img = img2.copy()
+
+#     # Crop img1 and mask1 to fit within the bounds of img2
+#     img1_cropped = img1[paste_y1:paste_y2, paste_x1:paste_x2]
+#     mask1_cropped = mask1[paste_y1:paste_y2, paste_x1:paste_x2]
+
+#     # Apply mask filtering to result_img
+#     for c in range(img2.shape[2]):
+#         result_img[paste_y:paste_y + img1_cropped.shape[0], paste_x:paste_x + img1_cropped.shape[1], c] = \
+#             img1_cropped * (mask1_cropped / 255.0) + img2[paste_y:paste_y + img1_cropped.shape[0], paste_x:paste_x + img1_cropped.shape[1], c] * (1 - mask1_cropped / 255.0)
+
+#     return result_img
+
+def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
     """
         paste img1 to img2 with the center of x,y
         filter the final result by mask1, mask2 and calculate the iou
@@ -177,53 +214,45 @@ def paste_image_centered_at(img1, img2, mask1, mask2, x, y, is_canny = True):
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
 
-    # left up 
-    paste_x = int(x - w1 // 2)
-    paste_y = int(y - h1 // 2)
+    h_max, w_max = max(h1,h2), max(w1,w2)
+    # final result large
+    expand_img1 = np.zeros((h_max,w_max,3))
+    expand_img2 = np.zeros((h_max,w_max,3))
+    result_img = np.zeros((h_max,w_max,3))
+    expand_mask1 = np.zeros((h_max,w_max))
+    expand_mask2 = np.zeros((h_max,w_max))
 
-    # ensure img1 is smaller than img2
-    if paste_x < 0:
-        paste_x = 0
-    if paste_y < 0:
-        paste_y = 0
-    if paste_x + w1 > w2:
-        img1 = img1[:, :w2 - paste_x]
-        mask1 = mask1[:, :w2 - paste_x]
-    if paste_y + h1 > h2:
-        img1 = img1[:h2 - paste_y, :]
-        mask1 = mask1[:h2 - paste_y, :]
+    img2_box = [(w_max-w2)//2, (h_max-h2)//2, (w_max + w2)//2, (h_max+h2)//2]
+    print('img2_box:', img2_box[2]-img2_box[0],img2_box[3]-img2_box[1])
 
-    # direct paste img1 to img2
-    expand_img1 = np.ones((h2,w2,3)) * 255.
-    expand_mask1 = np.zeros((h2,w2))
-    
-    # final result
-    result_img = np.zeros((h2,w2,3))
-    
     # merge mask1 mask2, white use img1, black use img2
-    merge_mask = np.zeros((h2,w2))
+    merge_mask = np.zeros((h_max,w_max))
 
-    merge_mask[paste_y:paste_y + h1, paste_x:paste_x + w1] = mask1
-    merge_mask = np.where(np.logical_and(merge_mask > 128, mask2 > 128), 255, 0)
+    expand_img1 = paste_image_center(img1,expand_img1)
+    expand_img2 = paste_image_center(img2,expand_img2)
+    expand_mask1 = paste_image_center(mask1,expand_mask1)
+    expand_mask2 = paste_image_center(mask2,expand_mask2)
 
-    # paste img1, mask1
-    expand_img1[paste_y:paste_y + h1, paste_x:paste_x + w1:] = img1
-    expand_mask1[paste_y:paste_y + h1, paste_x:paste_x + w1:] = mask1
+    # cv2.imwrite('expand_img1.jpg',expand_img1)
+    # cv2.imwrite('expand_img2.jpg',expand_img2)
+    # cv2.imwrite('expand_mask1.jpg',expand_mask1)
+    # cv2.imwrite('expand_mask2.jpg',expand_mask2)
 
-    iou = calculate_iou(expand_mask1,mask2)
-    
-    # filter the final result
+    iou = calculate_iou(expand_mask1,expand_mask2)
+    merge_mask = np.where(np.logical_and(expand_mask1 > 128, expand_mask2 > 128), 255, 0)
+    cv2.imwrite('merge_mask.jpg',merge_mask)
+
     result_img[merge_mask == 255] = expand_img1[merge_mask == 255]
-    result_img[merge_mask == 0] = img2[merge_mask == 0]
+    result_img[merge_mask == 0] = expand_img2[merge_mask == 0]
 
-    expand_region_mask = copy.deepcopy(mask2)
+    expand_region_mask = copy.deepcopy(expand_mask2)
     expand_region_mask[merge_mask==255]=0
 
-    # cv2.imwrite('result_img.jpg',result_img)
-    # cv2.imwrite('expand_img.jpg',expand_img1)
+    cv2.imwrite('result_img11.jpg',result_img)
+    cv2.imwrite('expand_img11.jpg',expand_img1)
     # cv2.imwrite('mask2.jpg',mask2)
     # cv2.imwrite('merge_mask.jpg',merge_mask)
-    # cv2.imwrite('expnad_region_mask.jpg',expand_region_mask)
+    cv2.imwrite('expand_region_mask.jpg',expand_region_mask)
 
     # print(result_img.shape)
     # print(expand_img1.shape)
@@ -234,10 +263,22 @@ def paste_image_centered_at(img1, img2, mask1, mask2, x, y, is_canny = True):
     expand_ratio=1.5 
     result_img = blend_images(result_img, expand_img1, expand_ratio, expand_region_mask)
 
-    return result_img,iou,expand_mask1
+    # crop to img2
+    result_img = crop_image(result_img,img2_box)
+    expand_img1 = crop_image(expand_img1,img2_box)
+    expand_img2 = crop_image(expand_img2,img2_box)
+    expand_mask1 = crop_image(expand_mask1,img2_box)
+    expand_mask2 = crop_image(expand_mask2,img2_box)
+
+    cv2.imwrite('expand_img1.jpg',expand_img1)
+    cv2.imwrite('expand_img2.jpg',expand_img2)
+    cv2.imwrite('expand_mask1.jpg',expand_mask1)
+    cv2.imwrite('expand_mask2.jpg',expand_mask2)
+
+    return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
+    # return result_img,expand_mask1
     
-# def add_background(img_inner, img_background):
-#     img_background = Image
+
 
 def rotate_resize_image(array, angle, scale_ratio):
     """
@@ -270,28 +311,14 @@ def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = Fal
     # rotate and resize img1 mask1
     img1 = rotate_resize_image(img1, angle, ratio)
     mask1 = rotate_resize_image(mask1, angle, ratio)
-    cv2.imwrite('rotate_img1.jpg',img1)
-    rotate_img1 = copy.deepcopy(img1)
-    print('crop and paste (after rotate):',rotate_img1.shape)
+    # rotate_img1 = copy.deepcopy(img1)
 
-    # use local
-    if use_local:
-        img2 = paste_image_center(img2, img1)
-        mask2 = paste_image_center(mask2, mask1)
+    # paste to mask2 (img1 img2 is not the same size now)
+    print('bf merge:',img2.shape)
+    result_img, img1, img2, mask1, mask2, iou = merge_images(img1, img2, mask1, mask2, x, y)
+    print('af merge:',img2.shape)
 
-    print(img1.shape)
-    print(img2.shape)
-    print(mask1.shape)
-    
-    cv2.imwrite('align_img1.jpg',img1)
-    cv2.imwrite('align_mask1.jpg',mask1)
-    cv2.imwrite('align_img2.jpg',img2)
-    cv2.imwrite('align_mask2.jpg',mask2)
-
-    # paste to mask2
-    result_img,iou,mask1 = paste_image_centered_at(img1, img2, mask1, mask2, x, y)
-
-    return result_img, rotate_img1, iou, mask1, mask2
+    return result_img, img1, img2, mask1, mask2, iou
 
 
 def match_polygon_points(polygon1, polygon2):
@@ -379,38 +406,72 @@ def show_polygons(polygon1,polygon2):
     # 显示图形
     plt.show()
 
+
 def paste_image_center(img1, img2):
     """
-    将图像1粘贴在图像2的中心，不调整图像1的大小
+    Paste img1 at the center of img2.
 
-    参数:
-    img1 (numpy.ndarray): 要粘贴的图像
-    img2 (numpy.ndarray): 目标图像
+    Args:
+        img1 (numpy.ndarray): The image to paste.
+        img2 (numpy.ndarray): The target image.
 
-    返回:
-    numpy.ndarray: 结果图像
+    Returns:
+        numpy.ndarray: The resulting image.
     """
-    # 获取图像2的宽度和高度
-    width2, height2 = img2.shape[1], img2.shape[0]
+    h1, w1 = img1.shape[:2]
+    h2, w2 = img2.shape[:2]
 
-    # 计算将图像1放置在图像2中心的坐标
-    left = (width2 - img1.shape[1]) // 2
-    upper = (height2 - img1.shape[0]) // 2
-    right = left + img1.shape[1]
-    lower = upper + img1.shape[0]
+    # Calculate the coordinates to place img1 at the center of img2
+    paste_x = (w2 - w1) // 2
+    paste_y = (h2 - h1) // 2
 
-    # 确保坐标是非负的
-    left = max(left, 0)
-    upper = max(upper, 0)
+    # Ensure img1 is within the bounds of img2
+    paste_x = max(0, paste_x)
+    paste_y = max(0, paste_y)
+    paste_x = min(paste_x, w2 - w1)
+    paste_y = min(paste_y, h2 - h1)
 
-    # 从图像2中复制相应区域
-    # centered_image = img2.copy()
-    # centered_image = np.full(img2.shape, 255, dtype=np.uint8)
-    centered_image = np.zeros_like(img2)
+    # Create an empty result image
+    result_img = img2.copy()
 
-    centered_image[upper:lower, left:right] = img1
+    # Paste img1 onto result_img using the calculated coordinates
+    result_img[paste_y:paste_y + h1, paste_x:paste_x + w1] = img1
 
-    return centered_image
+    return result_img
+
+
+# def paste_image_center(img1, img2):
+#     """
+#     将图像1粘贴在图像2的中心，不调整图像1的大小
+
+#     参数:
+#     img1 (numpy.ndarray): 要粘贴的图像
+#     img2 (numpy.ndarray): 目标图像
+
+#     返回:
+#     numpy.ndarray: 结果图像
+#     """
+#     # 获取图像2的宽度和高度
+#     width2, height2 = img2.shape[1], img2.shape[0]
+
+#     # 计算将图像1放置在图像2中心的坐标
+#     left = (width2 - img1.shape[1]) // 2
+#     upper = (height2 - img1.shape[0]) // 2
+#     right = left + img1.shape[1]
+#     lower = upper + img1.shape[0]
+
+#     # 确保坐标是非负的
+#     left = max(left, 0)
+#     upper = max(upper, 0)
+
+#     # 从图像2中复制相应区域
+#     # centered_image = img2.copy()
+#     # centered_image = np.full(img2.shape, 255, dtype=np.uint8)
+#     centered_image = np.zeros_like(img2)
+
+#     centered_image[upper:lower, left:right] = img1
+
+#     return centered_image
     
 
 def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box2=None, find_param={}):
@@ -426,6 +487,9 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         resized_mask1 = resize_and_stretch(mask1,target_size=(mask2.shape[1],mask2.shape[0]))
         resized_mask1 = resized_mask1[:,:,0]
 
+    cv2.imwrite('resized_img1.jpg',resized_img1)
+    cv2.imwrite('resized_mask1.jpg',resized_mask1)
+    cv2.imwrite('resized_img2.jpg',img2)
     print('align and overlay (resized img1):',resized_img1.shape)
     print('align and overlay (resized mask1):',resized_mask1.shape)
     print('align and overlay (resized img2):',img2.shape)
@@ -451,18 +515,29 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         
         for angle in angles:
             for ratio in ratios:
-                res_img, rotate_img1 ,iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+                # res_img, rotate_img1 ,iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+                res_img, res_img1, res_img2, res_mask1, res_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+
                 print(f'iou: {iou}, angle: {angle}, ratio: {ratio}')
+                print(res_img.shape)
+                print(res_img1.shape)
+                print(res_img2.shape)
+                print(res_mask1.shape)
+                print(res_mask2.shape)
 
                 if iou > max_iou:
                     max_iou = iou
                     final_res = res_img
+                    final_img1 = res_img1
+                    final_mask1 = res_mask1
+                    final_mask2 = res_mask2
     else:
-        final_res, rotate_img1, iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+        final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+        # final_res, rotate_img1, iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
 
-    return final_res, rotate_img1, mask1, mask2
+    return final_res, final_img1, final_mask1, final_mask2
 
-def expand_roi(box, ratio, max_box, eps=5):
+def expand_roi(box, ratio, max_box, eps=0):
     centerx = (box[0] + box[2]) / 2
     centery = (box[1] + box[3]) / 2
     w = box[2] - box[0]
@@ -479,7 +554,7 @@ def expand_roi(box, ratio, max_box, eps=5):
     return [b0, b1, b2, b3]
 
 
-def crop_image(img, box, expand_ratio=1.5):
+def crop_image(img, box, expand_ratio=1.0):
     """
     使用OpenCV裁剪图像
 
@@ -491,7 +566,7 @@ def crop_image(img, box, expand_ratio=1.5):
     numpy.ndarray: 裁剪后的图像
     """
     W, H = img.shape[1], img.shape[0]
-    print(W,H)
+    # print(W,H)
     x1,y1,x2,y2 = expand_roi(box,ratio=expand_ratio,max_box=[0,0,W,H])
 
     cropped_img = img[y1:y2, x1:x2]
@@ -750,8 +825,8 @@ def merge_with_inner_canny(image, mask1, mask2):
     canny_image_inner = remove_outline(canny_image, mask1_outline)
     cv2.imwrite('canny_image_inner.jpg', canny_image_inner)
     
-    print('after canny:',canny_image.shape, resize_image.shape)
-    return canny_image_inner
+    # print('after canny:',canny_image.shape, resize_image.shape)
+    return resize_image, canny_image_inner
      
 
 def blend_images(img1, img2, expand_ratio, mask):
@@ -779,9 +854,19 @@ def blend_images(img1, img2, expand_ratio, mask):
     for c in range(img1.shape[2]):
         result_img[:, :, c] = result_img[:, :, c] * (1 - mask) + cropped_resized_img2[:, :, c] * mask
 
-    # 使用高斯模糊对边缘进行平滑处理
-    # ksize = 15  # 调整高斯核的大小
-    # sigma = 10  # 调整高斯核的标准差
-    # result_img = cv2.GaussianBlur(result_img, (ksize, ksize), sigma)
-
     return result_img
+
+
+def copy_white_mask_to_template(img, mask, template, box):
+    h,w,_ = template.shape
+    expand_mask = np.zeros((h,w))
+
+    print(mask.shape)
+    expand_mask[box[1]:box[3], box[0]:box[2]] = mask
+
+    result = np.zeros_like(template)
+    result[box[1]:box[3], box[0]:box[2]] = np.array(img, np.uint8)
+    result[expand_mask==0] = template[expand_mask==0]
+    result[expand_mask==0] = template[expand_mask==0]
+    return result
+
