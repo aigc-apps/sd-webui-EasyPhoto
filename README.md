@@ -262,3 +262,22 @@ This project is licensed under the [Apache License (Version 2.0)](https://github
 <img src="images/erweima.jpg" width=300/>
 <img src="images/wechat.jpg" width=300/>
 </figure>
+
+
+# Contributors ✨
+
+Thanks goes to these wonderful people :
+
+<table>
+  <tr>
+     <td>
+  <a href="https://github.com/aigc-apps/sd-webui-EasyPhoto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=aigc-apps/sd-webui-EasyPhoto" />
+  </a>
+    </td>
+  </tr>
+</table>
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+
+<p align="right"><a href="#top">Back to top</a></p>
