@@ -29,20 +29,20 @@ def mask_to_polygon(mask, epsilon_multiplier):
     approx_polygon = cv2.approxPolyDP(largest_contour, epsilon, True)
 
     # 创建多边形mask
-    polygon_mask = np.zeros_like(mask)
-    cv2.drawContours(polygon_mask, [approx_polygon], -1, 255, thickness=cv2.FILLED)
+    # polygon_mask = np.zeros_like(mask)
+    # cv2.drawContours(polygon_mask, [approx_polygon], -1, 255, thickness=cv2.FILLED)
 
-    # 创建图像用于绘制多边形和标签
-    polygon_image = np.zeros_like(mask)
-    cv2.drawContours(polygon_image, [approx_polygon], -1, 255, thickness=cv2.FILLED)
+    # # 创建图像用于绘制多边形和标签
+    # polygon_image = np.zeros_like(mask)
+    # cv2.drawContours(polygon_image, [approx_polygon], -1, 255, thickness=cv2.FILLED)
 
     # 获取多边形的顶点坐标
     approx_polygon = approx_polygon.reshape(-1, 2)
 
     # 绘制顶点标记和标签
-    for i, (x, y) in enumerate(approx_polygon):
-        cv2.circle(polygon_image, (x, y), 3, (255, 255, 255), -1)  # 绘制红色的圆点
-        cv2.putText(polygon_image, str(i), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    # for i, (x, y) in enumerate(approx_polygon):
+    #     cv2.circle(polygon_image, (x, y), 3, (255, 255, 255), -1)  # 绘制红色的圆点
+    #     cv2.putText(polygon_image, str(i), (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
 
     return approx_polygon
@@ -222,8 +222,8 @@ def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
     expand_mask1 = np.zeros((h_max,w_max))
     expand_mask2 = np.zeros((h_max,w_max))
 
-    img2_box = [(w_max-w2)//2, (h_max-h2)//2, (w_max + w2)//2, (h_max+h2)//2]
-    print('img2_box:', img2_box[2]-img2_box[0],img2_box[3]-img2_box[1])
+    # img2_box = [(w_max-w2)//2, (h_max-h2)//2, (w_max + w2)//2, (h_max+h2)//2]
+    # print('img2_box:', img2_box[2]-img2_box[0],img2_box[3]-img2_box[1])
 
     # merge mask1 mask2, white use img1, black use img2
     merge_mask = np.zeros((h_max,w_max))
@@ -233,12 +233,13 @@ def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
     expand_mask1 = paste_image_center(mask1,expand_mask1)
     expand_mask2 = paste_image_center(mask2,expand_mask2)
 
-    # cv2.imwrite('expand_img1.jpg',expand_img1)
-    # cv2.imwrite('expand_img2.jpg',expand_img2)
-    # cv2.imwrite('expand_mask1.jpg',expand_mask1)
-    # cv2.imwrite('expand_mask2.jpg',expand_mask2)
+    cv2.imwrite('bf_expand_img1.jpg',expand_img1)
+    cv2.imwrite('bf_expand_img2.jpg',expand_img2)
+    cv2.imwrite('bf_expand_mask1.jpg',expand_mask1)
+    cv2.imwrite('bf_expand_mask2.jpg',expand_mask2)
 
     iou = calculate_iou(expand_mask1,expand_mask2)
+
     merge_mask = np.where(np.logical_and(expand_mask1 > 128, expand_mask2 > 128), 255, 0)
     cv2.imwrite('merge_mask.jpg',merge_mask)
 
@@ -248,33 +249,34 @@ def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
     expand_region_mask = copy.deepcopy(expand_mask2)
     expand_region_mask[merge_mask==255]=0
 
-    cv2.imwrite('result_img11.jpg',result_img)
-    cv2.imwrite('expand_img11.jpg',expand_img1)
+    # cv2.imwrite('result_img11.jpg',result_img)
+    # cv2.imwrite('expand_img11.jpg',expand_img1)
     # cv2.imwrite('mask2.jpg',mask2)
     # cv2.imwrite('merge_mask.jpg',merge_mask)
-    cv2.imwrite('expand_region_mask.jpg',expand_region_mask)
+    # cv2.imwrite('expand_region_mask.jpg',expand_region_mask)
 
     # print(result_img.shape)
     # print(expand_img1.shape)
     # print(mask2.shape)
     # print(merge_mask.shape)
 
-    # expand
-    expand_ratio=1.5 
-    result_img = blend_images(result_img, expand_img1, expand_ratio, expand_region_mask)
+    # expand update paste background
+    # expand_ratio=1.5 
+    # result_img = blend_images(result_img, expand_img1, expand_ratio, expand_region_mask)
 
     # crop to img2
-    result_img = crop_image(result_img,img2_box)
-    expand_img1 = crop_image(expand_img1,img2_box)
-    expand_img2 = crop_image(expand_img2,img2_box)
-    expand_mask1 = crop_image(expand_mask1,img2_box)
-    expand_mask2 = crop_image(expand_mask2,img2_box)
+    # result_img = crop_image(result_img,img2_box)
+    # expand_img1 = crop_image(expand_img1,img2_box)
+    # expand_img2 = crop_image(expand_img2,img2_box)
+    # expand_mask1 = crop_image(expand_mask1,img2_box)
+    # expand_mask2 = crop_image(expand_mask2,img2_box)
 
-    cv2.imwrite('expand_img1.jpg',expand_img1)
-    cv2.imwrite('expand_img2.jpg',expand_img2)
-    cv2.imwrite('expand_mask1.jpg',expand_mask1)
-    cv2.imwrite('expand_mask2.jpg',expand_mask2)
-
+    # cv2.imwrite('expand_img1.jpg',expand_img1)
+    # cv2.imwrite('expand_img2.jpg',expand_img2)
+    # cv2.imwrite('expand_mask1.jpg',expand_mask1)
+    # cv2.imwrite('expand_mask2.jpg',expand_mask2)
+    
+    # result shape is w_max h_max 
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
     # return result_img,expand_mask1
 
@@ -643,17 +645,18 @@ def adjust_B_to_match_A(A, B):
 
     return adjusted_B
 
-def draw_vertex_polygon(image, polygon, name):
+def draw_vertex_polygon(image, polygon, name, line_color = (0,0,255), font_color = (0,0,255)):
     # image = np.zeros((1008, 512, 3))
+    plot_image = copy.deepcopy(image)
     polygon = np.array(polygon, dtype=np.int32)
-    cv2.polylines(image, [polygon], isClosed=True, color=(0, 0, 255), thickness=2)
+    cv2.polylines(plot_image, [polygon], isClosed=True, color=line_color, thickness=2)
     
     # 标注顶点序号
     font = cv2.FONT_HERSHEY_SIMPLEX
     for i, (x, y) in enumerate(polygon):
-        cv2.putText(image, str(i), (x, y), font, 0.5, (255, 255, 255), 2)
+        cv2.putText(plot_image, str(i), (x, y), font, 0.5, font_color, 2)
     
-    cv2.imwrite(f'{name}.jpg',image)
+    cv2.imwrite(f'{name}.jpg',plot_image)
 
 
 def mask_to_box(mask):
@@ -872,4 +875,7 @@ def copy_white_mask_to_template(img, mask, template, box):
     result[expand_mask==0] = template[expand_mask==0]
     result[expand_mask==0] = template[expand_mask==0]
     return result
+
+def wrap_image_by_vertex(img,polygon1,polygon2):
+    return img
 

@@ -406,24 +406,27 @@ if __name__ == "__main__":
         sub_image, sub_mask = extract_subimage_with_mask_and_kpts(image, mask, tkpts)
 
         # rotate
-        angle_low = -60
-        angle_high = 60
-        angle_num = 5
-        angles = np.linspace(angle_low, angle_high, angle_num)
+        # angle_low = -60
+        # angle_high = 60
+        # angle_num = 5
+        # angles = np.linspace(angle_low, angle_high, angle_num)
         
-        if 0 not in angles:
-            angles = np.insert(angles, 0, 0)
+        # if 0 not in angles:
+        #     angles = np.insert(angles, 0, 0)
+    
+        # for angle_id, angle in enumerate(angles):
+        #     rotate_sub = rotate_resize_image(sub_image, angle, 1.0)
 
-
-        for angle_id, angle in enumerate(angles):
-            rotate_sub = rotate_resize_image(sub_image, angle, 1.0)
-
-            cv2.imwrite(f'{images_save_path}/{i}_{angle_id}.jpg',rotate_sub[:, :, ::-1])
-            with open(os.path.join(images_save_path, str(i) + '_'+str(angle_id)+".txt"), "w") as f:
-                f.write(validation_prompt)
+        #     cv2.imwrite(f'{images_save_path}/{i}_{angle_id}.jpg',rotate_sub[:, :, ::-1])
+        #     with open(os.path.join(images_save_path, str(i) + '_'+str(angle_id)+".txt"), "w") as f:
+        #         f.write(validation_prompt)
 
         mask_list.append(sub_mask)
         ref_list.append(sub_image)
+
+        cv2.imwrite(f'{images_save_path}/{i}.jpg',sub_image[:, :, ::-1])
+        with open(os.path.join(images_save_path, str(i) + ".txt"), "w") as f:
+            f.write(validation_prompt)
 
         if i == 0:
             cv2.imwrite(ref_image_path, sub_image[:, :, ::-1])

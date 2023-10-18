@@ -26,7 +26,7 @@ from scripts.easyphoto_process_utils import (align_and_overlay_images,
                                              expand_polygon_vertex, adjust_B_to_match_A,
                                              mask_to_polygon, draw_vertex_polygon, mask_to_box, draw_box_on_image,
                                              seg_by_box,apply_mask_to_image, merge_with_inner_canny,crop_image,
-                                             resize_image_with_pad, copy_white_mask_to_template)
+                                             resize_image_with_pad, copy_white_mask_to_template, wrap_image_by_vertex)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
@@ -219,9 +219,6 @@ def inpaint(
 
     return image
 
-
-
-
 retinaface_detection = None
 image_face_fusion = None
 skin_retouching = None
@@ -235,7 +232,7 @@ check_hash = True
 def easyphoto_infer_forward(
     sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
     angle, ratio, angle_low, angle_high, ratio_low, ratio_high, angle_num, ratio_num, refine_input_mask, \
-    optimize_angle_and_ratio, optimize_shape, use_dragdiffusion, model_selected_tab, *user_ids
+    optimize_angle_and_ratio, change_shape, optimize_vertex, use_dragdiffusion, model_selected_tab, *user_ids
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, face_skin, face_recognition, check_hash
@@ -281,7 +278,7 @@ def easyphoto_infer_forward(
 
     # prompt init
     prompt                  = validation_prompt
-    input_prompt            = f"{validation_prompt}, <lora:{user_ids[0]}:0.7>"
+    input_prompt            = f"{validation_prompt}, <lora:{user_ids[0]}:0.9>"
 
     # model init
     sam                 = sam_model_registry['vit_l']()
@@ -328,6 +325,8 @@ def easyphoto_infer_forward(
     img2            = crop_image(np.array(img2), box_template)
     mask2           = crop_image(np.array(mask2), box_template)
 
+    mask2_copy = copy.deepcopy(mask2) # use for second paste
+
     cv2.imwrite('croped_img1.jpg',img1)
     cv2.imwrite('croped_img2.jpg',img2)
     cv2.imwrite('croped_mask1.jpg',mask1)
@@ -349,22 +348,32 @@ def easyphoto_infer_forward(
     print('input first paste:',img1.shape)
     result_img, rotate_img1, mask1, mask2 = align_and_overlay_images(np.array(img1), np.array(img2), np.array(mask1), np.array(mask2), angle=angle, ratio=ratio,find_param = find_param)
     
-    print('first paste')
+
+    print('after first paste') # shape not the same as img2 (img1 is rotate)
     print(rotate_img1.shape)
     print(result_img.shape)
     print(mask1.shape)
     print(mask2.shape)
     print(np.array(img2).shape)
 
-    result_img = Image.fromarray(np.uint8(result_img))
+    h_expand, w_expand = result_img.shape[:2]
+    h2, w2 = np.array(img2).shape[:2]
+    crop_img2_box_first = [(w_expand-w2)//2, (h_expand-h2)//2, (w_expand + w2)//2, (h_expand+h2)//2]
+    # print('img2_box:', crop_img2_box[2]-crop_img2_box[0],crop_img2_box[3]-crop_img2_box[1])
 
-    cv2.imwrite('rotate_img1.jpg',rotate_img1)
-    cv2.imwrite('mask1.jpg',mask1)
-    cv2.imwrite('mask2.jpg',mask2)
-    result_img.save('first_paste_result_img.jpg')
-    first_paste = copy.deepcopy(result_img)
+    # result_img = Image.fromarray(np.uint8(result_img))
 
-    if optimize_shape: 
+    cv2.imwrite('first_paste_rotate_img1.jpg',rotate_img1)
+    cv2.imwrite('first_paste_mask1.jpg',mask1)
+    cv2.imwrite('first_paste_mask2.jpg',mask2)
+    cv2.imwrite('first_paste_result_img.jpg',result_img)
+
+    first_paste = crop_image(result_img, crop_img2_box_first)
+    # cv2.imwrite('first_paste_crop.jpg',first_paste)
+    first_paste = Image.fromarray(np.uint8(first_paste))
+    second_paste = Image.fromarray(np.uint8(np.zeros((512,512,3))))
+
+    if change_shape: 
         epsilon_multiplier = 0.005
         # mask to polygon
         polygon1 = mask_to_polygon(np.uint8(mask1), epsilon_multiplier)
@@ -374,100 +383,182 @@ def easyphoto_infer_forward(
         expand_A = expand_polygon_vertex(polygon1, num_k)
         expand_B = expand_polygon_vertex(polygon2, num_k)
         expand_B = adjust_B_to_match_A(expand_A, expand_B)
-        expand_B = expand_B.reshape(-1)
 
-        # Define the constraint functions
-        def constraint_1(params,A):
-            K = len(params) // 2
-            new_A = params.reshape((K, 2))
-            iou = calculate_polygon_iou(A, new_A)
-            return iou - 0.9
-
-        def constraint_2(params, A):
-            K = len(params) // 2
-            new_A = params.reshape((K, 2))
-            avg_distance = calculate_average_distance(A, new_A)
-            return avg_distance - 10
+        draw_vertex_polygon(rotate_img1,expand_A,'expand_A',line_color=(0,0,255),font_color=(0,0,255))
+        draw_vertex_polygon(rotate_img1,expand_B,'expand_B',line_color=(255,0,0),font_color=(255,0,0))
         
-        def objective_function(params, A, B, lambda_1, lambda_2):
-            K = len(params) // 2
-            new_A = params.reshape((K, 2))
-            iou = calculate_polygon_iou(B, new_A)
-            avg_distance = calculate_average_distance(A, new_A)
-            # total_loss = -iou
-            total_loss = lambda_1 * (1 - iou) + lambda_2 * avg_distance
-            return total_loss
+        if optimize_vertex:
+            # optimize the target polygon to obtain the larget iou and the least moving distance
+            expand_B = expand_B.reshape(-1)
+
+            # Define the constraint functions
+            def constraint_1(params,A):
+                K = len(params) // 2
+                new_A = params.reshape((K, 2))
+                iou = calculate_polygon_iou(A, new_A)
+                return iou - 0.9
+
+            def constraint_2(params, A):
+                K = len(params) // 2
+                new_A = params.reshape((K, 2))
+                avg_distance = calculate_average_distance(A, new_A)
+                return avg_distance - 10
+            
+            def objective_function(params, A, B, lambda_1, lambda_2):
+                K = len(params) // 2
+                new_A = params.reshape((K, 2))
+                iou = calculate_polygon_iou(B, new_A)
+                avg_distance = calculate_average_distance(A, new_A)
+                # total_loss = -iou
+                total_loss = lambda_1 * (1 - iou) + lambda_2 * avg_distance
+                return total_loss
+            
+            # Create constraint objects
+            constraint_1_obj = {'type': 'ineq', 'fun': constraint_1, 'args': (polygon2,)}
+            constraint_2_obj = {'type': 'ineq', 'fun': constraint_2, 'args': (expand_A,)}
+
+            # Combine constraints into a list
+            constraints = [constraint_1_obj, constraint_2_obj]
+
+            print(objective_function(expand_B, expand_A, polygon2,0.5,0.5))
+
+            # optimize
+            res = minimize(objective_function, expand_B, args=(expand_A, polygon2, 5, 0.5), constraints=constraints, method='COBYLA')
+            new_polygon = res.x.reshape(-1,2)
+
+            draw_vertex_polygon(rotate_img1,new_polygon,'new_polygon',line_color=(0,255,0),font_color=(0,255,0))
+        else:
+            # default is to match vertex on A to vertex B
+            new_polygon = expand_B     
         
-        # Create constraint objects
-        constraint_1_obj = {'type': 'ineq', 'fun': constraint_1, 'args': (polygon2,)}
-        constraint_2_obj = {'type': 'ineq', 'fun': constraint_2, 'args': (expand_A,)}
+        if use_dragdiffusion:
+            # drag the input image to target polygon by drag diffusion
+            # source_image cal
+            source_image = rotate_img1 * np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128) + np.ones_like(rotate_img1) * 255 * (1 - np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128))
+            source_image = np.pad(source_image, [(padding_size, padding_size), (padding_size, padding_size), (0, 0)], constant_values=255)
+            
+            print('source_image:',source_image.shape)
+            cv2.imwrite('source_img.jpg',source_image)
 
-        # Combine constraints into a list
-        constraints = [constraint_1_obj, constraint_2_obj]
+            # mask cal
+            mask = np.uint8(cv2.dilate(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1) - cv2.erode(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1))
+            mask = np.pad(mask,[(padding_size, padding_size), (padding_size, padding_size)])
 
-        print(objective_function(expand_B, expand_A, polygon2,0.5,0.5))
-        # optimize
-        res = minimize(objective_function, expand_B, args=(expand_A, polygon2, 5, 0.5), constraints=constraints, method='COBYLA')
-        new_polygon = res.x.reshape(-1,2)
-        
-        # source_image cal
-        source_image = rotate_img1 * np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128) + np.ones_like(rotate_img1) * 255 * (1 - np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128))
-        source_image = np.pad(source_image, [(padding_size, padding_size), (padding_size, padding_size), (0, 0)], constant_values=255)
-        
-        # mask cal
-        mask = np.uint8(cv2.dilate(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1) - cv2.erode(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1))
-        mask = np.pad(mask,[(padding_size, padding_size), (padding_size, padding_size)])
+            print('drag_diffusion_mask:',mask.shape)
+            cv2.imwrite('drag_diffusion_mask.jpg',mask)
 
-        # points cal
-        final_points = []
-        source_points = expand_A
-        target_points = new_polygon
-        for i in range(len(source_points)):
-            final_points.append([int(k) for k in source_points[i]])
-            final_points.append([int(k) for k in target_points[i]])
-        final_points = np.array(final_points) + padding_size
+            # points cal
+            final_points = []
+            source_points = expand_A
+            target_points = new_polygon
+            for i in range(len(source_points)):
+                final_points.append([int(k) for k in source_points[i]])
+                final_points.append([int(k) for k in target_points[i]])
+            final_points = np.array(final_points) + padding_size
 
-        out_image = run_drag(
-            source_image,
-            mask,
-            prompt,
-            final_points,
-            inversion_strength,
-            lam,
-            latent_lr,
-            n_pix_step,
-            model_path,
-            sd_base15_checkpoint,
-            lora_path,
-            start_step,
-            start_layer
-        )
+            # print(len(final_points))
+            draw_vertex_polygon(source_image, np.array(source_points)+padding_size, 'pad_source')
+            draw_vertex_polygon(source_image, np.array(target_points)+padding_size, 'pad_target')
 
-        out_image   = out_image[padding_size:-padding_size, padding_size:-padding_size]
-        mask1       = salient_detect(out_image)[OutputKeys.MASKS]
-        mask_gen, box_gen = mask_to_box(mask1)
+            out_image = run_drag(
+                source_image,
+                mask,
+                prompt,
+                final_points,
+                inversion_strength,
+                lam,
+                latent_lr,
+                n_pix_step,
+                model_path,
+                sd_base15_checkpoint,
+                lora_path,
+                start_step,
+                start_layer
+            )
+            print('drag out:', out_image.shape)
 
-        # crop image again
-        gen_img     = crop_image(out_image, box_gen)
-        mask_gen    = crop_image(mask_gen, box_gen)
+            cv2.imwrite('drag_diffusion_out.jpg', out_image[:,:,::-1])
+            out_image   = out_image[padding_size:-padding_size, padding_size:-padding_size]
 
-        # paste again after drag
-        result_img, rotate_img1, mask1, mask2 = align_and_overlay_images(np.array(gen_img), np.array(img2), np.array(mask_gen), np.array(mask2), box2=box_gen)
-        result_img = Image.fromarray(np.uint8(result_img))
+            print('after crop:', out_image.shape)
+            mask1       = salient_detect(out_image)[OutputKeys.MASKS]
+            mask_gen, box_gen = mask_to_box(mask1)
 
-        print('after_drag_paste:',result_img.size)
+            cv2.imwrite('drag_out_mask.jpg',mask_gen)
+            draw_box_on_image(out_image,box_gen,'drag_out_box.jpg')
 
-    if 0:
-        # resize 
-        short_side  = min(result_img.width, result_img.height)
-        resize      = float(short_side / 512.0)
-        new_size    = (int(result_img.width // resize // 32 * 32), int(result_img.height // resize // 32 * 32))
-        result_img  = result_img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        print('after_resize:',result_img.size)
-        result_img.save('after_drag_paste.jpg')
+            # crop image again
+            gen_img     = crop_image(out_image, box_gen)
+            mask_gen    = crop_image(mask_gen, box_gen)
 
-    # merge mask is the mask for img1 in final_res (resize)
+            # paste again after drag
+            print('Start second paste')
+            print(gen_img.shape)
+            print(mask_gen.shape)
+            print(img2.shape)
+            print(mask2_copy.shape)
+
+            cv2.imwrite('second_paste_img2.jpg',img2)
+
+            # if optimize_angle_and_ratio:
+            #     find_param = {
+            #         'angle_low':angle_low,
+            #         'angle_high':angle_high,
+            #         'angle_num':angle_num,
+            #         'ratio_low':ratio_low,
+            #         'ratio_high':ratio_high,
+            #         'ratio_num':ratio_num
+            #     } 
+            # else:
+            #     find_param = None
+
+            result_img, rotate_img1, mask1, mask2 = align_and_overlay_images(np.array(gen_img), np.array(img2), np.array(mask_gen), np.array(mask2_copy),find_param = find_param)
+            cv2.imwrite('second_paste_res.jpg', result_img)
+
+            h_expand, w_expand = result_img.shape[:2]
+            h2, w2 = np.array(img2).shape[:2]
+            crop_img2_box_second = [(w_expand-w2)//2, (h_expand-h2)//2, (w_expand + w2)//2, (h_expand+h2)//2]
+
+            second_paste = crop_image(result_img, crop_img2_box_second)
+            second_paste = Image.fromarray(np.uint8(second_paste))
+            # result_img = Image.fromarray(np.uint8(result_img))
+
+            # print('after_drag_paste:',result_img.size)
+
+            # if 0:
+            #     # resize 
+            #     short_side  = min(result_img.width, result_img.height)
+            #     resize      = float(short_side / 512.0)
+            #     new_size    = (int(result_img.width // resize // 32 * 32), int(result_img.height // resize // 32 * 32))
+            #     result_img  = result_img.resize(new_size, Image.Resampling.LANCZOS)
+                
+            #     print('after_resize:',result_img.size)
+            #     result_img.save('after_drag_paste.jpg')
+
+        # else:
+        #     # direct wrap the image by matching vertex
+        #     result_img = wrap_image_by_vertex(rotate_img1, expand_A,new_polygon)
+
+    # crop the result to the same size as cropped_img2
+    if change_shape:
+        result_img = crop_image(result_img, crop_img2_box_second)
+        mask1 = crop_image(mask1, crop_img2_box_second)
+        mask2 = crop_image(mask2, crop_img2_box_second)
+    else:
+        result_img = crop_image(result_img, crop_img2_box_first)
+        mask1 = crop_image(mask1, crop_img2_box_first)
+        mask2 = crop_image(mask2, crop_img2_box_first)
+
+    result_img = Image.fromarray(np.uint8(result_img))
+
+    # cv2.imwrite('rotate_img1.jpg',rotate_img1)
+    cv2.imwrite('mask1.jpg',mask1)
+    cv2.imwrite('mask2.jpg',mask2)
+    result_img.save('paste_result_img.jpg')
+
+    # first_paste = copy.deepcopy(result_img)
+
+    # get inner canny and resize img to 512
     resize_image, res_canny = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask1, mask2)
     resize_mask2, remove_pad = resize_image_with_pad(mask2, resolution=512)
     resize_mask2 = remove_pad(resize_mask2)
@@ -490,13 +581,12 @@ def easyphoto_infer_forward(
     resize_image = Image.fromarray(resize_image)
     resize_image.save('final_res_img.jpg')
 
-    # first diffusion
     result_img = inpaint(resize_image, mask2, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompt, hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
     print('inpaint:', result_img.size)
     result_img.save('inpaint_res1.jpg')
 
     # second diffusion to fix boundary
-    
+
     # resize diffusion results
     target_width = box_template[2] - box_template[0]
     target_height = box_template[3] - box_template[1]
@@ -519,4 +609,4 @@ def easyphoto_infer_forward(
     # add portrait enhancement
     # template_copy = Image.fromarray(cv2.cvtColor(portrait_enhancement(template_copy)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
     # template_copy = Image.fromarray(cv2.cvtColor(template_copy[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-    return "Success", [template_copy, first_paste]
+    return "Success", [template_copy, first_paste, second_paste]
