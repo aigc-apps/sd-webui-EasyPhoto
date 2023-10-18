@@ -519,13 +519,6 @@ def on_ui_tabs():
                                     value=False
                                 )
 
-                                def face_shape_match_change(face_shape_match_bool):
-                                    if face_shape_match_bool:
-                                        return gr.update(minimum=0.10, maximum=0.40, value=0.25)
-                                    else:
-                                        return gr.update(minimum=0.30, maximum=0.60, value=0.45)
-                                face_shape_match.change(face_shape_match_change, inputs=[face_shape_match], outputs=[first_denoising_strength])
-
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
                                     value="gpen", \
