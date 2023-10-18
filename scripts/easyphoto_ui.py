@@ -379,17 +379,17 @@ def on_ui_tabs():
 
                             with gr.Row():
                                 angle_low = gr.Slider(
-                                    minimum=-90, maximum=90, value=-30,
+                                    minimum=-90, maximum=90, value=-20,
                                     step=1, label='Angle Low'
                                 )
                                 angle_high = gr.Slider(
-                                    minimum=-90, maximum=90, value=30,
+                                    minimum=-90, maximum=90, value=20,
                                     step=1, label='Angle High'
                                 )
 
                             with gr.Row():
                                 ratio_low = gr.Slider(
-                                    minimum=0.1, maximum=5, value=0.5,
+                                    minimum=0.1, maximum=5, value=1.0,
                                     step=0.1, label='Ratio Low'
                                 )
                                 ratio_high = gr.Slider(
@@ -416,8 +416,12 @@ def on_ui_tabs():
                                     label="Optimize Angle and Ratio", 
                                     value=False
                                 )
-                                optimize_shape = gr.Checkbox(
-                                    label="Optimize Shape",  
+                                change_shape = gr.Checkbox(
+                                    label="Change Shape",  
+                                    value=True
+                                )
+                                optimize_vertex = gr.Checkbox(
+                                    label="Optimize Vertex",  
                                     value=True
                                 )
                                 use_dragdiffusion = gr.Checkbox(
@@ -445,7 +449,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
                             angle, ratio, angle_low, angle_high, ratio_low, ratio_high, angle_num, ratio_num, refine_input_mask, \
-                            optimize_angle_and_ratio, optimize_shape, use_dragdiffusion, model_selected_tab, *uuids],
+                            optimize_angle_and_ratio, change_shape, optimize_vertex, use_dragdiffusion, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )

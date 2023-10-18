@@ -164,7 +164,7 @@ def easyphoto_train_forward(
             f'--train_data_dir={user_path}',
             '--caption_column=text', 
             f'--resolution={resolution}',
-            '--random_flip',
+            # '--random_flip',
             f'--train_batch_size={train_batch_size}',
             f'--gradient_accumulation_steps={gradient_accumulation_steps}',
             f'--dataloader_num_workers={dataloader_num_workers}', 
