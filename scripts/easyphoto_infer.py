@@ -537,13 +537,16 @@ def easyphoto_infer_forward(
                     # detect face area
                     face_skin_mask = face_skin(first_diffusion_output_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]
                     kernel_size = np.ones((int(face_width//10), int(face_width//10)), np.uint8)
+                    
                     # Fill small holes with a close operation
                     face_skin_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(face_skin_mask), cv2.MORPH_CLOSE, kernel_size)))
+                    
                     # Use dilate to reconstruct the surrounding area of the face
                     face_skin_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(face_skin_mask), kernel_size, iterations=1)))
                     face_skin_mask = cv2.blur(np.float32(face_skin_mask), (32, 32)) / 255
                     
-                    # paste back to photo
+                    # paste back to photo, Using I2I generation controlled solely by OpenPose, even with a very small denoise amplitude, 
+                    # still carries the risk of introducing NSFW and global incoherence.!!! important!!!
                     input_image_uint8 = np.array(first_diffusion_output_image) * face_skin_mask + np.array(input_image) * (1 - face_skin_mask)
                     first_diffusion_output_image = Image.fromarray(np.uint8(input_image_uint8))
 
