@@ -514,6 +514,17 @@ def on_ui_tabs():
                                     label="MakeUp Transfer",
                                     value=False
                                 )
+                                face_shape_match = gr.Checkbox(
+                                    label="Face Shape Match",
+                                    value=False
+                                )
+
+                                def face_shape_match_change(face_shape_match_bool):
+                                    if face_shape_match_bool:
+                                        return gr.update(minimum=0.10, maximum=0.40, value=0.25)
+                                    else:
+                                        return gr.update(minimum=0.30, maximum=0.60, value=0.45)
+                                face_shape_match.change(face_shape_match_change, inputs=[face_shape_match], outputs=[first_denoising_strength])
 
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
@@ -581,7 +592,7 @@ def on_ui_tabs():
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
+                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )

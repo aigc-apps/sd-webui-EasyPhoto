@@ -207,7 +207,7 @@ def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
@@ -304,7 +304,7 @@ def easyphoto_infer_forward(
     # Second diffusion hr scale
     default_hr_scale                = 1.0
     need_mouth_fix                  = True
-    input_mask_face_part_only       = False
+    input_mask_face_part_only       = True
 
     ep_logger.info("Start templates and user_ids preprocess.")
     for user_id in user_ids:
@@ -527,8 +527,25 @@ def easyphoto_infer_forward(
                 
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
-                controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
-                first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                if not face_shape_match:
+                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                    first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                else:
+                    controlnet_pairs = [["openpose", input_image, 0.50]]
+                    first_diffusion_output_image = inpaint(input_image, None, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+
+                    # detect face area
+                    face_skin_mask = face_skin(first_diffusion_output_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 12, 13]])[0]
+                    kernel_size = np.ones((int(face_width//10), int(face_width//10)), np.uint8)
+                    # Fill small holes with a close operation
+                    face_skin_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(face_skin_mask), cv2.MORPH_CLOSE, kernel_size)))
+                    # Use dilate to reconstruct the surrounding area of the face
+                    face_skin_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(face_skin_mask), kernel_size, iterations=1)))
+                    face_skin_mask = cv2.blur(np.float32(face_skin_mask), (32, 32)) / 255
+                    
+                    # paste back to photo
+                    input_image_uint8 = np.array(first_diffusion_output_image) * face_skin_mask + np.array(input_image) * (1 - face_skin_mask)
+                    first_diffusion_output_image = Image.fromarray(np.uint8(input_image_uint8))
 
                 if color_shift_middle:
                     # apply color shift
