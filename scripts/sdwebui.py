@@ -412,11 +412,17 @@ def i2i_inpaint_call(
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.name is None:
-            continue
-        if alwayson_scripts.name=='controlnet':
-            p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-    
+        try:
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name=='controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        except:
+            if alwayson_scripts.title().lower() is None:
+                continue
+            if alwayson_scripts.title().lower()=='controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', sd_model_checkpoint)
     
