@@ -37,9 +37,16 @@ def post(encoded_image, url='http://0.0.0.0:7860'):
         "color_shift_middle"        : True,
         "color_shift_last"          : True,
         "super_resolution"          : True,
+        "super_resolution_method"   : "gpen",
+
         "skin_retouching_bool"      : True,
 
         "background_restore"        : False,
+        "background_restore_denoising_strength" : 0.35,
+
+        "makeup_transfer"           : False,
+        "makeup_transfer_ratio"     : 0.50,
+        "face_shape_match"          : False,
         "tabs"                      : 1
     })
     r = requests.post(f'{url}/easyphoto/easyphoto_infer_forward', data=datas, timeout=1500)
@@ -81,7 +88,7 @@ if __name__ == '__main__':
     # End of record time
     # The calculated time difference is the execution time of the program, expressed in seconds / s
     time_end = time.time()  
-    time_sum = (time_end - time_start) % 60 
+    time_sum = time_end - time_start 
     print('# --------------------------------------------------------- #')
     print(f'#   Total expenditure: {time_sum}s')
     print('# --------------------------------------------------------- #')

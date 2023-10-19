@@ -91,13 +91,17 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         color_shift_middle          = datas.get("color_shift_middle", True)
         color_shift_last            = datas.get("color_shift_last", True)
         super_resolution            = datas.get("super_resolution", True)
+        super_resolution_method     = datas.get("super_resolution_method", "gpen")
+        skin_retouching_bool        = datas.get("skin_retouching_bool", False)
         display_score               = datas.get("display_score", False)
         background_restore          = datas.get("background_restore", False)
-        background_restore_denoising_strength = datas.get("background_restore", 0.35)
+        background_restore_denoising_strength = datas.get("background_restore_denoising_strength", 0.35)
+        makeup_transfer             = datas.get("makeup_transfer", False)
+        makeup_transfer_ratio       = datas.get("makeup_transfer_ratio", 0.50)
+        face_shape_match            = datas.get("face_shape_match", False)
         sd_xl_input_prompt          = datas.get("sd_xl_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32")
         sd_xl_resolution            = datas.get("sd_xl_resolution", "(1024, 1024)")
         tabs                        = datas.get("tabs", 1)
-        skin_retouching_bool        = datas.get("skin_retouching_bool", False)
 
         if type(user_ids) == str:
             user_ids = [user_ids]
@@ -130,8 +134,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             comment, outputs, face_id_outputs = easyphoto_infer_forward(
                 sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
                 before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, \
-                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
+                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, \
+                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
         except Exception as e:
