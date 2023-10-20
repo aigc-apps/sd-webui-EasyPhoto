@@ -446,12 +446,64 @@ def i2i_inpaint_call(
 
 
 if 1:
-    from .animatediff.animatediff_ui import AnimateDiffProcess
-    import pdb
-    pdb.set_trace()
-    tmp_animatediff = AnimateDiffProcess()
-    print(type(tmp_animatediff))
+    from scripts.animatediff.animatediff_ui import AnimateDiffProcess
+    from scripts.animatediff.animatediff_mm import mm_animatediff as motion_module
+    from scripts.animatediff.animatediff_infotext import update_infotext
 
+    script_dir = scripts.basedir()
+    motion_module.set_script_dir(script_dir)
+    motion_module._load('mm_sd_v15_v2.ckpt')
+    animate_diff_process = AnimateDiffProcess()
+    # tmp = animate_diff_process.get_dict(True)
+    # print(tmp)
+
+    from scripts.animatediff.animatediff_cn import AnimateDiffControl
+    from scripts.animatediff.animatediff_infv2v import AnimateDiffInfV2V
+    from scripts.animatediff.animatediff_lora import AnimateDiffLora
+    from scripts.animatediff.animatediff_latent import AnimateDiffI2VLatent
+    from scripts.animatediff.animatediff_output import AnimateDiffOutput
+    
+    class AnimateDiffScript():
+        def __init__(self):
+            self.lora_hacker = None
+            self.cfg_hacker = None
+            self.cn_hacker = None
+            self.prompt_scheduler = None
+
+        def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
+            if isinstance(params, dict): params = AnimateDiffProcess(**params)
+            if params.enable:
+                logger.info("AnimateDiff process start.")
+                params.set_p(p)
+                motion_module.inject(p.sd_model, params.model)
+                self.prompt_scheduler = AnimateDiffPromptSchedule()
+                self.lora_hacker = AnimateDiffLora(motion_module.mm.using_v2)
+                self.lora_hacker.hack()
+                self.cfg_hacker = AnimateDiffInfV2V(p, self.prompt_scheduler)
+                self.cfg_hacker.hack(params)
+                self.cn_hacker = AnimateDiffControl(p, self.prompt_scheduler)
+                self.cn_hacker.hack(params)
+                update_infotext(p, params)
+
+
+        def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
+            if isinstance(params, dict): params = AnimateDiffProcess(**params)
+            if params.enable and isinstance(p, StableDiffusionProcessingImg2Img):
+                AnimateDiffI2VLatent().randomize(p, params)
+
+
+        def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
+            if isinstance(params, dict): params = AnimateDiffProcess(**params)
+            if params.enable:
+                self.prompt_scheduler.set_infotext(res)
+                self.cn_hacker.restore()
+                self.cfg_hacker.restore()
+                self.lora_hacker.restore()
+                motion_module.restore(p.sd_model)
+                AnimateDiffOutput().output(p, res, params)
+                logger.info("AnimateDiff process end.")
+
+    animate_diff_script = AnimateDiffScript()
     # this function is modified , to support a image with multiframe constrain input 
     # and expand image to video with Animatediff pretrained model
     def i2mi_inpaint_call(
