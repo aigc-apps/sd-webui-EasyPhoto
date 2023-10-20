@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import math
 import time
 import random
@@ -17,7 +17,10 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
-def mask_to_polygon(mask, epsilon_multiplier):
+from scipy.optimize import minimize
+
+
+def mask_to_polygon(mask, epsilon_multiplier=0.005):
     # 寻找轮廓
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -206,7 +209,7 @@ def resize_and_stretch(img, target_size, is_mask = False, white_back = False):
 
 #     return result_img
 
-def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
+def merge_images(img1, img2, mask1, mask2, x, y, color):
     """
         paste img1 to img2 with the center of x,y
         filter the final result by mask1, mask2 and calculate the iou
@@ -249,19 +252,27 @@ def merge_images(img1, img2, mask1, mask2, x, y, is_canny = True):
     expand_region_mask = copy.deepcopy(expand_mask2)
     expand_region_mask[merge_mask==255]=0
 
-    # cv2.imwrite('result_img11.jpg',result_img)
-    # cv2.imwrite('expand_img11.jpg',expand_img1)
-    # cv2.imwrite('mask2.jpg',mask2)
-    # cv2.imwrite('merge_mask.jpg',merge_mask)
-    # cv2.imwrite('expand_region_mask.jpg',expand_region_mask)
+    cv2.imwrite('af_result_img11.jpg',result_img)
+    cv2.imwrite('af_expand_img11.jpg',expand_img1)
+    cv2.imwrite('af_mask2.jpg',mask2)
+    cv2.imwrite('af_merge_mask.jpg',merge_mask)
+    cv2.imwrite('af_expand_region_mask.jpg',expand_region_mask)
 
-    # print(result_img.shape)
-    # print(expand_img1.shape)
-    # print(mask2.shape)
-    # print(merge_mask.shape)
+    print(result_img.shape)
+    print(expand_img1.shape)
+    print(mask2.shape)
+    print(merge_mask.shape)
 
     # expand update paste background
     # expand_ratio=1.5 
+    
+    # merge_mask_edge = np.uint8(np.array(expand_mask1)) - cv2.erode(np.array(expand_mask1), np.ones((30, 30), np.uint8), iterations=1)
+    # cv2.imwrite('af_merge_mask_edge.jpg',merge_mask_edge)
+    # result_img = modify_image_based_on_masks(result_img,expand_region_mask, color)
+    white_area = np.where(expand_region_mask >128)
+    result_img[white_area] = color
+    cv2.imwrite('af_result_img_paste.jpg',result_img)
+
     # result_img = blend_images(result_img, expand_img1, expand_ratio, expand_region_mask)
 
     # crop to img2
@@ -344,7 +355,7 @@ def rotate_resize_image(array, angle=0.0, scale_ratio=1.0, use_white_bg=False):
 
     
 @timing_decorator
-def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = False):
+def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, color):
     # rotate and resize img1 mask1
     img1 = rotate_resize_image(img1, angle, ratio)
     mask1 = rotate_resize_image(mask1, angle, ratio)
@@ -352,7 +363,7 @@ def crop_and_paste(img1, mask1, img2, mask2, angle, x, y, ratio, use_local = Fal
 
     # paste to mask2 (img1 img2 is not the same size now)
     print('bf merge:',img2.shape)
-    result_img, img1, img2, mask1, mask2, iou = merge_images(img1, img2, mask1, mask2, x, y)
+    result_img, img1, img2, mask1, mask2, iou = merge_images(img1, img2, mask1, mask2, x, y, color)
     print('af merge:',img2.shape)
 
     return result_img, img1, img2, mask1, mask2, iou
@@ -478,7 +489,7 @@ def paste_image_center(img1, img2):
 
     
 
-def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box2=None, find_param={}):
+def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box2=None, color = (0,0,0)):
     # crop img1 box region to same size as img2 box region
     if box2:
         # use box2 to mark center
@@ -503,42 +514,8 @@ def align_and_overlay_images(img1, img2, mask1, mask2, angle=0.0, ratio=1.0, box
         x, y = calculate_box_center(box2)
     else:
         x, y = img2.shape[1]/2, img2.shape[0]/2
-    
-    max_iou = 0
-
-    if find_param:
-        angle_low   = find_param.get('angle_low', -60)
-        angle_high  = find_param.get('angle_high', 60)
-        angle_num   = find_param.get('angle_num', 5)
-        ratio_low   = find_param.get('ratio_low', 0.8)
-        ratio_high  = find_param.get('ratio_high', 1.5)
-        ratio_num   = find_param.get('ratio_num', 5)
-        
-        angles      = [random.uniform(angle_low, angle_high) for _ in range(angle_num)]
-        ratios      = [random.uniform(ratio_low, ratio_high) for _ in range(ratio_num)]
-        
-        for angle in angles:
-            for ratio in ratios:
-                # res_img, rotate_img1 ,iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
-                res_img, res_img1, res_img2, res_mask1, res_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
-
-                # print(f'iou: {iou}, angle: {angle}, ratio: {ratio}')
-                # print(res_img.shape)
-                # print(res_img1.shape)
-                # print(res_img2.shape)
-                # print(res_mask1.shape)
-                # print(res_mask2.shape)
-
-                if iou > max_iou:
-                    max_iou = iou
-                    final_res = res_img
-                    final_img1 = res_img1
-                    final_mask1 = res_mask1
-                    final_mask2 = res_mask2
-                    print(f'update iou! iou: {iou}, angle: {angle}, ratio: {ratio}')
-    else:
-        final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
-        # final_res, rotate_img1, iou, mask1, mask2 = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio)
+ 
+    final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio, color)
 
     return final_res, final_img1, final_mask1, final_mask2
 
@@ -879,3 +856,157 @@ def copy_white_mask_to_template(img, mask, template, box):
 def wrap_image_by_vertex(img,polygon1,polygon2):
     return img
 
+def get_background_color(img, mask):
+    # 获取 mask2 区域的坐标
+    mask_area = np.where(mask > 0)
+
+    # 统计 mask2 区域的像素值分布
+    img_mask_area = img[mask_area]
+    unique_values, counts = np.unique(img_mask_area, axis=0, return_counts=True)
+
+    # 找到分布最多的像素值
+    most_frequent_index = np.argmax(counts)
+    most_frequent_value = unique_values[most_frequent_index]
+    # print(most_frequent_value)
+    # 将 mask1 黑色区域的像素值修改为 mask2 区域的分布最多的像素值
+    # img1[white_area] = most_frequent_value
+
+    return most_frequent_value
+
+
+def generate_sketch_input(image, mask, color, mask_alpha = 0, mask_blur = 4):
+    # img np array
+    orig = copy.deepcopy(image)
+    print(image.shape)
+    print(mask.shape)
+    # inpaint the image with color
+    image[mask>128] = color
+    cv2.imwrite('debug_inpaint_color_sketch1.jpg', image)
+
+    # orig = inpaint_color_sketch_orig or inpaint_color_sketch
+
+    # inpaint_color_sketch_orig.save('inpaint_color_sketch_orig.jpg')
+    # orig.save('debug_orig.jpg')
+    cv2.imwrite('orig1.jpg',orig)
+
+    mask = Image.fromarray(np.uint8(mask))
+    orig = Image.fromarray(np.uint8(orig))
+    image = Image.fromarray(np.uint8(image))
+
+    mask = ImageEnhance.Brightness(mask).enhance(1 - mask_alpha / 100)
+    blur = ImageFilter.GaussianBlur(mask_blur)
+    image = Image.composite(image.filter(blur), orig, mask.filter(blur))
+    image.save('debug_image_final1.jpg')
+    mask.save('mask1.jpg')
+
+    return image,mask
+
+# def modify_image_based_on_masks(img1, mask1, color):
+#     """
+#         img1 取 mask2对应频率最高的点
+#         填充mask1 区域
+#     """
+#     # 获取 mask2 区域的坐标
+#     mask2_area = np.where(mask2 > 0)
+
+#     # 获取 mask1 白色区域的坐标
+#     white_area = np.where(mask1 >128)
+
+#     # 统计 mask2 区域的像素值分布
+#     img1_mask2_area = img1[mask2_area]
+#     unique_values, counts = np.unique(img1_mask2_area, axis=0, return_counts=True)
+
+#     # 找到分布最多的像素值
+#     most_frequent_index = np.argmax(counts)
+#     most_frequent_value = unique_values[most_frequent_index]
+#     print(most_frequent_value)
+#     # 将 mask1 黑色区域的像素值修改为 mask2 区域的分布最多的像素值
+#     img1[white_area] = most_frequent_value
+
+#     return img1
+
+
+def compute_rotation_angle(polygon):
+    # Create a copy of the polygon in the format expected by OpenCV
+    points = np.array(polygon, dtype=np.int32)
+
+    # Fit a rotated rectangle around the polygon
+    rect = cv2.minAreaRect(points)
+
+    # Get the rotation angle of the minimum bounding box
+    rotation_angle = rect[2]
+
+    return rotation_angle
+
+
+def find_best_angle_ratio(polygon1,polygon2,initial_parameters,x,y, angle_target, max_iters=100,iou_threshold=0.7):
+    # 定义优化目标函数
+    def target_function(parameters):
+        return -align_and_compute_iou(polygon1, polygon2, x, y, parameters) + 0.1*angle_loss(angle_target,parameters)
+
+    def constraint_function(parameters):
+        iou = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
+        return iou - iou_threshold
+
+    def angle_loss(angle_target, parameters):
+        print('angle_target:',angle_target)
+        loss = (angle_target-parameters[0])**2
+        # print(f'angle:{parameters[0]}, loss:{loss}')
+        return loss
+
+
+    def align_and_compute_iou(polygon1, polygon2, x,y, parameters):
+        angle,ratio = parameters
+        # 创建旋转矩阵
+        rotation_matrix = np.array([[np.cos(np.radians(angle)), -np.sin(np.radians(angle))],
+                                    [np.sin(np.radians(angle)), np.cos(np.radians(angle))]])
+
+        # Translate the polygon to the origin
+        translated_polygon = polygon1 - [x, y]
+
+        # Rotate the translated polygon
+        rotated_polygon = np.dot(translated_polygon, rotation_matrix.T)
+
+        # Scale the rotated polygon
+        scaled_polygon = rotated_polygon * ratio
+
+        # Translate the scaled polygon back to its original position
+        polygon1_transformed = scaled_polygon + [x, y]
+
+        # draw_vertex_polygon(np.zeros((1000,1000,3)),polygon1_transformed,'polygon1_transformed')
+        # draw_vertex_polygon(np.zeros((1000,1000,3)),polygon2,'polygon2_transformed')
+
+        # cv2.imwrite('trans_point1.jpg', draw_points_on_image(np.zeros((1000,1000,3)), (x,y)))
+        # cv2.imwrite('trans_point2.jpg', draw_points_on_image(np.zeros((1000,1000,3)), (x,y)))
+
+        # 使用 Shapely 库创建多边形对象
+        poly1 = Polygon(polygon1_transformed)
+        poly2 = Polygon(polygon2)
+
+        # 计算 IoU
+        iou = poly1.intersection(poly2).area / poly1.union(poly2).area
+        print(f'iou: {iou}, angle:{angle}, ratio:{ratio}')
+        return iou
+
+
+        # 定义约束
+    constraint = {'type': 'ineq', 'fun': constraint_function}
+
+    # 定义优化选项，包括学习率
+    options = {'disp': True, 'maxiter': max_iters, 'ftol': 1e-6, 'eps': 1e-5}
+
+    # 最大化 IoU，同时满足约束条件
+    bounds = [(angle_target-10, angle_target+10), (0.1, 3.0)]
+    result = minimize(target_function, initial_parameters, method='SLSQP', constraints=constraint, options=options, bounds=bounds)
+
+    # # 最大化 IoU
+    # result = minimize(target_function, initial_parameters, method='SLSQP', constraints=constraint)
+
+    # # 最优参数
+    optimal_parameters = result.x
+
+    # # 最大 IoU 值
+    max_iou = -result.fun
+    print(optimal_parameters)
+    print(max_iou)
+    return optimal_parameters[0], optimal_parameters[1]
