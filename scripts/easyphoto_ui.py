@@ -310,7 +310,7 @@ def on_ui_tabs():
                                         if check_id_valid(_id, user_id_outpath_samples, models_path):
                                             ids.append(_id)
                                 ids = sorted(ids)
-                                return gr.update(choices=["none", "tjcdg"] + ids)
+                                return gr.update(choices=["none"] + ids)
 
                             ids = []
                             if os.path.exists(user_id_outpath_samples):
@@ -325,7 +325,7 @@ def on_ui_tabs():
                             uuids           = []
                             visibles        = [True, False, False, False, False]
                             for i in range(int(5)):
-                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "tjcdg"] + ids, min_width=140, label=f"User_{i} id", visible=visibles[i])
+                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=140, label=f"User_{i} id", visible=visibles[i])
                                 uuids.append(uuid)
 
                             def update_uuids(_num_of_faceid):
@@ -368,6 +368,17 @@ def on_ui_tabs():
                                 )
 
                             with gr.Row():
+                                lora_weight = gr.Slider(
+                                    minimum=0, maximum=1, value=0.8,
+                                    step=0.1, label='LoRA weight'
+                                )
+                                iou_threshold = gr.Slider(
+                                    minimum=0, maximum=1, value=0.7,
+                                    step=0.05, label='IoU Threshold '
+                                )
+
+
+                            with gr.Row():
                                 angle = gr.Slider(
                                     minimum=-90, maximum=90, value=0.0,
                                     step=1, label='Angle'
@@ -375,36 +386,6 @@ def on_ui_tabs():
                                 ratio = gr.Slider(
                                     minimum=0.5, maximum=5.5, value=1.0,
                                     step=0.1, label='Ratio'
-                                )
-
-                            with gr.Row():
-                                angle_low = gr.Slider(
-                                    minimum=-90, maximum=90, value=-20,
-                                    step=1, label='Angle Low'
-                                )
-                                angle_high = gr.Slider(
-                                    minimum=-90, maximum=90, value=20,
-                                    step=1, label='Angle High'
-                                )
-
-                            with gr.Row():
-                                ratio_low = gr.Slider(
-                                    minimum=0.1, maximum=5, value=1.0,
-                                    step=0.1, label='Ratio Low'
-                                )
-                                ratio_high = gr.Slider(
-                                    minimum=0.1, maximum=5, value=2.0,
-                                    step=1, label='Ratio High'
-                                )
-
-                            with gr.Row():
-                                angle_num = gr.Slider(
-                                    minimum=1, maximum=10, value=5,
-                                    step=1, label='Angle Num'
-                                )
-                                ratio_num = gr.Slider(
-                                    minimum=1, maximum=10, value=3,
-                                    step=1, label='Ratio Num'
                                 )
 
                             with gr.Row():
@@ -448,8 +429,8 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-                            angle, ratio, angle_low, angle_high, ratio_low, ratio_high, angle_num, ratio_num, refine_input_mask, \
-                            optimize_angle_and_ratio, change_shape, optimize_vertex, use_dragdiffusion, model_selected_tab, *uuids],
+                            lora_weight, iou_threshold, angle, ratio, refine_input_mask, optimize_angle_and_ratio, change_shape, optimize_vertex, \
+                            use_dragdiffusion, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )
