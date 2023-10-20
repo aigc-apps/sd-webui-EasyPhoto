@@ -10,12 +10,14 @@ from shutil import copyfile
 
 from PIL import Image, ImageOps
 
+from modules.sd_models_config import config_sdxl
 from scripts.easyphoto_config import (easyphoto_outpath_samples, models_path, cache_log_file_path,
                                       user_id_outpath_samples,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid)
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
+from scripts.sdwebui import get_checkpoint_type
 
 
 python_executable_path = sys.executable
@@ -54,6 +56,18 @@ def easyphoto_train_forward(
 
     if user_id in ids:
         return "User id non-repeatability."
+    
+    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+    if checkpoint_type == 2:
+        return "EasyPhoto does not support the SD2 checkpoint: {}.".format(sd_model_checkpoint)
+    sdxl_pipeline_flag = True if checkpoint_type == 3 else False
+
+    # Check conflicted arguments in SDXL training.
+    if sdxl_pipeline_flag:
+        if enable_rl:
+            return "EasyPhoto does not support RL with the SDXL checkpoint: {}.".format(sd_model_checkpoint)
+        if int(resolution) < 1024:
+            return "The resolution for SDXL Training needs to be 1024."
 
     check_files_exists_and_download(check_hash)
     check_hash = False
@@ -74,7 +88,9 @@ def easyphoto_train_forward(
     weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
-    sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    sd_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    if sdxl_pipeline_flag:
+        sd_save_path = sd_save_path.replace("stable-diffusion-v1-5", "stable-diffusion-xl/stabilityai_stable_diffusion_xl_base_1.0")
     if enable_rl:
         ddpo_weight_save_path = os.path.join(user_id_outpath_samples, user_id, "ddpo_weights")
         face_lora_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
@@ -116,23 +132,39 @@ def easyphoto_train_forward(
     if not os.path.exists(json_save_path):
         return "Failed to obtain preprocessed metadata.jsonl, please check the preprocessing process."
 
-    train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
+    if not sdxl_pipeline_flag:
+        train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
+    else:
+        train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora_sd_XL.py")
     print("train_file_path : ", train_kohya_path)
     if enable_rl:
         train_ddpo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_ddpo.py")
         print("train_ddpo_path : ", train_kohya_path)
     
-    # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
+    # outputs/easyphoto-tmp/train_kohya_log.txt, use to cache log and flush to UI
     print("cache_log_file_path:", cache_log_file_path)
     if not os.path.exists(os.path.dirname(cache_log_file_path)):
         os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
 
+    # Extra arguments to run SDXL training.
+    env = None
+    if sdxl_pipeline_flag:
+        original_config = config_sdxl
+        # pretrained_vae_model_name_or_path = os.path.join(models_path, "VAE", "madebyollin-sdxl-vae-fp16-fix.safetensors")
+        # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
+        # We provide them in extensions/sd-webui-EasyPhoto/models. Thus, we need set some environment variables for transformers.
+        # if we pass `env` in subprocess.run, the environment variables in the child process will be reset and different from Web UI.
+        env = {
+            "CUDA_VISIBLE_DEVICES": os.environ["CUDA_VISIBLE_DEVICES"],
+            "TRANSFORMERS_OFFLINE": "1",
+            "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl")
+        }
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
         command = [
             f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
+            f'--pretrained_model_name_or_path={os.path.relpath(sd_save_path, pwd)}',
             f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
             f'--train_data_dir={os.path.relpath(user_path, pwd)}',
             '--caption_column=text', 
@@ -164,8 +196,11 @@ def easyphoto_train_forward(
         ]
         if validation:
             command += ["--validation"]
+        if sdxl_pipeline_flag:
+            command += [f"--original_config={original_config}"]
+            # command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         try:
-            subprocess.run(command, check=True)
+            subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
         
@@ -178,7 +213,7 @@ def easyphoto_train_forward(
                 f'--run_name={user_id}',
                 f'--logdir={os.path.relpath(ddpo_weight_save_path, pwd)}',
                 f'--cache_log_file={cache_log_file_path}',
-                f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
+                f'--pretrained_model_name_or_path={os.path.relpath(sd_save_path, pwd)}',
                 f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
                 f'--face_lora_path={os.path.relpath(face_lora_path, pwd)}',
                 f'--sample_batch_size=4',
@@ -214,7 +249,7 @@ def easyphoto_train_forward(
     else:
         command = [
             f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
-            f'--pretrained_model_name_or_path={sd15_save_path}',
+            f'--pretrained_model_name_or_path={sd_save_path}',
             f'--pretrained_model_ckpt={webui_load_path}', 
             f'--train_data_dir={user_path}',
             '--caption_column=text', 
@@ -246,8 +281,13 @@ def easyphoto_train_forward(
         ]
         if validation:
             command += ["--validation"]
+        if sdxl_pipeline_flag:
+            command += [f"--original_config={original_config}"]
+            # command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         try:
-            subprocess.run(command, check=True)
+            print(env)
+            print(command)
+            subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
         
@@ -260,7 +300,7 @@ def easyphoto_train_forward(
                 f'--run_name={user_id}',
                 f'--logdir={ddpo_weight_save_path}',
                 f'--cache_log_file={cache_log_file_path}',
-                f'--pretrained_model_name_or_path={sd15_save_path}',
+                f'--pretrained_model_name_or_path={sd_save_path}',
                 f'--pretrained_model_ckpt={webui_load_path}', 
                 f'--face_lora_path={face_lora_path}',
                 f'--sample_batch_size=4',
@@ -297,6 +337,11 @@ def easyphoto_train_forward(
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     if not os.path.exists(best_weight_path):
         return "Failed to obtain Lora after training, please check the training process."
+    
+    # Currently, SDXL training doesn't support the model selection and ensemble. We use the final
+    # trained model as the best for simplicity.
+    if sdxl_pipeline_flag:
+        best_weight_path = os.path.join(weights_save_path, "pytorch_lora_weights.safetensors")
 
     copyfile(best_weight_path, webui_save_path)
     

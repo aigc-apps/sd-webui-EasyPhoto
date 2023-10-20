@@ -27,7 +27,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
-from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
+from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call, get_checkpoint_type, get_lora_type
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -63,6 +63,17 @@ def get_controlnet_unit(unit, input_image, weight):
             threshold_b=200,
             model='control_v11p_sd15_canny'
         )
+    elif unit == "sdxl_canny":
+        control_unit = ControlNetUnit(
+            input_image=input_image, module='canny',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1, 
+            resize_mode='Just Resize',
+            threshold_a=100,
+            threshold_b=200,
+            model='diffusers_xl_canny_full'
+        )
     elif unit == "openpose":
         control_unit = ControlNetUnit(
             input_image=input_image, module='openpose_full',
@@ -71,6 +82,15 @@ def get_controlnet_unit(unit, input_image, weight):
             control_mode=1, 
             resize_mode='Just Resize',
             model='control_v11p_sd15_openpose'
+        )
+    elif unit == "sdxl_openpose":
+        control_unit = ControlNetUnit(
+            input_image=input_image, module='openpose_full',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1, 
+            resize_mode='Just Resize',
+            model='thibaud_xl_openpose'
         )
     elif unit == "color":
         blur_ratio      = 24
@@ -153,6 +173,7 @@ def inpaint(
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
+    sd_vae="vae-ft-mse-840000-ema-pruned.ckpt",
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
     sampler = "DPM++ 2M SDE Karras"
 ):
@@ -184,6 +205,7 @@ def inpaint(
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
+        sd_vae=sd_vae,
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_img2img_samples,
         sampler=sampler,
@@ -200,6 +222,7 @@ face_skin = None
 face_recognition = None
 psgan_inference = None
 check_hash = True
+sdxl_txt2img_flag = False
 
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator() 
@@ -210,17 +233,35 @@ def easyphoto_infer_forward(
     background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
 ): 
     # global
-    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
+    global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash)
     check_hash = False
 
+    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+    if checkpoint_type == 2:
+        return "EasyPhoto does not support the SD2 checkpoint.", [], []
+    sdxl_pipeline_flag = True if checkpoint_type == 3 else False
+    sd_vae = None if sdxl_pipeline_flag else "vae-ft-mse-840000-ema-pruned.ckpt"
+
     for user_id in user_ids:
         if user_id != "none":
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []  
-    
+            # Check if the type of the stable diffusion model and the user LoRA match.
+            # sdxl_lora_flag = True if "sdxl" in user_id else False
+            sdxl_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
+            sdxl_lora_flag = True if sdxl_lora_type == 3 else False
+            if sdxl_lora_flag != sdxl_pipeline_flag:
+                checkpoint_type_name = "SDXL" if sdxl_pipeline_flag else "SD1"
+                lora_type_name = "SDXL" if sdxl_lora_flag else "SD1"
+                error_info = (
+                    "The type of the stable diffusion model {} ({}) and the user id {} ({}) does not "
+                    "match ".format(sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name)
+                )
+                return error_info, [], []
+
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
     for idx, user_id in enumerate(user_ids):
@@ -307,6 +348,14 @@ def easyphoto_infer_forward(
     input_mask_face_part_only       = False
 
     ep_logger.info("Start templates and user_ids preprocess.")
+
+    # SD web UI will raise the `Error: A tensor with all NaNs was produced in Unet.`
+    # when users do img2img with SDXL currently (v1.6.0). Users should launch SD web UI with `--no-half`
+    # or do txt2img with SDXL once before img2img.
+    # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
+    if sdxl_pipeline_flag and not sdxl_txt2img_flag:
+        txt2img([], diffusion_steps=2, sd_model_checkpoint=SDXL_MODEL_NAME)
+        sdxl_txt2img_flag = True
     for user_id in user_ids:
         if user_id == 'none':
             # use some placeholder 
@@ -324,6 +373,9 @@ def easyphoto_infer_forward(
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
             
+            if sdxl_pipeline_flag:
+                input_prompt = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + additional_prompt
+
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
             # get roop image
@@ -527,8 +579,23 @@ def easyphoto_infer_forward(
                 
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
-                controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
-                first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                if not sdxl_pipeline_flag:
+                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                else:
+                    controlnet_pairs = [["sdxl_canny", input_image, 0.50], ["sdxl_openpose", replaced_input_image, 0.50]]
+                first_diffusion_output_image = inpaint(
+                    input_image,
+                    input_mask,
+                    controlnet_pairs,
+                    diffusion_steps=first_diffusion_steps,
+                    denoising_strength=first_denoising_strength,
+                    input_prompt=input_prompts[index],
+                    hr_scale=1.0,
+                    seed=str(seed),
+                    sd_vae=sd_vae,
+                    sd_model_checkpoint=sd_model_checkpoint,
+                )
+                first_diffusion_output_image.save("1.png")
 
                 if color_shift_middle:
                     # apply color shift
@@ -585,8 +652,23 @@ def easyphoto_infer_forward(
                     input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
                 
                 ep_logger.info("Start Second diffusion.")
-                controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
-                second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                if not sdxl_pipeline_flag:
+                    controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
+                else:
+                    controlnet_pairs = [["sdxl_canny", fusion_image, 1.00]]
+                second_diffusion_output_image = inpaint(
+                    input_image,
+                    input_mask,
+                    controlnet_pairs,
+                    input_prompts[index],
+                    diffusion_steps=second_diffusion_steps,
+                    denoising_strength=second_denoising_strength,
+                    hr_scale=default_hr_scale,
+                    seed=str(seed),
+                    sd_vae=sd_vae,
+                    sd_model_checkpoint=sd_model_checkpoint
+                )
+                second_diffusion_output_image.save("2.png")
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -680,8 +762,22 @@ def easyphoto_infer_forward(
                     output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                     denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
-                    controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
-                    output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint)
+                    if not sdxl_pipeline_flag:
+                        controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
+                    else:
+                        controlnet_pairs = [["sdxl_canny", output_image, 1.00]]
+                    output_image = inpaint(
+                        output_image,
+                        output_mask,
+                        controlnet_pairs,
+                        input_prompt_without_lora,
+                        30,
+                        denoising_strength=denoising_strength,
+                        hr_scale=1,
+                        seed=str(seed),
+                        sd_vae=sd_vae,
+                        sd_model_checkpoint=sd_model_checkpoint
+                    )
             except Exception as e:
                 torch.cuda.empty_cache()
                 traceback.print_exc()
