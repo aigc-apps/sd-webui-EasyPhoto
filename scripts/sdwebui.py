@@ -443,3 +443,153 @@ def i2i_inpaint_call(
     else:
         gen_image = processed.images[0]
     return gen_image
+
+
+if 1:
+    from .animatediff.animatediff_ui import AnimateDiffProcess
+    import pdb
+    pdb.set_trace()
+    tmp_animatediff = AnimateDiffProcess()
+    print(type(tmp_animatediff))
+
+    # this function is modified , to support a image with multiframe constrain input 
+    # and expand image to video with Animatediff pretrained model
+    def i2mi_inpaint_call(
+            images=[],  
+            resize_mode=0,
+            denoising_strength=0.75,
+            image_cfg_scale=1.5,
+            mask_image=None,  # PIL Image mask
+            mask_blur=8,
+            inpainting_fill=0,
+            inpaint_full_res=True,
+            inpaint_full_res_padding=0,
+            inpainting_mask_invert=0,
+            initial_noise_multiplier=1,
+            prompt="",
+            styles=[],
+            seed=-1,
+            subseed=-1,
+            subseed_strength=0,
+            seed_resize_from_h=0,
+            seed_resize_from_w=0,
+
+            batch_size=1,
+            n_iter=1,
+            steps=None,
+            cfg_scale=7.0,
+            width=640,
+            height=768,
+            restore_faces=False,
+            tiling=False,
+            do_not_save_samples=False,
+            do_not_save_grid=False,
+            negative_prompt="",
+            eta=1.0,
+            s_churn=0,
+            s_tmax=0,
+            s_tmin=0,
+            s_noise=1,
+            override_settings={},
+            override_settings_restore_afterwards=True,
+            sampler=None, 
+            include_init_images=False,
+
+            controlnet_units: List[ControlNetUnit] = [],
+            use_deprecated_controlnet=False,
+            outpath_samples = "",
+            sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
+            sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+    ):
+        if sampler is None:
+            sampler = "Euler a"
+        if steps is None:
+            steps = 20
+
+        try:
+            origin_sd_model_checkpoint  = opts.sd_model_checkpoint
+            origin_sd_vae               = opts.sd_vae
+        except Exception as e:
+            message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
+            ep_logger.error(f"{message} with Error: {e}")
+            origin_sd_model_checkpoint  = ""
+            origin_sd_vae               = ""
+
+        sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
+        vae_near_checkpoint = find_vae_near_checkpoint(sd_vae)
+        if vae_near_checkpoint is not None:
+            sd_vae = os.path.basename(vae_near_checkpoint)
+        else:
+            sd_vae = None
+
+        p_img2img = StableDiffusionProcessingImg2Img(
+            sd_model=origin_sd_model_checkpoint,
+            outpath_samples=outpath_samples,
+            outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            styles=[],
+            seed=seed,
+            subseed=subseed,
+            subseed_strength=subseed_strength,
+            seed_resize_from_h=seed_resize_from_h,
+            seed_resize_from_w=seed_resize_from_w,
+            sampler_name=sampler,
+            batch_size=batch_size,
+            n_iter=n_iter,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            width=width,
+            height=height,
+            restore_faces=restore_faces,
+            tiling=tiling,
+            init_images=images,
+            mask=mask_image,
+            mask_blur=mask_blur,
+            inpainting_fill=inpainting_fill,
+            resize_mode=resize_mode,
+            denoising_strength=denoising_strength,
+            image_cfg_scale=image_cfg_scale,
+            inpaint_full_res=inpaint_full_res,
+            inpaint_full_res_padding=inpaint_full_res_padding,
+            inpainting_mask_invert=inpainting_mask_invert,
+            override_settings=override_settings,
+            initial_noise_multiplier=initial_noise_multiplier
+        )
+
+        p_img2img.scripts = scripts.scripts_img2img
+        p_img2img.extra_generation_params["Mask blur"] = mask_blur
+        p_img2img.script_args = init_default_script_args(p_img2img.scripts)
+
+        for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name=='controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        
+        if sd_model_checkpoint != origin_sd_model_checkpoint:
+            reload_model('sd_model_checkpoint', sd_model_checkpoint)
+        
+        if sd_vae is not None:
+            if origin_sd_vae != sd_vae:
+                reload_model('sd_vae', sd_vae)
+
+        processed = processing.process_images(p_img2img)
+
+        if sd_model_checkpoint != origin_sd_model_checkpoint:
+            reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
+        if sd_vae is not None:
+            if origin_sd_vae != sd_vae:
+                reload_model('sd_vae', origin_sd_vae)
+
+        if len(processed.images) > 1:
+            # get the generate image!
+            h_0, w_0, c_0 = np.shape(processed.images[0])
+            h_1, w_1, c_1 = np.shape(processed.images[1])
+            if w_1 != w_0:
+                gen_image = processed.images[1]
+            else:
+                gen_image = processed.images[0]
+        else:
+            gen_image = processed.images[0]
+        return gen_image
