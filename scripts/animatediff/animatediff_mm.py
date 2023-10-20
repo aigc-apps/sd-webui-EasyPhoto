@@ -11,13 +11,15 @@ from ldm.modules.diffusionmodules.util import GroupNorm32
 from modules import hashes, shared, sd_models
 from modules.devices import cpu, device, torch_gc
 
-from motion_module import MotionWrapper, VanillaTemporalModule
+# from scripts.animatediff_mm import mm_animatediff as motion_module
 # from scripts.animatediff_logger import logger_animatediff as logger
 
 try:
     from scripts.animatediff_logger import logger_animatediff as logger
+    from motion_module import MotionWrapper, VanillaTemporalModule
 except ImportError:
     from scripts.animatediff.animatediff_logger import logger_animatediff as logger
+    from scripts.animatediff.motion_module  import MotionWrapper, VanillaTemporalModule
 
 
 class AnimateDiffMM:
@@ -38,7 +40,8 @@ class AnimateDiffMM:
 
     def _load(self, model_name):
         model_path = os.path.join(
-            shared.opts.data.get("animatediff_model_path", os.path.join(self.script_dir, "model")),
+            # shared.opts.data.get("animatediff_model_path", os.path.join(self.script_dir, "model")), # original version is model
+            shared.opts.data.get("animatediff_model_path", os.path.join(self.script_dir, "models")),
             model_name,
         )
         model_hash, using_v2, guess = self._hash(model_path, model_name)
