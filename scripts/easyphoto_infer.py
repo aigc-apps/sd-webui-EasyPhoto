@@ -69,6 +69,7 @@ def get_controlnet_unit(unit, input_image, weight):
             weight=weight,
             guidance_end=1,
             control_mode=1, 
+            processor_res=1024,
             resize_mode='Just Resize',
             threshold_a=100,
             threshold_b=200,
@@ -89,6 +90,7 @@ def get_controlnet_unit(unit, input_image, weight):
             weight=weight,
             guidance_end=1,
             control_mode=1, 
+            processor_res=1024, 
             resize_mode='Just Resize',
             model='thibaud_xl_openpose'
         )
@@ -509,10 +511,11 @@ def easyphoto_infer_forward(
                 else:
                     input_image = copy.deepcopy(loop_template_image)
 
-                # Resize the template image with short edges on 512
-                ep_logger.info("Start Image resize to 512.")
+                # Resize the template image with short edges on 512 (SD1)/1024 (SDXL)
+                input_short_size = 512.0 if not sdxl_pipeline_flag else 1024.0
+                ep_logger.info("Start Image resize to {}.".format(input_short_size))
                 short_side  = min(input_image.width, input_image.height)
-                resize      = float(short_side / 512.0)
+                resize      = float(short_side / input_short_size)
                 new_size    = (int(input_image.width//resize), int(input_image.height//resize))
                 input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
                 if crop_face_preprocess:
@@ -534,6 +537,7 @@ def easyphoto_infer_forward(
                 # Paste user images onto template images
                 replaced_input_image = crop_and_paste(face_id_images[index], face_id_retinaface_masks[index], input_image, face_id_retinaface_keypoints[index], input_image_retinaface_keypoint, face_id_retinaface_boxes[index])
                 replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
+                # replaced_input_image.save("replaced_input_image.png")  # debug: hkz
                 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
@@ -583,6 +587,8 @@ def easyphoto_infer_forward(
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
                 else:
                     controlnet_pairs = [["sdxl_canny", input_image, 0.50], ["sdxl_openpose", replaced_input_image, 0.50]]
+                    # controlnet_pairs = []  # hkz: Debug
+                # input_image.save("first_diffusion_input_image.png")  # hkz: Debug
                 first_diffusion_output_image = inpaint(
                     input_image,
                     input_mask,
@@ -595,7 +601,7 @@ def easyphoto_infer_forward(
                     sd_vae=sd_vae,
                     sd_model_checkpoint=sd_model_checkpoint,
                 )
-                first_diffusion_output_image.save("1.png")
+                # first_diffusion_output_image.save("first_diffusion_output_image.png")  # hkz: Debug
 
                 if color_shift_middle:
                     # apply color shift
@@ -655,7 +661,9 @@ def easyphoto_infer_forward(
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                 else:
-                    controlnet_pairs = [["sdxl_canny", fusion_image, 1.00]]
+                    # controlnet_pairs = [["sdxl_canny", fusion_image, 1.00]]
+                    controlnet_pairs = []  # debug: hkz
+                # input_image.save("second_diffusion_input_image.png")  # debug: hkz
                 second_diffusion_output_image = inpaint(
                     input_image,
                     input_mask,
@@ -668,7 +676,7 @@ def easyphoto_infer_forward(
                     sd_vae=sd_vae,
                     sd_model_checkpoint=sd_model_checkpoint
                 )
-                second_diffusion_output_image.save("2.png")
+                # second_diffusion_output_image.save("second_diffusion_output_image.png")  # debug: hkz
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:

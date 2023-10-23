@@ -471,10 +471,14 @@ def get_lora_type(filename: str) -> int:
     """Get the type (1 means SD1; 2 means SD2; 3 means SDXL) of the Lora given the path `filename`.
     Modified from `extensions-builtin/Lora/network.py`.
     """
+    # Firstly, read the metadata of the Lora from the cache. If the Lora is added to the folder 
+    # after the SD Web UI launch, then read the Lora from the hard disk to get the metadata.
     try:
         name = os.path.splitext(os.path.basename(filename))[0]
         read_metadata = lambda filename: sd_models.read_metadata_from_safetensors(filename)
         metadata = cache.cached_data_for_file("safetensors-metadata", "lora/" + name, filename, read_metadata)
+    except TypeError as e:
+        metadata = sd_models.read_metadata_from_safetensors(filename)
     except Exception as e:
         errors.display(e, f"reading lora {filename}")
     if str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):

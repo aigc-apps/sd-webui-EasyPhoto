@@ -150,7 +150,6 @@ def easyphoto_train_forward(
     env = None
     if sdxl_pipeline_flag:
         original_config = config_sdxl
-        # pretrained_vae_model_name_or_path = os.path.join(models_path, "VAE", "madebyollin-sdxl-vae-fp16-fix.safetensors")
         sdxl_model_dir = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl")
         pretrained_vae_model_name_or_path = os.path.join(sdxl_model_dir, "madebyollin_sdxl_vae_fp16_fix")
         # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
@@ -345,13 +344,12 @@ def easyphoto_train_forward(
     #     sd_models.reload_model_weights()
 
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
-    if not os.path.exists(best_weight_path):
-        return "Failed to obtain Lora after training, please check the training process."
-    
     # Currently, SDXL training doesn't support the model selection and ensemble. We use the final
     # trained model as the best for simplicity.
     if sdxl_pipeline_flag:
         best_weight_path = os.path.join(weights_save_path, "pytorch_lora_weights.safetensors")
+    if not os.path.exists(best_weight_path):
+        return "Failed to obtain Lora after training, please check the training process."
 
     copyfile(best_weight_path, webui_save_path)
     
