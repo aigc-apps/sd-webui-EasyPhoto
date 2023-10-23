@@ -48,7 +48,7 @@ Our ui interface is as follows:
 
 # Quick Start
 
-#### a. From docker 
+## a. From docker 
 If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
 
 Then execute the following commands in this way:
@@ -60,16 +60,24 @@ docker pull registry.cn-shanghai.aliyuncs.com/pai-ai-test/eas-service:ubuntu2204
 docker run -it -p 7860:7860 --network host --gpus all registry.cn-shanghai.aliyuncs.com/pai-ai-test/eas-service:ubuntu2204-cuda117-torch201-sdwebui-anyid01
 
 # launch webui
-python3 launch.py --port 7860
+python launch.py --xformers
 ```
+
+If you've already pulled the images provided in the EasyPhoto master, you can navigate to the EasyPhoto directory and switch to the "anyid" branch. Then, refer to the [Install LightGlue](#####install-lightglue) to install lightglue. 
+
 The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first. 
 ```
 cd extensions/sd-webui-EasyPhoto/
+# checkout anyid
+git checkout -b anyid remotes/origin/anyid
+
+# update code
 git pull
+
 cd /workspace
 ```
 
-### b. Local install: Environment Check/Downloading/Installation
+## b. Local install: Environment Check/Downloading/Installation
 
 We have verified EasyPhoto execution on the following environment:  
 If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
@@ -85,19 +93,17 @@ The detailed of Linux:
 
 We need about 60GB available on disk (for saving weights and datasets process), please check!
 
-#### Relevant Repositories & Weights Downloading
-##### i. Controlnet 
+### Relevant Repositories & Weights Downloading
+#### i. Controlnet 
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
-In addition, we need at least three Controlnets for inference. So you need to set the **Multi ControlNet: Max models amount (requires restart)** in Setting.
-![controlnet_num](images/controlnet_num.png)
-
-##### ii. Other Dependencies.
-We are mutually compatible with the existing stable-diffusion-webui environment, and the relevant repositories are installed when starting stable-diffusion-webui.
+#### ii. Other Dependencies.
+We are mutually compatible with the existing stable-diffusion-webui environment, and the relevant repositories (except lightglue) are installed when starting stable-diffusion-webui.
 
 The weights we need will be downloaded automatically when you start training first time.
 
 - Install LightGlue
+
 [LightGlue](https://github.com/cvg/LightGlue) is used for preprocess when training. You should mannually install LightGlue before start EasyPhoto of anyid version. 
 (Since the latest version of LightGlue misses the setup.py and allow only to download model from github, we recommend you to install LightGlue using our provided version.)
 ```
@@ -108,7 +114,7 @@ python -m pip install -e .
 ```
 
 
-#### c. Plug-in Installation
+### c. Plug-in Installation
 Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
 
 ![install](images/install.png)
@@ -124,7 +130,7 @@ The EasyPhoto training interface is as follows:
 - On the left is the training image. First upload a main image, and click Upload Photos to upload the image. 
 - On the right are the training parameters, which shares the same meaning as the master pipeline.
 
-After clicking Upload Photos, we can start uploading images. The main image is used to match the ROI in the training image that is used to segment the target id. Therefore, please choose a clean front image as the main image. **The main image should be **. Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
+The main image is used to match the ROI in the training image that is used to segment the target id. Therefore, please choose a clean front image as the main image. Then, click the Upload Photos button to upload training images, the training images will be processed by LightGlue and SAM to obtain the main target. Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
 
 ![train_1](images/train_1.png)
 
