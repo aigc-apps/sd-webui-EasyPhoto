@@ -887,7 +887,7 @@ def easyphoto_infer_forward(
         input_mask = input_mask.resize((target_width, target_height))
 
         result_img.save('result_img.jpg')
-        cv2.imwrite('template_copy.jpg', template_copy)
+        cv2.imwrite('template_copy.jpg', template_copy[:,:,::-1])
         cv2.imwrite('input_mask_copy.jpg', input_mask_copy)
 
         print(box_pad)
@@ -908,12 +908,12 @@ def easyphoto_infer_forward(
             np.array(result_img), mask_blur, template_copy, box_pad
         )
 
-        save_image(final_generation1, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+        save_image(Image.fromarray(np.uint8(final_generation1)), easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
-        return_res.append(Image.fromarray(np.uint8(init_generation)))
+        # return_res.append(Image.fromarray(np.uint8(init_generation)))
         # return_res.append(Image.fromarray(np.uint8(init_generation1)))
         # return_res.append(Image.fromarray(np.uint8(final_generation)))
-        # return_res.append(Image.fromarray(np.uint8(final_generation1)))
+        return_res.append(Image.fromarray(np.uint8(final_generation1)))
 
     return_res.append(first_paste)
     return_res.append(second_paste)

@@ -1,9 +1,9 @@
-# 📷 EasyPhoto | Your Smart AI Photo Generator.
-🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. 
+# 📷 EasyPhoto | Your Smart AI Photo Generator (AnyID).
+🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you.
+
+We are continuously enhancing our efforts to expand the EasyPhoto pipeline, making it suitable for any identification (not limited to just the face)
 
 🦜 🦜 Welcome!
-
-[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/alibaba-pai/easyphoto)
 
 English | [简体中文](./README_zh-CN.md)
 
