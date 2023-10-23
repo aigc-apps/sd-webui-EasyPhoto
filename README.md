@@ -5,6 +5,8 @@ Here, we expand the EasyPhoto pipeline, making it suitable for any identificatio
 
 We are still work on it for robust generation, have it for fun and welcome any suggestions!
 
+The image is used for demo presentation. If it has specific copyright, please contact us and we will delete it as soon as possible.
+
 🦜 🦜 Welcome!
 
 English | [简体中文](./README_zh-CN.md)
@@ -109,24 +111,22 @@ python -m pip install -e .
 #### c. Plug-in Installation
 Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
 
-![install](images/install.jpg)
+![install](images/install.png)
 
 
 # How to use
+
+The process closely resembles the EasyPhoto master pipeline, with the additional steps of selecting a main image and specifying the target region during inference.
+
 ### 1. Model Training
 The EasyPhoto training interface is as follows:
 
-- On the left is the training image. Simply click Upload Photos to upload the image, and click Clear Photos to delete the uploaded image;
-- On the right are the training parameters, which cannot be adjusted for the first training.
+- On the left is the training image. First upload a main image, and click Upload Photos to upload the image. 
+- On the right are the training parameters, which shares the same meaning as the master pipeline.
 
-After clicking Upload Photos, we can start uploading images. **It is best to upload 5 to 20 images here, including different angles and lighting conditions**. It is best to have some images that do not include glasses. If they are all glasses, the generated results may easily generate glasses.
-![train_1](images/train_1.jpg)
+After clicking Upload Photos, we can start uploading images. The main image is used to match the ROI in the training image that is used to segment the target id. Therefore, please choose a clean front image as the main image. **The main image should be **. Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
 
-Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
-![train_2](images/train_2.jpg)
-
-After the model starts training, the webui will automatically refresh the training log. If there is no refresh, click Refresh Log button.
-![train_3](images/train_3.jpg)
+![train_1](images/train_1.png)
 
 If you want to set parameters, the parsing of each parameter is as follows:
 
@@ -144,51 +144,15 @@ If you want to set parameters, the parsing of each parameter is as follows:
 |Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to 64|
 
 ### 2. Inference 
-#### a. single people
 - Step 1: Click the refresh button to query the model corresponding to the trained user ID.
 - Step 2: Select the user ID.
-- Step 3: Select the template that needs to be generated.
+- Step 3: Select the template and mask the target region that needs to be generated.
 - Step 4: Click the Generate button to generate the results.
 
-![single_people](images/single_people.jpg)
+![infer](images/infer_1.png)
 
-#### b. multi people
-- Step 1: Go to the settings page of EasyPhoto and set num_of_faceid is greater than 1.
-- Step 2: Apply settings.
-- Step 3: Restart the ui interface of the webui.
-- Step 4: Return to EasyPhoto and upload the two person template.
-- Step 5: Select the user IDs of two people.
-- Step 6: Click the Generate button. Perform image generation.
-
-![single_people](images/multi_people_1.jpg)
-![single_people](images/multi_people_2.jpg)
 # Algorithm Detailed
-
-### 1. Architectural Overview
-
-![overview](images/overview.jpg)
-
-In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference. 
-
-### 2. Training Detailed
-
-![overview](images/train_detail.jpg)
-
-First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.   
-
-During training, we utilize the template image for verification in real time, and at the end of training, we calculate the face id gap between the verification image and the user's image to achieve Lora fusion, which ensures that our Lora is a perfect digital doppelganger of the user.
-
-In addition, we will choose the image that is most similar to the user in the validation as the face_id image, which will be used in Inference.
-
-### 3. Inference Detailed
-#### a. First Diffusion:  
-First, we will perform face detection on our incoming template image to determine the mask that needs to be inpainted for stable diffusion. then we will use the template image to perform face fusion with the optimal user image. After the face fusion is completed, we use the above mask to inpaint (fusion_image) with the face fused image. In addition, we will affix the optimal face_id image obtained during training to the template image by affine transformation (replaced_image). Then we will apply Controlnets on it, we use canny with color to extract features for fusion_image and openpose for replaced_image to ensure the similarity and stability of the images. Then we will use Stable Diffusion combined with the user's digital split for generation.
-
-#### b. Second Diffusion:
-After getting the result of First Diffusion, we will fuse the result with the optimal user image for face fusion, and then we will use Stable Diffusion again with the user's digital doppelganger for generation. The second generation will use higher resolution.
-
-# Special thanks
-Special thanks to DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen for their code contributions (in no particular order).
+TBD
 
 # Reference
 - insightface：https://github.com/deepinsight/insightface    
