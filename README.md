@@ -1,7 +1,9 @@
 # 📷 EasyPhoto | Your Smart AI Photo Generator (AnyID).
 🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you.
 
-We are continuously enhancing our efforts to expand the EasyPhoto pipeline, making it suitable for any identification (not limited to just the face)
+Here, we expand the EasyPhoto pipeline, making it suitable for any identification (not limited to just the face).
+
+We are still work on it for robust generation, have it for fun and welcome any suggestions!
 
 🦜 🦜 Welcome!
 
@@ -11,12 +13,11 @@ English | [简体中文](./README_zh-CN.md)
 - [Introduction](#introduction)
 - [TODO List](#todo-list)
 - [Quick Start](#quick-start)
-    - [1. Cloud usage: AliyunDSW/AutoDL/Docker](#1-cloud-usage-aliyundswautodldocker)
+    - [1. Cloud usage: AliyunDSW/AutoDL/Docker](#1-cloud-usage-aliyundswautodldocker) [Not suppport now]
     - [2. Local install: Check/Downloading/Installation](#2-local-install-environment-checkdownloadinginstallation)
 - [How to use](#how-to-use)
     - [1. Model Training](#1-model-training)
     - [2. Inference](#2-inference)
-- [API test](./api_test/README.md)
 - [Algorithm Detailed](#algorithm-detailed)
     - [1. Architectural Overview](#1-architectural-overview)
     - [2. Training Detailed](#2-training-detailed)
@@ -27,67 +28,34 @@ English | [简体中文](./README_zh-CN.md)
 - [ContactUS](#contactus)
 
 # Introduction
-EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.    
+EasyPhoto can be used to generate your AI portraits within 5 to 20 images. We're working to expand the EasyPhoto pipeline, allowing you to create images for any desired identity (ID). By providing a set of training images featuring your target ID, you are allowed to first train a specific LoRA model. This empowers you to effortlessly generate personalized ID photos by seamlessly replacing the target in your template image. We now support for virtual try-on applications, and we're continuously exploring more exciting fetaures.
 
 Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).   
 
 If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
 
-We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start).
-
-Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
-
-What's New: 
-- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory![🔥 🔥 🔥 2023.09.26]
-- We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
-- **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
-- **Support different base models for training and inference.** [🔥🔥 2023.09.08]
-- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
-- Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
-
 These are our generated results:
 ![results_1](images/results_1.jpg)
-![results_2](images/results_2.jpg)
-![results_3](images/results_3.jpg)
 
 Our ui interface is as follows:  
 **train part:**
-![train_ui](images/train_ui.jpg)
+![train_ui](images/train_ui.png)
 **inference part:**
-![infer_ui](images/infer_ui.jpg)
+![infer_ui](images/infer_ui.png)
 
-# TODO List
-- Support chinese ui.
-- Support change in template's background.
-- Support high resolution.
 
 # Quick Start
-### 1. Cloud usage: AliyunDSW/AutoDL/Docker
-#### a. From AliyunDSW
-DSW has free GPU time, which can be applied once by a user and is valid for 3 months after appling.
 
-Aliyun provide free GPU time in [Freetier](https://help.aliyun.com/document_detail/2567864.html), get it and use in Aliyun PAI-DSW to start EasyPhoto within 3min!
-
-[![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
-
-#### b. From AutoDL
-If you are using AutoDL, you can quickly pull up the Stable DIffusion webui using the mirror we provide.
-
-You can select the desired mirror by filling in the following information in Community Mirrors.
-```
-aigc-apps/sd-webui-EasyPhoto/sd-webui-EasyPhoto
-```
-
-#### c. From docker 
+#### a. From docker 
 If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
 
 Then execute the following commands in this way:
 ```
 # pull image
-docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker pull registry.cn-shanghai.aliyuncs.com/pai-ai-test/eas-service:ubuntu2204-cuda117-torch201-sdwebui-anyid01
 
 # enter image
-docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker run -it -p 7860:7860 --network host --gpus all registry.cn-shanghai.aliyuncs.com/pai-ai-test/eas-service:ubuntu2204-cuda117-torch201-sdwebui-anyid01
 
 # launch webui
 python3 launch.py --port 7860
@@ -99,19 +67,10 @@ git pull
 cd /workspace
 ```
 
-### 2. Local install: Environment Check/Downloading/Installation
-#### a. Environment Check
+### b. Local install: Environment Check/Downloading/Installation
+
 We have verified EasyPhoto execution on the following environment:  
 If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
-
-The detailed of Windows 10:  
-- OS: Windows10
-- python: py3.10
-- pytorch: torch2.0.1
-- tensorflow-cpu: 2.13.0
-- CUDA: 11.7
-- CUDNN: 8+
-- GPU: Nvidia-3060 12G
 
 The detailed of Linux:  
 - OS: Ubuntu 20.04, CentOS
@@ -124,7 +83,7 @@ The detailed of Linux:
 
 We need about 60GB available on disk (for saving weights and datasets process), please check!
 
-#### b.  Relevant Repositories & Weights Downloading
+#### Relevant Repositories & Weights Downloading
 ##### i. Controlnet 
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
@@ -136,10 +95,19 @@ We are mutually compatible with the existing stable-diffusion-webui environment,
 
 The weights we need will be downloaded automatically when you start training first time.
 
+- Install LightGlue
+[LightGlue](https://github.com/cvg/LightGlue) is used for preprocess when training. You should mannually install LightGlue before start EasyPhoto of anyid version. 
+(Since the latest version of LightGlue misses the setup.py and allow only to download model from github, we recommend you to install LightGlue using our provided version.)
+```
+wget https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/LightGlue.zip
+unzip LightGlue.zip
+cd LightGlue
+python -m pip install -e .
+```
+
+
 #### c. Plug-in Installation
 Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
-
-We will support installing EasyPhoto from **Available** in the future.
 
 ![install](images/install.jpg)
 
