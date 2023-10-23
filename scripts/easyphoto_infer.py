@@ -27,7 +27,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
-from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
+from scripts.sdwebui import i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -53,8 +53,9 @@ def resize_image(input_image, resolution, nearest = False, crop264 = True):
 # this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
 def get_controlnet_unit(unit, input_image, weight):
     if unit == "canny":
-        control_unit = ControlNetUnit(
-            input_image=input_image, module='canny',
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None}, 
+            module='canny',
             weight=weight,
             guidance_end=1,
             control_mode=1, 
@@ -64,8 +65,9 @@ def get_controlnet_unit(unit, input_image, weight):
             model='control_v11p_sd15_canny'
         )
     elif unit == "openpose":
-        control_unit = ControlNetUnit(
-            input_image=input_image, module='openpose_full',
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None}, 
+            module='openpose_full',
             weight=weight,
             guidance_end=1,
             control_mode=1, 
@@ -85,15 +87,17 @@ def get_controlnet_unit(unit, input_image, weight):
         color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
         color_image = Image.fromarray(np.uint8(color_image))
 
-        control_unit = ControlNetUnit(input_image=color_image, module='none',
+        control_unit = dict(input_image={'image': np.asarray(color_image), 'mask': None}, 
+                                            module='none',
                                             weight=weight,
                                             guidance_end=1,
                                             control_mode=1,
                                             resize_mode='Just Resize',
                                             model='control_sd15_random_color')
     elif unit == "tile":
-        control_unit = ControlNetUnit(
-            input_image=input_image, module='tile_resample',
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None}, 
+            module='tile_resample',
             weight=weight,
             guidance_end=1,
             control_mode=1, 
