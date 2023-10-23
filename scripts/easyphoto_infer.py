@@ -374,7 +374,7 @@ def easyphoto_infer_forward(
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
             
             if sdxl_pipeline_flag:
-                input_prompt = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + additional_prompt
+                input_prompt = f"{validation_prompt}, <lora:{user_id}>" + additional_prompt
 
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))

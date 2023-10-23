@@ -151,14 +151,22 @@ def easyphoto_train_forward(
     if sdxl_pipeline_flag:
         original_config = config_sdxl
         # pretrained_vae_model_name_or_path = os.path.join(models_path, "VAE", "madebyollin-sdxl-vae-fp16-fix.safetensors")
+        sdxl_model_dir = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl")
+        pretrained_vae_model_name_or_path = os.path.join(sdxl_model_dir, "madebyollin_sdxl_vae_fp16_fix")
         # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
         # We provide them in extensions/sd-webui-EasyPhoto/models. Thus, we need set some environment variables for transformers.
         # if we pass `env` in subprocess.run, the environment variables in the child process will be reset and different from Web UI.
         env = {
-            "CUDA_VISIBLE_DEVICES": os.environ["CUDA_VISIBLE_DEVICES"],
             "TRANSFORMERS_OFFLINE": "1",
-            "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl")
+            "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"),
+            **os.environ.copy()
         }
+        # # SDXL LoRA training requires large GPU memory, clearing the cache models in the Web UI.
+        # We should recommend users launch SD Web UI with `--use-cpu all --no-half`.
+        # from modules import sd_models, shared
+
+        # origin_sd_model_checkpoint  = shared.opts.sd_model_checkpoint
+        # sd_models.unload_model_weights(origin_sd_model_checkpoint)
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
@@ -198,7 +206,7 @@ def easyphoto_train_forward(
             command += ["--validation"]
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
-            # command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+            command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         try:
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
@@ -283,10 +291,8 @@ def easyphoto_train_forward(
             command += ["--validation"]
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
-            # command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+            command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         try:
-            print(env)
-            print(command)
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
@@ -334,6 +340,10 @@ def easyphoto_train_forward(
                 with open(cache_log_file_path, "w") as _:
                     pass
     
+    # if sdxl_pipeline_flag:
+    #     opts.sd_model_checkpoint = origin_sd_model_checkpoint
+    #     sd_models.reload_model_weights()
+
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     if not os.path.exists(best_weight_path):
         return "Failed to obtain Lora after training, please check the training process."

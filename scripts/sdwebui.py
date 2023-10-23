@@ -461,11 +461,9 @@ def get_checkpoint_type(sd_model_checkpoint: str) -> int:
         # SD web UI uses `hasattr(model, conditioner)` to check the SDXL model.
         if k.startswith("conditioner"):
             return 3
-            break
         # SD web UI uses `hasattr(model, model.cond_stage_model)` to check the SD2 model.
         if k.startswith("cond_stage_model.model"):
             return 2
-            break
     return 1
 
 

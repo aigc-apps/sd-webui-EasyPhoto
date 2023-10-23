@@ -33,7 +33,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
-from diffusers import DDPMScheduler, StableDiffusionXLPipeline
+from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionXLPipeline
 from diffusers.optimization import get_scheduler
 from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from diffusers.utils import check_min_version, is_wandb_available
@@ -616,6 +616,8 @@ def main():
     tokenizer_one, text_encoder_one = pipeline.tokenizer, pipeline.text_encoder
     tokenizer_two, text_encoder_two = pipeline.tokenizer_2, pipeline.text_encoder_2
     vae, unet = pipeline.vae, pipeline.unet
+    if args.pretrained_vae_model_name_or_path is not None:
+        vae = AutoencoderKL.from_pretrained(args.pretrained_vae_model_name_or_path)
     noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
 
     # We only train the additional adapter LoRA layers
@@ -1099,6 +1101,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # SDXL LoRA training requires large GPU memory, clearing the cache models in the Web UI.
-    torch.cuda.empty_cache()
     main()
