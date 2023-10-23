@@ -377,7 +377,6 @@ def on_ui_tabs():
                                     step=0.05, label='IoU Threshold '
                                 )
 
-
                             with gr.Row():
                                 angle = gr.Slider(
                                     minimum=-90, maximum=90, value=0.0,
@@ -387,6 +386,13 @@ def on_ui_tabs():
                                     minimum=0.5, maximum=5.5, value=1.0,
                                     step=0.1, label='Ratio'
                                 )
+
+                            with gr.Row():
+                                batch_size = gr.Slider(
+                                    minimum=1, maximum=10, value=1,
+                                    step=1, label='Batch Size'
+                                )
+                               
 
                             with gr.Row():
                                 refine_input_mask = gr.Checkbox(
@@ -429,7 +435,7 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-                            lora_weight, iou_threshold, angle, ratio, refine_input_mask, optimize_angle_and_ratio, change_shape, optimize_vertex, \
+                            lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, change_shape, optimize_vertex, \
                             use_dragdiffusion, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
