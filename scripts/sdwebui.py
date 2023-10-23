@@ -609,6 +609,7 @@ if 1:
             initial_noise_multiplier=initial_noise_multiplier
         )
 
+        # should fit scripts to animatediff scripts
         p_img2img.scripts = scripts.scripts_img2img
         p_img2img.extra_generation_params["Mask blur"] = mask_blur
         p_img2img.script_args = init_default_script_args(p_img2img.scripts)
