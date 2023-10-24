@@ -249,7 +249,7 @@ def t2i_call(
     p_txt2img = StableDiffusionProcessingTxt2Img(
         sd_model=origin_sd_model_checkpoint,
         outpath_samples=outpath_samples,
-        outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
+        outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
         styles=[],
@@ -270,15 +270,21 @@ def t2i_call(
         override_settings=override_settings
     )
 
-    p_txt2img.scripts = scripts.scripts_img2img
+    p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
-    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.name is None:
-            continue
-        if alwayson_scripts.name=='controlnet':
-            p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-    
+    for alwayson_scripts in modules.scripts.scripts_txt2img.alwayson_scripts:
+        if hasattr(alwayson_scripts, "name"):
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name=='controlnet':
+                p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        else:
+            if alwayson_scripts.title().lower() is None:
+                continue
+            if alwayson_scripts.title().lower()=='controlnet':
+                p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', sd_model_checkpoint)
     
@@ -412,11 +418,17 @@ def i2i_inpaint_call(
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.name is None:
-            continue
-        if alwayson_scripts.name=='controlnet':
-            p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-    
+        if hasattr(alwayson_scripts, "name"):
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name=='controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        else:
+            if alwayson_scripts.title().lower() is None:
+                continue
+            if alwayson_scripts.title().lower()=='controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', sd_model_checkpoint)
     
