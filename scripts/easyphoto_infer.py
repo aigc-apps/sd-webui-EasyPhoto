@@ -729,15 +729,14 @@ def easyphoto_infer_forward(
     cv2.imwrite("after_canny_res_canny.jpg", res_canny)
     # cv2.imwrite("after_canny_res_image.jpg", resize_image[:, :, ::-1])
     # cv2.imwrite("after_canny_res_mask.jpg", resize_mask2)
-    # cv2.imwrite("after_canny_res_image_ori.jpg", resize_img2[:, :, ::-1])
+    cv2.imwrite("after_canny_res_control_depth.jpg", resize_img2[:, :, ::-1])
     # cv2.imwrite("after_canny_res_mask1.jpg", resize_mask1)
     # cv2.imwrite("after_canny_res_image1.jpg", resize_img1[:, :, ::-1])
 
     # first diffusion
-    
-
     mask2 = Image.fromarray(
-        np.uint8(np.clip((np.float32(resize_mask2) * 255), 0, 255)))
+        np.uint8(resize_mask2))
+
     resize_image = Image.fromarray(resize_image)
     resize_image_input = copy.deepcopy(resize_image)
     mask2_input = copy.deepcopy(mask2)
@@ -747,7 +746,7 @@ def easyphoto_infer_forward(
         logging.info("Start First diffusion.")
 
         controlnet_pairs = [
-            ["canny", res_canny, 0.5, False],
+            ["canny", res_canny, 1.0, False],
             ["depth", resize_img2, 1.0, True],
         ]
         
@@ -764,7 +763,7 @@ def easyphoto_infer_forward(
         )
 
         # print("inpaint:", result_img.size)
-        # result_img.save("inpaint_res1.jpg")
+        result_img.save("inpaint_res1.jpg")
 
         # second diffusion
         # second_diffusion_steps = 20
@@ -796,19 +795,15 @@ def easyphoto_infer_forward(
 
         # copy back
         template_copy = np.array(template_copy, np.uint8)
-        init_generation = copy_white_mask_to_template(
-            np.array(result_img),
-            np.array(np.uint8(resize_mask2))[:, :, 0],
-            template_copy,
-            box_template,
-        )
 
         mask_blur = cv2.GaussianBlur(
             np.array(np.uint8(resize_mask2))[:, :, 0], (5, 5), 0
         )
-        init_generation1 = copy_white_mask_to_template(
+
+        init_generation = copy_white_mask_to_template(
             np.array(result_img), mask_blur, template_copy, box_template
         )
+
         cv2.imwrite("mask_blur.jpg", mask_blur)
         cv2.imwrite("template_copy_init.jpg", init_generation)
 
@@ -857,10 +852,12 @@ def easyphoto_infer_forward(
 
         # generate
         controlnet_pairs = [["canny", input_control_img, 1.0, True]]
-        input_mask = Image.fromarray(
-            np.uint8(np.clip((np.float32(input_mask) * 255), 0, 255))
-        )
-
+        # input_mask = Image.fromarray(
+        #     np.uint8(np.clip((np.float32(input_mask) * 255), 0, 255))
+        # )
+        
+        print(input_mask.max())
+        input_mask = Image.fromarray(np.uint8(input_mask))
         input_img = Image.fromarray(input_img)
 
         refine_diffusion_steps = 20
@@ -893,27 +890,18 @@ def easyphoto_infer_forward(
         print(box_pad)
 
         # copy back
-        final_generation = copy_white_mask_to_template(
-            np.array(result_img),
-            np.array(np.uint8(input_mask_copy)),
-            template_copy,
-            box_pad,
-        )
-
         mask_blur = cv2.GaussianBlur(
             np.array(np.uint8(input_mask_copy)), (5, 5), 0)
         # cv2.imwrite("mask_blur2.jpg", mask_blur)
 
-        final_generation1 = copy_white_mask_to_template(
+        final_generation = copy_white_mask_to_template(
             np.array(result_img), mask_blur, template_copy, box_pad
         )
 
-        save_image(Image.fromarray(np.uint8(final_generation1)), easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+        save_image(Image.fromarray(np.uint8(final_generation)), easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
         # return_res.append(Image.fromarray(np.uint8(init_generation)))
-        # return_res.append(Image.fromarray(np.uint8(init_generation1)))
-        # return_res.append(Image.fromarray(np.uint8(final_generation)))
-        return_res.append(Image.fromarray(np.uint8(final_generation1)))
+        return_res.append(Image.fromarray(np.uint8(final_generation)))
 
     return_res.append(first_paste)
     return_res.append(second_paste)

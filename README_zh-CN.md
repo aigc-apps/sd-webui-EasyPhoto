@@ -1,4 +1,4 @@
-# EasyPhoto | 您的智能 AI 照片生成器。
+# EasyPhoto | 您的智能 AI 照片生成器 (AnyId)。
 🦜 EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于训练与您相关的数字分身。
 
 本分支用于扩展EasyPhoto的流程，以适应任意的id（不仅仅是人脸）。
