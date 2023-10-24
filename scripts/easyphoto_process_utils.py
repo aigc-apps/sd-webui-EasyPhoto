@@ -891,14 +891,24 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
     _, resize_mask2 = canny(mask2)
 
     # Create a mask outline using morphological operations
+    # mask1_outline = np.uint8(
+    #     cv2.dilate(np.array(resize_mask1), np.ones(
+    #         (10, 10), np.uint8), iterations=1)
+    #     - cv2.erode(np.array(resize_mask1),
+    #                 np.ones((5, 5), np.uint8), iterations=1)
+    # )
+
+    erode_kernal = int(0.2* min(resize_mask1.shape[0], resize_mask1.shape[1]))
     mask1_outline = np.uint8(
-        cv2.dilate(np.array(resize_mask1), np.ones(
-            (10, 10), np.uint8), iterations=1)
-        - cv2.erode(np.array(resize_mask1),
-                    np.ones((5, 5), np.uint8), iterations=1)
-    )
+            cv2.dilate(np.array(resize_mask1), np.ones(
+                (10, 10), np.uint8), iterations=1)
+            - cv2.erode(np.array(resize_mask1),
+                        np.ones((erode_kernal, erode_kernal), np.uint8), iterations=1)
+        )
 
     mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
+
+    cv2.imwrite('mask1_outline.jpg', mask1_outline)
 
     # Remove the mask1 outline from the Canny image to obtain inner edges
     canny_image_inner = remove_outline(canny_image, mask1_outline)
@@ -925,11 +935,15 @@ def copy_white_mask_to_template(img: np.ndarray, mask: np.ndarray, template: np.
     # Expand the mask to match the specified bounding box
     expand_mask[box[1]:box[3], box[0]:box[2]] = mask
 
-    result = np.zeros_like(template)
-    result[box[1]:box[3], box[0]:box[2]] = np.array(img, np.uint8)
+    # result = np.zeros_like(template)
+    result = template
+    mask = np.stack((mask,) * 3, axis=-1)
+
+    template_crop = template[box[1]:box[3], box[0]:box[2]]
+    result[box[1]:box[3], box[0]:box[2]] = np.array(img, np.uint8)*(mask/255.) + np.array(template_crop, np.uint8)*((255-mask)/255.)
 
     # Copy the region from the template to the result where the mask is 0
-    result[expand_mask == 0] = template[expand_mask == 0]
+    # result[expand_mask == 0] = template[expand_mask == 0]
 
     return result
 
