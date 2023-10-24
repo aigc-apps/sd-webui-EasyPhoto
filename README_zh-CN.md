@@ -242,9 +242,9 @@ EasyPhoto训练界面如下：
 本项目采用 [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 # 联系我们
-1. 使用[钉钉](https://www.dingtalk.com/)搜索群38250008552或扫描下列二维码加入群聊
+1. 使用[钉钉](https://www.dingtalk.com/)搜索2群54095000124或扫描下列二维码加入群聊
 2. 由于 微信群 已经满了，需要扫描右边的图片先添加这个同学为好友，然后再加入 微信群 。
 <figure>
-<img src="images/erweima.jpg" width=300/>
+<img src="images/ding_erweima.jpg" width=300/>
 <img src="images/wechat.jpg" width=300/>
 </figure>
