@@ -401,20 +401,29 @@ def on_ui_tabs():
                                 )
                                 optimize_angle_and_ratio = gr.Checkbox(
                                     label="Optimize Angle and Ratio", 
-                                    value=False
-                                )
-                                change_shape = gr.Checkbox(
-                                    label="Change Shape",  
                                     value=True
                                 )
-                                optimize_vertex = gr.Checkbox(
-                                    label="Optimize Vertex",  
+                                refine_bound = gr.Checkbox(
+                                    label="Refine Boundary",  
                                     value=True
                                 )
-                                use_dragdiffusion = gr.Checkbox(
-                                    label="Use Dragdiffusion",  
+                                global_inpaint = gr.Checkbox(
+                                    label="Global Inpaint", 
                                     value=True
                                 )
+
+                                # change_shape = gr.Checkbox(
+                                #     label="Change Shape",  
+                                #     value=True
+                                # )
+                                # optimize_vertex = gr.Checkbox(
+                                #     label="Optimize Vertex",  
+                                #     value=True
+                                # )
+                                # use_dragdiffusion = gr.Checkbox(
+                                #     label="Use Dragdiffusion",  
+                                #     value=True
+                                # )
                             
                         display_button = gr.Button('Start Generation')
 
@@ -435,8 +444,8 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-                            lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, change_shape, optimize_vertex, \
-                            use_dragdiffusion, model_selected_tab, *uuids],
+                            lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
+                            global_inpaint, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )
