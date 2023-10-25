@@ -39,7 +39,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 这些是我们的生成结果:
-![results_1](images/results_1.jpg)
+![results_1](images/results.png)
 
 我们的ui界面如下:  
 **训练部分:**
