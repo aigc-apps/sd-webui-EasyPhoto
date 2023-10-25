@@ -898,12 +898,12 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
     #                 np.ones((5, 5), np.uint8), iterations=1)
     # )
 
-    erode_kernal = int(0.2* min(resize_mask1.shape[0], resize_mask1.shape[1]))
+    # erode_kernal = int(0.1* min(resize_mask1.shape[0], resize_mask1.shape[1]))
     mask1_outline = np.uint8(
             cv2.dilate(np.array(resize_mask1), np.ones(
                 (10, 10), np.uint8), iterations=1)
             - cv2.erode(np.array(resize_mask1),
-                        np.ones((erode_kernal, erode_kernal), np.uint8), iterations=1)
+                        np.ones((10, 10), np.uint8), iterations=1)
         )
 
     mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
