@@ -89,7 +89,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
     if unit == "canny":
         if use_preprocess:
             control_unit = ControlNetUnit(
-                input_image=input_image,
+                image=input_image,
                 module="canny",
                 weight=weight,
                 guidance_end=1,
@@ -104,7 +104,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
         else:
             # direct use the inout canny image with inner line
             control_unit = ControlNetUnit(
-                input_image=input_image,
+                image=input_image,
                 module=None,
                 weight=weight,
                 guidance_end=1,
@@ -118,7 +118,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
             print(input_image.shape)
     elif unit == "openpose":
         control_unit = ControlNetUnit(
-            input_image=input_image,
+            image=input_image,
             module="openpose_full",
             weight=weight,
             guidance_end=1,
@@ -147,7 +147,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
         color_image = Image.fromarray(np.uint8(color_image))
 
         control_unit = ControlNetUnit(
-            input_image=color_image,
+            image=color_image,
             module="none",
             weight=weight,
             guidance_end=1,
@@ -157,7 +157,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
         )
     elif unit == "tile":
         control_unit = ControlNetUnit(
-            input_image=input_image,
+            image=input_image,
             module="tile_resample",
             weight=weight,
             guidance_end=1,
@@ -170,7 +170,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
 
     elif unit == "depth":
         control_unit = ControlNetUnit(
-            input_image=input_image,
+            image=input_image,
             module="depth_midas",
             weight=weight,
             guidance_end=1,
