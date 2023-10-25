@@ -37,7 +37,7 @@ Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](
 If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
 
 These are our generated results:
-![results_1](images/results_1.jpg)
+![results_1](images/results.png)
 
 Our ui interface is as follows:  
 **train part:**
