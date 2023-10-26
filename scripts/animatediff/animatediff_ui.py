@@ -47,6 +47,7 @@ class AnimateDiffProcess:
         latent_power=1,
         latent_scale=32,
         last_frame=None,
+        video_frames=None,
         latent_power_last=1,
         latent_scale_last=32,
     ):
@@ -68,6 +69,7 @@ class AnimateDiffProcess:
         self.latent_power = latent_power
         self.latent_scale = latent_scale
         self.last_frame = last_frame
+        self.video_frames = video_frames
         self.latent_power_last = latent_power_last
         self.latent_scale_last = latent_scale_last
 

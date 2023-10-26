@@ -23,7 +23,6 @@ except ImportError:
 
 
 class AnimateDiffMM:
-
     def __init__(self):
         self.mm: MotionWrapper = None
         self.script_dir = None
@@ -37,13 +36,8 @@ class AnimateDiffMM:
     def set_script_dir(self, script_dir):
         self.script_dir = script_dir
 
-
     def _load(self, model_name):
-        model_path = os.path.join(
-            # shared.opts.data.get("animatediff_model_path", os.path.join(self.script_dir, "model")), # original version is model
-            shared.opts.data.get("animatediff_model_path", os.path.join(self.script_dir, "models")),
-            model_name,
-        )
+        model_path = os.path.join(self.script_dir, model_name)
         model_hash, using_v2, guess = self._hash(model_path, model_name)
         if not os.path.isfile(model_path):
             raise RuntimeError("Please download models manually.")
@@ -59,7 +53,6 @@ class AnimateDiffMM:
         self.mm.to(device).eval()
         if not shared.cmd_opts.no_half:
             self.mm.half()
-
 
     def _hash(self, model_path: str, model_name="mm_sd_v15.ckpt"):
         model_hash = hashes.sha256(model_path, f"AnimateDiff/{model_name}")

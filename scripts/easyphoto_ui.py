@@ -8,7 +8,7 @@ from modules import script_callbacks, shared
 
 from scripts.easyphoto_config import (cache_log_file_path, models_path,
                                       user_id_outpath_samples)
-from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
 
@@ -268,7 +268,7 @@ def on_ui_tabs():
                                 ],
                                 outputs=[output_message])
                                 
-        with gr.TabItem('Inference'):
+        with gr.TabItem('Photo Inference'):
             dummy_component = gr.Label(visible=False)
             training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
             infer_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates/*.jpg'))
@@ -589,7 +589,219 @@ def on_ui_tabs():
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
-            
+    
+        with gr.TabItem('Video Inference'):
+            dummy_component     = gr.Label(visible=False)
+
+            with gr.Blocks() as demo:
+                with gr.Row():
+                    with gr.Column():
+                        with gr.TabItem("upload") as upload_video_tab:
+                            init_video = gr.Video(label="Video for easyphoto", elem_id="{id_part}_image", show_label=False, source="upload")
+
+                        with gr.Row():
+                            def checkpoint_refresh_function():
+                                checkpoints = []
+                                models_dir = os.path.join(models_path, "Stable-diffusion")
+                                
+                                for root, dirs, files in os.walk(models_dir):
+                                    for _checkpoint in files:
+                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                            rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
+                                            checkpoints.append(rel_path)
+                                
+                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
+                            
+                            checkpoints = []
+                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                    checkpoints.append(_checkpoint)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
+
+                            checkpoint_refresh = ToolButton(value="\U0001f504")
+                            checkpoint_refresh.click(
+                                fn=checkpoint_refresh_function,
+                                inputs=[],
+                                outputs=[sd_model_checkpoint]
+                            )
+
+                        with gr.Row():
+                            def select_function():
+                                ids = []
+                                if os.path.exists(user_id_outpath_samples):
+                                    _ids = os.listdir(user_id_outpath_samples)
+                                    for _id in _ids:
+                                        if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                            ids.append(_id)
+                                ids = sorted(ids)
+                                return gr.update(choices=["none"] + ids)
+
+                            ids = []
+                            if os.path.exists(user_id_outpath_samples):
+                                _ids = os.listdir(user_id_outpath_samples)
+                                for _id in _ids:
+                                    if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                        ids.append(_id)
+                                ids = sorted(ids)
+
+                            num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid", visible=False)
+
+                            uuids           = []
+                            visibles        = [True, False, False, False, False]
+                            for i in range(int(5)):
+                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=80, label=f"User_{i} id", visible=visibles[i])
+                                uuids.append(uuid)
+
+                            def update_uuids(_num_of_faceid):
+                                _uuids = []
+                                for i in range(int(_num_of_faceid)):
+                                    _uuids.append(gr.update(value="none", visible=True))
+                                for i in range(int(5 - int(_num_of_faceid))):
+                                    _uuids.append(gr.update(value="none", visible=False))
+                                return _uuids
+                            
+                            num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
+                            
+                            refresh = ToolButton(value="\U0001f504")
+                            for i in range(int(5)):
+                                refresh.click(
+                                    fn=select_function,
+                                    inputs=[],
+                                    outputs=[uuids[i]]
+                                )
+
+                        with gr.Accordion("Advanced Options", open=False):
+                            additional_prompt = gr.Textbox(
+                                label="Video Additional Prompt",
+                                lines=3,
+                                value='masterpiece, beauty',
+                                interactive=True
+                            )
+                            seed = gr.Textbox(
+                                label="Video Seed", 
+                                value=-1,
+                            )
+                            with gr.Row():
+                                max_frames = gr.Textbox(
+                                    label="Video Max frames", 
+                                    value=-1,
+                                )
+                                max_fps = gr.Textbox(
+                                    label="Video Max fps", 
+                                    value=16,
+                                )
+                                save_as = gr.Dropdown(
+                                    value="gif", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
+                                )
+
+                            with gr.Row():
+                                before_face_fusion_ratio = gr.Slider(
+                                    minimum=0.2, maximum=0.8, value=0.50,
+                                    step=0.05, label='Video Face Fusion Ratio Before'
+                                )
+                                after_face_fusion_ratio = gr.Slider(
+                                    minimum=0.2, maximum=0.8, value=0.50,
+                                    step=0.05, label='Video Face Fusion Ratio After'
+                                )
+
+                            with gr.Row():
+                                first_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=50,
+                                    step=1, label='Video First Diffusion steps'
+                                )
+                                first_denoising_strength = gr.Slider(
+                                    minimum=0.30, maximum=0.60, value=0.45,
+                                    step=0.05, label='Video First Diffusion denoising strength'
+                                )
+                            with gr.Row():
+                                apply_face_fusion_before = gr.Checkbox(
+                                    label="Video Apply Face Fusion Before", 
+                                    value=True
+                                )
+                                apply_face_fusion_after = gr.Checkbox(
+                                    label="Video Apply Face Fusion After",  
+                                    value=True
+                                )
+                                color_shift_middle = gr.Checkbox(
+                                    label="Video Apply color shift first",  
+                                    value=True
+                                )
+                            with gr.Row():
+                                super_resolution = gr.Checkbox(
+                                    label="Video Super Resolution at last",  
+                                    value=False
+                                )
+                                skin_retouching_bool = gr.Checkbox(
+                                    label="Video Skin Retouching",  
+                                    value=False
+                                )
+                                makeup_transfer = gr.Checkbox(
+                                    label="Video MakeUp Transfer",
+                                    value=False
+                                )
+                            with gr.Row():
+                                face_shape_match = gr.Checkbox(
+                                    label="Video Face Shape Match",
+                                    value=False
+                                )
+
+                            with gr.Row():
+                                super_resolution_method = gr.Dropdown(
+                                    value="gpen", \
+                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=True
+                                )
+                                makeup_transfer_ratio = gr.Slider(
+                                    minimum=0.00, maximum=1.00, value=0.50,
+                                    step=0.05, label='Video Makeup Transfer Ratio',
+                                    visible=False
+                                )
+                                
+                                super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
+                                makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
+
+                            with gr.Box():
+                                gr.Markdown(
+                                    '''
+                                    Parameter parsing:
+                                    1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
+                                    2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
+                                    3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
+                                    4. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
+                                    5. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
+                                    '''
+                                )
+                            
+                        display_button = gr.Button('Start Generation')
+
+                    with gr.Column():
+                        gr.Markdown('Generated Results')
+
+                        output_images = gr.Gallery(
+                            label='Output',
+                            show_label=False
+                        ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                        output_video = gr.Video(
+                            label='Output Video', 
+                            show_label=False, 
+                        )
+
+                        infer_progress = gr.Textbox(
+                            label="Generation Progress",
+                            value="No task currently",
+                            interactive=False
+                        )
+                    
+                display_button.click(
+                    fn=easyphoto_video_infer_forward,
+                    inputs=[sd_model_checkpoint, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                            first_diffusion_steps, first_denoising_strength, seed, apply_face_fusion_before, apply_face_fusion_after, \
+                            color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
+                            makeup_transfer, makeup_transfer_ratio, face_shape_match, model_selected_tab, *uuids],
+                    outputs=[infer_progress, output_images, output_video]
+
+                )
+
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 # 注册设置页的配置项

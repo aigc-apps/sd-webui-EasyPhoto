@@ -1,51 +1,27 @@
 import os
-import logging
-from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import gradio as gr
 import modules
 import modules.scripts as scripts
 import numpy as np
-from scripts.easyphoto_utils import ep_logger
-from modules import processing, scripts, sd_models, sd_samplers, shared, sd_vae
+from modules import processing, scripts, sd_models, sd_samplers, sd_vae, shared
 from modules.api.models import *
-from modules.processing import StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
+from modules.processing import (Processed, StableDiffusionProcessing,
+                                StableDiffusionProcessingImg2Img,
+                                StableDiffusionProcessingTxt2Img)
 from modules.sd_models import get_closet_checkpoint_match, load_model
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
+from scripts.animatediff import AnimateDiffScript
+from scripts.animatediff.animatediff_mm import mm_animatediff as motion_module
+from scripts.animatediff.animatediff_ui import AnimateDiffProcess
+from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
 InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
-
-class ControlMode(Enum):
-    """
-    The improved guess mode.
-    """
-
-    BALANCED = "Balanced"
-    PROMPT = "My prompt is more important"
-    CONTROL = "ControlNet is more important"
-
-class ResizeMode(Enum):
-    """
-    Resize modes for ControlNet input images.
-    """
-
-    RESIZE = "Just Resize"
-    INNER_FIT = "Crop and Resize"
-    OUTER_FIT = "Resize and Fill"
-
-    def int_value(self):
-        if self == ResizeMode.RESIZE:
-            return 0
-        elif self == ResizeMode.INNER_FIT:
-            return 1
-        elif self == ResizeMode.OUTER_FIT:
-            return 2
-        assert False, "NOTREACHED"
 
 class ControlNetUnit:
     """
@@ -59,7 +35,7 @@ class ControlNetUnit:
         model: Optional[str]=None,
         weight: float=1.0,
         image: Optional[InputImage]=None,
-        resize_mode: Union[ResizeMode, int, str] = ResizeMode.INNER_FIT,
+        resize_mode: Union[int, str] = 1,
         low_vram: bool=False,
         processor_res: int=-1,
         threshold_a: float=-1,
@@ -67,7 +43,8 @@ class ControlNetUnit:
         guidance_start: float=0.0,
         guidance_end: float=1.0,
         pixel_perfect: bool=False,
-        control_mode: Union[ControlMode, int, str] = ControlMode.BALANCED,
+        control_mode: Union[int, str] = 0,
+        batch_images = [],
         **_kwargs,
     ):
         self.enabled = enabled
@@ -84,6 +61,7 @@ class ControlNetUnit:
         self.guidance_end = guidance_end
         self.pixel_perfect = pixel_perfect
         self.control_mode = control_mode
+        self.batch_images = batch_images
 
     def __eq__(self, other):
         if not isinstance(other, ControlNetUnit):
@@ -345,11 +323,13 @@ def i2i_inpaint_call(
         sampler=None, 
         include_init_images=False,
 
-        controlnet_units: List[ControlNetUnit] = [],
+        controlnet_units: List[ControlNetUnit]=[],
         use_deprecated_controlnet=False,
-        outpath_samples = "",
-        sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
-        sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        outpath_samples="",
+        sd_vae="vae-ft-mse-840000-ema-pruned.ckpt", 
+        sd_model_checkpoint="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        animatediff_flag=False,
+        animatediff_fps=0,
 ):
     if sampler is None:
         sampler = "Euler a"
@@ -424,7 +404,18 @@ def i2i_inpaint_call(
         if origin_sd_vae != sd_vae:
             reload_model('sd_vae', sd_vae)
 
+    if animatediff_flag:
+        motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
+        motion_module._load('mm_sd_v15_v2.ckpt')
+
+        animate_diff_process = AnimateDiffProcess(enable=True, video_length=len(images), fps=animatediff_fps)
+        animate_diff_script = AnimateDiffScript()
+        animate_diff_script.before_process(p_img2img, animate_diff_process)
+
     processed = processing.process_images(p_img2img)
+    if animatediff_flag:
+        animate_diff_script.postprocess(p_img2img, processed, animate_diff_process)
+        motion_module.remove()
 
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
@@ -432,208 +423,9 @@ def i2i_inpaint_call(
         if origin_sd_vae != sd_vae:
             reload_model('sd_vae', origin_sd_vae)
 
-    if len(processed.images) > 1:
-        # get the generate image!
-        h_0, w_0, c_0 = np.shape(processed.images[0])
-        h_1, w_1, c_1 = np.shape(processed.images[1])
-        if w_1 != w_0:
-            gen_image = processed.images[1]
-        else:
-            gen_image = processed.images[0]
+    if animatediff_flag:
+        gen_image = processed.images
     else:
-        gen_image = processed.images[0]
-    return gen_image
-
-
-if 1:
-    from scripts.animatediff.animatediff_ui import AnimateDiffProcess
-    from scripts.animatediff.animatediff_mm import mm_animatediff as motion_module
-    from scripts.animatediff.animatediff_infotext import update_infotext
-
-    script_dir = scripts.basedir()
-    motion_module.set_script_dir(script_dir)
-    motion_module._load('mm_sd_v15_v2.ckpt')
-    animate_diff_process = AnimateDiffProcess()
-    # tmp = animate_diff_process.get_dict(True)
-    # print(tmp)
-
-    from scripts.animatediff.animatediff_cn import AnimateDiffControl
-    from scripts.animatediff.animatediff_infv2v import AnimateDiffInfV2V
-    from scripts.animatediff.animatediff_lora import AnimateDiffLora
-    from scripts.animatediff.animatediff_latent import AnimateDiffI2VLatent
-    from scripts.animatediff.animatediff_output import AnimateDiffOutput
-    
-    class AnimateDiffScript():
-        def __init__(self):
-            self.lora_hacker = None
-            self.cfg_hacker = None
-            self.cn_hacker = None
-            self.prompt_scheduler = None
-
-        def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable:
-                logger.info("AnimateDiff process start.")
-                params.set_p(p)
-                motion_module.inject(p.sd_model, params.model)
-                self.prompt_scheduler = AnimateDiffPromptSchedule()
-                self.lora_hacker = AnimateDiffLora(motion_module.mm.using_v2)
-                self.lora_hacker.hack()
-                self.cfg_hacker = AnimateDiffInfV2V(p, self.prompt_scheduler)
-                self.cfg_hacker.hack(params)
-                self.cn_hacker = AnimateDiffControl(p, self.prompt_scheduler)
-                self.cn_hacker.hack(params)
-                update_infotext(p, params)
-
-
-        def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable and isinstance(p, StableDiffusionProcessingImg2Img):
-                AnimateDiffI2VLatent().randomize(p, params)
-
-
-        def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable:
-                self.prompt_scheduler.set_infotext(res)
-                self.cn_hacker.restore()
-                self.cfg_hacker.restore()
-                self.lora_hacker.restore()
-                motion_module.restore(p.sd_model)
-                AnimateDiffOutput().output(p, res, params)
-                logger.info("AnimateDiff process end.")
-
-    animate_diff_script = AnimateDiffScript()
-    # this function is modified , to support a image with multiframe constrain input 
-    # and expand image to video with Animatediff pretrained model
-    def i2mi_inpaint_call(
-            images=[],  
-            resize_mode=0,
-            denoising_strength=0.75,
-            image_cfg_scale=1.5,
-            mask_image=None,  # PIL Image mask
-            mask_blur=8,
-            inpainting_fill=0,
-            inpaint_full_res=True,
-            inpaint_full_res_padding=0,
-            inpainting_mask_invert=0,
-            initial_noise_multiplier=1,
-            prompt="",
-            styles=[],
-            seed=-1,
-            subseed=-1,
-            subseed_strength=0,
-            seed_resize_from_h=0,
-            seed_resize_from_w=0,
-
-            batch_size=1,
-            n_iter=1,
-            steps=None,
-            cfg_scale=7.0,
-            width=640,
-            height=768,
-            restore_faces=False,
-            tiling=False,
-            do_not_save_samples=False,
-            do_not_save_grid=False,
-            negative_prompt="",
-            eta=1.0,
-            s_churn=0,
-            s_tmax=0,
-            s_tmin=0,
-            s_noise=1,
-            override_settings={},
-            override_settings_restore_afterwards=True,
-            sampler=None, 
-            include_init_images=False,
-
-            controlnet_units: List[ControlNetUnit] = [],
-            use_deprecated_controlnet=False,
-            outpath_samples = "",
-            sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
-            sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    ):
-        if sampler is None:
-            sampler = "Euler a"
-        if steps is None:
-            steps = 20
-
-        try:
-            origin_sd_model_checkpoint  = opts.sd_model_checkpoint
-            origin_sd_vae               = opts.sd_vae
-        except Exception as e:
-            message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
-            ep_logger.error(f"{message} with Error: {e}")
-            origin_sd_model_checkpoint  = ""
-            origin_sd_vae               = ""
-
-        sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
-        vae_near_checkpoint = find_vae_near_checkpoint(sd_vae)
-        if vae_near_checkpoint is not None:
-            sd_vae = os.path.basename(vae_near_checkpoint)
-        else:
-            sd_vae = None
-
-        p_img2img = StableDiffusionProcessingImg2Img(
-            sd_model=origin_sd_model_checkpoint,
-            outpath_samples=outpath_samples,
-            outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            styles=[],
-            seed=seed,
-            subseed=subseed,
-            subseed_strength=subseed_strength,
-            seed_resize_from_h=seed_resize_from_h,
-            seed_resize_from_w=seed_resize_from_w,
-            sampler_name=sampler,
-            batch_size=batch_size,
-            n_iter=n_iter,
-            steps=steps,
-            cfg_scale=cfg_scale,
-            width=width,
-            height=height,
-            restore_faces=restore_faces,
-            tiling=tiling,
-            init_images=images,
-            mask=mask_image,
-            mask_blur=mask_blur,
-            inpainting_fill=inpainting_fill,
-            resize_mode=resize_mode,
-            denoising_strength=denoising_strength,
-            image_cfg_scale=image_cfg_scale,
-            inpaint_full_res=inpaint_full_res,
-            inpaint_full_res_padding=inpaint_full_res_padding,
-            inpainting_mask_invert=inpainting_mask_invert,
-            override_settings=override_settings,
-            initial_noise_multiplier=initial_noise_multiplier
-        )
-
-        p_img2img.scripts = scripts.scripts_img2img
-        p_img2img.extra_generation_params["Mask blur"] = mask_blur
-        p_img2img.script_args = init_default_script_args(p_img2img.scripts)
-
-        for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-            if alwayson_scripts.name is None:
-                continue
-            if alwayson_scripts.name=='controlnet':
-                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-        
-        if sd_model_checkpoint != origin_sd_model_checkpoint:
-            reload_model('sd_model_checkpoint', sd_model_checkpoint)
-        
-        if sd_vae is not None:
-            if origin_sd_vae != sd_vae:
-                reload_model('sd_vae', sd_vae)
-
-        processed = processing.process_images(p_img2img)
-
-        if sd_model_checkpoint != origin_sd_model_checkpoint:
-            reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
-        if sd_vae is not None:
-            if origin_sd_vae != sd_vae:
-                reload_model('sd_vae', origin_sd_vae)
-
         if len(processed.images) > 1:
             # get the generate image!
             h_0, w_0, c_0 = np.shape(processed.images[0])
@@ -644,4 +436,4 @@ if 1:
                 gen_image = processed.images[0]
         else:
             gen_image = processed.images[0]
-        return gen_image
+    return gen_image

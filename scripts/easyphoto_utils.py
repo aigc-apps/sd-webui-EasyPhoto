@@ -5,12 +5,16 @@ import os
 import time
 from glob import glob
 
+import cv2
+import numpy as np
 import requests
-from modules.paths import models_path
-from tqdm import tqdm
-
-from scripts.easyphoto_config import data_path
+import torch
+import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
+from modules.paths import models_path
+from PIL import Image
+from scripts.easyphoto_config import data_path
+from tqdm import tqdm
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -167,3 +171,83 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
+def get_mov_all_images(file, frames):
+    if file is None:
+        return None
+    cap = cv2.VideoCapture(file)
+
+    if not cap.isOpened():
+        return None
+    
+    # frames不可以大于实际的fps，用于采样
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if frames > fps:
+        print('Waring: The set number of frames is greater than the number of video frames')
+        frames = int(fps)
+
+    # 获得所有帧
+    movies = []
+    while (True):
+        flag, frame = cap.read()
+        if not flag:
+            break
+        else:
+            movies.append(frame)
+    # 获得需要的帧
+    num_pics        = int(frames / int(cap.get(cv2.CAP_PROP_FPS)) * len(movies))
+    target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
+    image_list = []
+    for index in target_indexs:
+        frame = movies[int(index)]
+        image_list.append(frame)
+
+    cap.release()
+
+    image_list = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in image_list]
+    return image_list, frames
+
+def convert_to_video(path, frames, fps, mode="gif"):
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    index = len([path for path in os.listdir(path) if path.endswith(f'.{mode}')]) + 1
+    video_path = os.path.join(path, str(index).zfill(5) + f'.{mode}')
+
+    if mode == "gif":
+        import imageio.v3 as imageio
+        try:
+            import av
+        except ImportError:
+            from launch import run_pip
+            run_pip(
+                "install imageio[pyav]",
+                "sd-webui-animatediff GIF palette optimization requirement: imageio[pyav]",
+            )
+        video_array = [np.array(v) for v in frames]
+        imageio.imwrite(
+            video_path, video_array, plugin='pyav', fps=fps, 
+            codec='gif', out_pixel_format='pal8',
+            filter_graph=(
+                {
+                    "split": ("split", ""),
+                    "palgen": ("palettegen", ""),
+                    "paluse": ("paletteuse", ""),
+                    "scale": ("scale", f"{frames[0].width}:{frames[0].height}")
+                },
+                [
+                    ("video_in", "scale", 0, 0),
+                    ("scale", "split", 0, 0),
+                    ("split", "palgen", 1, 0),
+                    ("split", "paluse", 0, 0),
+                    ("palgen", "paluse", 0, 1),
+                    ("paluse", "video_out", 0, 0),
+                ]
+            )
+        )
+    else:
+        frames = [np.array(frame) for frame in frames]
+        frames = torch.from_numpy(np.array(frames))
+        if not os.path.exists(os.path.dirname(video_path)):
+            os.makedirs(os.path.dirname(video_path))
+        torchvision.io.write_video(video_path, frames, fps=fps, video_codec="libx264")
+    
+    return video_path

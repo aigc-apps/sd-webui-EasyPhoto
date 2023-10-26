@@ -46,24 +46,6 @@ class AnimateDiffControl:
         cn_script = self.cn_script
         prompt_scheduler = self.prompt_scheduler
 
-        def get_input_frames():
-            if params.video_source is not None and params.video_source != '':
-                cap = cv2.VideoCapture(params.video_source)
-                frame_count = 0
-                tmp_frame_dir = Path(f'{data_path}/tmp/animatediff-frames/')
-                tmp_frame_dir.mkdir(parents=True, exist_ok=True)
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    cv2.imwrite(f"{tmp_frame_dir}/{frame_count}.png", frame)
-                    frame_count += 1
-                cap.release()
-                return str(tmp_frame_dir)
-            elif params.video_path is not None and params.video_path != '':
-                return params.video_path
-            return ''
-
         from scripts import external_code
         from scripts.batch_hijack import InputMode, BatchHijack, instance
         def hacked_processing_process_images_hijack(self, p: StableDiffusionProcessing, *args, **kwargs):
@@ -75,32 +57,7 @@ class AnimateDiffControl:
             units = [unit for unit in units if getattr(unit, 'enabled', False)]
 
             if len(units) > 0:
-                global_input_frames = get_input_frames()
-                for idx, unit in enumerate(units):
-                    # if no input given for this unit, use global input
-                    if getattr(unit, 'input_mode', InputMode.SIMPLE) == InputMode.BATCH:
-                        if not (isinstance(unit.batch_images, str) and unit.batch_images != ''):
-                            assert global_input_frames != '', 'No input images found for ControlNet module'
-                            unit.batch_images = global_input_frames
-                    elif unit.image is None:
-                        try:
-                            cn_script.choose_input_image(p, unit, idx)
-                        except:
-                            assert global_input_frames != '', 'No input images found for ControlNet module'
-                            unit.batch_images = global_input_frames
-                            unit.input_mode = InputMode.BATCH
-
-                    if getattr(unit, 'input_mode', InputMode.SIMPLE) == InputMode.BATCH:
-                        if 'inpaint' in unit.module:
-                            images = shared.listfiles(f'{unit.batch_images}/image')
-                            masks = shared.listfiles(f'{unit.batch_images}/mask')
-                            assert len(images) == len(masks), 'Inpainting image mask count mismatch'
-                            unit.batch_images = [{'image': images[i], 'mask': masks[i]} for i in range(len(images))]
-                        else:
-                            unit.batch_images = shared.listfiles(unit.batch_images)
-
-                unit_batch_list = [len(unit.batch_images) for unit in units
-                                if getattr(unit, 'input_mode', InputMode.SIMPLE) == InputMode.BATCH]
+                unit_batch_list = [len(unit.batch_images) for unit in units]
 
                 if len(unit_batch_list) > 0:
                     video_length = min(unit_batch_list)
@@ -113,8 +70,7 @@ class AnimateDiffControl:
                         params.video_length = video_length
                         p.batch_size = video_length
                     for unit in units:
-                        if getattr(unit, 'input_mode', InputMode.SIMPLE) == InputMode.BATCH:
-                            unit.batch_images = unit.batch_images[:params.video_length]
+                        unit.batch_images = unit.batch_images[:params.video_length]
 
             prompt_scheduler.parse_prompt(p)
             update_infotext(p, params)
@@ -146,8 +102,6 @@ class AnimateDiffControl:
         from scripts.adapter import Adapter, Adapter_light, StyleAdapter
         from scripts.batch_hijack import InputMode
         # from scripts.controlnet_lllite import PlugableControlLLLite, clear_all_lllite # do not support controlllite for sdxl
-        from scripts.controlmodel_ipadapter import (PlugableIPAdapter,
-                                                    clear_all_ip_adapter)
         from scripts.hook import ControlModelType, ControlParams, UnetHook
         from scripts.logging import logger
         from scripts.processor import model_free_preprocessors
@@ -209,8 +163,6 @@ class AnimateDiffControl:
                 self.latest_network.restore()
 
             # always clear (~0.05s)
-            # clear_all_lllite() # do not support controlllite for sdxl
-            clear_all_ip_adapter()
 
             self.enabled_units = cn_script.get_enabled_units(p)
 
@@ -253,20 +205,11 @@ class AnimateDiffControl:
                     #     bind_control_lora(unet, control_lora)
                     #     p.controlnet_control_loras.append(control_lora)
 
-                if getattr(unit, 'input_mode', InputMode.SIMPLE) == InputMode.BATCH:
-                    input_images = []
-                    for img in unit.batch_images:
-                        unit.image = img # TODO: SAM extension should use new API
-                        input_image, _ = cn_script.choose_input_image(p, unit, idx)
-                        input_images.append(input_image)
-                else:
-                    input_image, image_from_a1111 = cn_script.choose_input_image(p, unit, idx)
-                    input_images = [input_image]
-
-                    if image_from_a1111:
-                        a1111_i2i_resize_mode = getattr(p, "resize_mode", None)
-                        if a1111_i2i_resize_mode is not None:
-                            resize_mode = external_code.resize_mode_from_value(a1111_i2i_resize_mode)
+                input_images = []
+                for img in unit.batch_images:
+                    unit.image = img # TODO: SAM extension should use new API
+                    input_image, _ = cn_script.choose_input_image(p, unit, idx)
+                    input_images.append(input_image)
 
                 for idx, input_image in enumerate(input_images):
                     a1111_mask_image : Optional[Image.Image] = getattr(p, "image_mask", None)
@@ -354,8 +297,6 @@ class AnimateDiffControl:
                     control_model_type = ControlModelType.T2I_Adapter
                 elif hasattr(model_net, 'control_model') and isinstance(model_net.control_model, StyleAdapter):
                     control_model_type = ControlModelType.T2I_StyleAdapter
-                elif isinstance(model_net, PlugableIPAdapter):
-                    control_model_type = ControlModelType.IPAdapter
                 # elif isinstance(model_net, PlugableControlLLLite): # do not support controlllite for sdxl
                 #     control_model_type = ControlModelType.Controlllite
 
