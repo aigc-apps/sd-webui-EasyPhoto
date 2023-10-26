@@ -244,7 +244,8 @@ def t2i_call(
 
     sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
     if sd_vae is not None:
-        sd_vae = os.path.basename(vae_near_checkpoint = find_vae_near_checkpoint(sd_vae))
+        vae_near_checkpoint = find_vae_near_checkpoint(sd_vae)
+        sd_vae = os.path.basename(vae_near_checkpoint)
     else:
         sd_vae = None
 
@@ -450,8 +451,13 @@ def i2i_inpaint_call(
 
 
 def get_checkpoint_type(sd_model_checkpoint: str) -> int:
-    """Get the type (1 means SD1; 2 means SD2; 3 means SDXL) 
-    of the stable diffusion model given the checkpoint name `sd_model_checkpoint`.
+    """Get the type of the stable diffusion model given the checkpoint name.
+
+    Args:
+        sd_model_checkpoint (str): the checkpoint name.
+    
+    Returns:
+        An integer representing the model type (1 means SD1; 2 means SD2; 3 means SDXL).
     """
     ckpt_path = os.path.join(models_path, "Stable-diffusion", sd_model_checkpoint)
     timer = Timer()
@@ -468,14 +474,20 @@ def get_checkpoint_type(sd_model_checkpoint: str) -> int:
 
 
 def get_lora_type(filename: str) -> int:
-    """Get the type (1 means SD1; 2 means SD2; 3 means SDXL) of the Lora given the path `filename`.
-    Modified from `extensions-builtin/Lora/network.py`.
+    """Get the type of the Lora given the path `filename`. Modified from `extensions-builtin/Lora/network.py`.
+
+    Args:
+        filename (str): the Lora file path.
+    
+    Returns:
+        An integer representing the Lora type (1 means SD1; 2 means SD2; 3 means SDXL).
     """
     # Firstly, read the metadata of the Lora from the cache. If the Lora is added to the folder 
-    # after the SD Web UI launch, then read the Lora from the hard disk to get the metadata.
+    # after the SD Web UI launches, then read the Lora from the hard disk to get the metadata.
     try:
         name = os.path.splitext(os.path.basename(filename))[0]
         read_metadata = lambda filename: sd_models.read_metadata_from_safetensors(filename)
+        # It will return None if the Lora file has not be cached before.
         metadata = cache.cached_data_for_file("safetensors-metadata", "lora/" + name, filename, read_metadata)
     except TypeError as e:
         metadata = sd_models.read_metadata_from_safetensors(filename)
