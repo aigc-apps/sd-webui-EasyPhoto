@@ -1,6 +1,8 @@
+import argparse
 import base64
 import json
 import sys
+import os
 import time
 from datetime import datetime
 from io import BytesIO
@@ -8,6 +10,8 @@ from io import BytesIO
 import cv2
 import numpy as np
 import requests
+from glob import glob 
+from tqdm import tqdm
 
 
 def decode_image_from_base64jpeg(base64_image):
@@ -16,9 +20,11 @@ def decode_image_from_base64jpeg(base64_image):
     image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     return image
 
-def post(encoded_image, url='http://0.0.0.0:7860'):
+def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
+    if user_id is None:
+        user_id = 'test'
     datas = json.dumps({
-        "user_ids"              : ["test"], 
+        "user_ids"              : [user_id], 
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "init_image"            : encoded_image, 
 
@@ -59,14 +65,28 @@ if __name__ == '__main__':
         The first: make sure the directory is full of readable images
         The second: public link of readable picture
     '''
-    
+    parser = argparse.ArgumentParser(description='Description of your script')
+
+    parser.add_argument('--template_dir', type=str, default='', help='Path to the template directory')
+    parser.add_argument('--output_path', type=str, default='./',help='Path to the output directory')
+    parser.add_argument('--user_ids', type=str, default='test',help='Test user ids, split with space')
+
+    args = parser.parse_args()
+
+    template_dir = args.template_dir
+    output_path = args.output_path
+    user_ids = args.user_ids.split(' ')
+
+    if output_path !='./':
+        os.makedirs(output_path, exist_ok=True)
+
     # initiate time
     now_date    = datetime.now()
     time_start  = time.time()  
     
     # -------------------test infer------------------- #
     # When there is no parameter input.
-    if len(sys.argv) == 1:
+    if template_dir == '':
         encoded_image = 'https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg'
         encoded_image = requests.get(encoded_image) 
         encoded_image = base64.b64encode(BytesIO(encoded_image.content).read()).decode('utf-8')
@@ -74,16 +94,30 @@ if __name__ == '__main__':
         outputs = post(encoded_image)
         outputs = json.loads(outputs)
         image = decode_image_from_base64jpeg(outputs["outputs"][0])
-        cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
+        toutput_path = os.path.join(os.path.join(output_path), img_path.split('/')[-1])
+        cv2.imwrite(toutput_path, image)
 
     # When selecting a local file as a parameter input.
-    elif len(sys.argv) == 2:
-        with open(sys.argv[1], 'rb') as f:
-            encoded_image = base64.b64encode(f.read()).decode('utf-8')
-            outputs = post(encoded_image)
-            outputs = json.loads(outputs)
-            image = decode_image_from_base64jpeg(outputs["outputs"][0])
-            cv2.imwrite(f"{now_date.hour}-{now_date.minute}-{now_date.second}" + ".jpg", image)
+    else:
+        img_list = glob(os.path.join(template_dir, '*.jpg'))
+        if len(img_list) == 0:
+            print(f' Input template dir {template_dir} contains not jpg images')
+        else:
+            print(f' Total {len(img_list)} templates to test for {len(user_ids)} ID')
+
+
+        # please set your test user ids in args
+        for user_id in tqdm(user_ids):
+            for img_path in tqdm(img_list):
+                print(f' Call generate for ID ({user_id}) and Template ({img_path})')
+                with open(img_path, 'rb') as f:
+                    encoded_image = base64.b64encode(f.read()).decode('utf-8')
+                    outputs = post(encoded_image, user_id)
+                    outputs = json.loads(outputs)
+                    image = decode_image_from_base64jpeg(outputs["outputs"][0])
+                    toutput_path = os.path.join(os.path.join(output_path), f'{user_id}_' + os.path.basename(img_path))
+                    print(output_path)
+                    cv2.imwrite(toutput_path, image)
 
     # End of record time
     # The calculated time difference is the execution time of the program, expressed in seconds / s
