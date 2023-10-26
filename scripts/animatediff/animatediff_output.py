@@ -1,6 +1,7 @@
 import base64
 from pathlib import Path
 
+import copy
 import imageio.v3 as imageio
 import numpy as np
 from PIL import Image, PngImagePlugin
@@ -20,12 +21,15 @@ except ImportError:
 
 class AnimateDiffOutput:
     def output(
-        self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess
+        self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess, select = False
     ):
         video_paths = []
         logger.info("Merging images into GIF.")
         Path(f"{p.outpath_samples}/AnimateDiff").mkdir(exist_ok=True, parents=True)
         step = params.video_length if params.video_length > params.batch_size else params.batch_size
+        
+        origin_video = []
+        index = 0
         for i in range(res.index_of_first_image, len(res.images), step):
             # frame interpolation replaces video_list with interpolated frames
             # so make a copy instead of a slice (reference), to avoid modifying res
@@ -38,14 +42,16 @@ class AnimateDiffOutput:
             video_list = self._add_reverse(params, video_list)
             video_list = self._interp(p, params, video_list, filename)
             video_paths += self._save(params, video_list, video_path_prefix, res, i)
-
+            if index == 0:
+                origin_video = copy.deepcopy(video_list)
+            index += 1
 
         if len(video_paths) > 0:
-            if not p.is_api:
-                res.images = video_paths
-            else:
+            # if not p.is_api:
+            #     res.images = video_paths
+            # else:
                 # res.images = self._encode_video_to_b64(video_paths)
-                res.images = video_list
+            res.images = origin_video
 
     def _add_reverse(self, params: AnimateDiffProcess, video_list: list):
         if 0 in params.reverse:
