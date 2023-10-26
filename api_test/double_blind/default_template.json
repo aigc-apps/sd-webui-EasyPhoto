@@ -1,0 +1,10 @@
+{
+    "show_references": true,
+    "num_reference_imgs": 2,
+    "max_once": 15,
+    "questions": [
+        "更美观?/Beauty?",
+        "更像本人?/Similar?",
+        "更真实?/Reality?"
+    ]
+}

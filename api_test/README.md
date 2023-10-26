@@ -21,3 +21,23 @@
 
 
 ![infer](https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/reademe/infer.png)
+
+
+### 双盲测试
+基于上述的推理代码，我们可以可以实现预定模板和预定人物的Lora的批量生成，并由此对两个版本的代码的生成结果进行双盲测试，下面，我们简单的使用一个例子进行双盲测试。
+
+- 准备预设模板
+- 准备预设Lora
+- 运行批量推理代码
+```python
+python3 post_infer.py --template_dir xx --lora_path xx --output_path data/version1
+```
+- 运行数据整理代码
+```python
+python3 ./double_blind/format_data2json.py data/version1 data/version2 
+```
+- 运行./double_blind/app.py 获取如下双盲测试页面。
+```python
+python3 app.py --data-path compare_version1_version2.json  --result-path result.json
+```
+运行上述代码后，会得到一个如下页面。如果在域名指定的机器，则可分享相关测试域名(待补充)，然后获得 version1 和version2的 winning rate，作为PR记录。
