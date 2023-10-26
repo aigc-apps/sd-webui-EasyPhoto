@@ -40,10 +40,10 @@ python3 post_infer.py --template_dir templates --output_path test_data/version1
 ```
 - 运行数据整理代码
 ```python
-python3 ./double_blind/format_data2json.py ref_image test_data/version1 test_data/version2 
+python3 ./double_blind/format_data2json.py  --ref_images ref_image  --version1_dir test_data/version1 --version2_dir test_data/version2 --output_json test_v1_v2.json
 ```
 - 运行./double_blind/app.py 获取如下双盲测试页面。
 ```python
-python3 ./double_blind/app.py --data-path compare_version1_version2.json  --result-path result.json
+python3 ./double_blind/app.py --data-path test_v1_v2.json  --result-path ./result.jsonl
 ```
 运行上述代码后，会得到一个如下页面。如果在域名指定的机器，则可分享相关测试域名(待补充)，然后获得 version1 和version2的 winning rate，作为PR记录。
