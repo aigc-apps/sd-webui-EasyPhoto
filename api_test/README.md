@@ -39,7 +39,7 @@
         - id2.jpg
 - 运行批量推理代码
 ```python
-python3 post_infer.py --template_dir templates --output_path test_data/version1
+python3 post_infer.py --template_dir templates --output_path test_data/version1 --user_ids your_id
 ```
 - 运行数据整理代码
 ```python
@@ -49,4 +49,4 @@ python3 ./double_blind/format_data2json.py  --ref_images ref_image  --version1_d
 ```python
 python3 ./double_blind/app.py --data-path test_v1_v2.json  --result-path ./result.jsonl
 ```
-运行上述代码后，会得到一个如下页面。如果在域名指定的机器，则可分享相关测试域名(待补充)，然后获得 version1 和version2的 winning rate，作为PR记录。
+运行上述代码后，会得到一个上述页面。如果在域名指定的机器，则可分享相关测试域名(待补充)，然后获得 version1和version2的 WinningRate，作为PR的记录。
