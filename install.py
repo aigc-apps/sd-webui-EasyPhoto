@@ -18,13 +18,18 @@ if not launch.is_installed("onnxruntime"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install onnxruntime", "requirements for onnxruntime")
 
-if not launch.is_installed("modelscope==1.8.4"):
+if not launch.is_installed("modelscope==1.9.3"):
     print('Installing requirements for easyphoto-webui')
-    launch.run_pip("install modelscope==1.8.4", "requirements for modelscope")
+    launch.run_pip("install modelscope==1.9.3", "requirements for modelscope")
 
 if not launch.is_installed("diffusers==0.18.2"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
+
+# Temporarily pin fsspec==2023.9.2. See https://github.com/huggingface/datasets/issues/6330 for details.
+if not launch.is_installed("fsspec==2023.9.2"):
+    print('Installing requirements for easyphoto-webui')
+    launch.run_pip("install fsspec==2023.9.2", "requirements for fsspec")
 
 # `StableDiffusionXLPipeline` in diffusers requires the invisible-watermark library.
 if not launch.is_installed("invisible-watermark"):

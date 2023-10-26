@@ -844,7 +844,7 @@ class PSGAN_Inference:
         """
         Args:
             device (str): Device type and index, such as "cpu" or "cuda:2".
-            device_id (int): Specefying which devide index
+            device_id (int): Specifying which device index
                 will be used for inference.
         """
         self.device = device
@@ -855,10 +855,10 @@ class PSGAN_Inference:
     def transfer(self, source: Image, reference: Image):
         """
         Args:
-            source (Image): The image where makeup will be transfered to.
+            source (Image): The image where makeup will be transferred to.
             reference (Image): Image containing targeted makeup.
         Return:
-            Image: Transfered image.
+            Image: Transferred image.
         """
         source_input, face, crop_face   = self.preprocess(source)
         reference_input, _, _           = self.preprocess(reference)

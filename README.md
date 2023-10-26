@@ -255,10 +255,29 @@ We've also listed some great open source projects as well as any extensions you 
 This project is licensed under the [Apache License (Version 2.0)](https://github.com/modelscope/modelscope/blob/master/LICENSE).
 
 # ContactUS
-1. Use [Dingding](https://www.dingtalk.com/) to search group `38250008552` or Scan to join
+1. Use [Dingding](https://www.dingtalk.com/) to search group-2 `54095000124` or Scan to join
 2. Since the WeChat group is full, you need to scan the image on the right to add this student as a friend first, and then join the WeChat group.
 
 <figure>
-<img src="images/erweima.jpg" width=300/>
+<img src="images/ding_erweima.jpg" width=300/>
 <img src="images/wechat.jpg" width=300/>
 </figure>
+
+
+# Contributors ✨
+
+Thanks goes to these wonderful people :
+
+<table>
+  <tr>
+     <td>
+  <a href="https://github.com/aigc-apps/sd-webui-EasyPhoto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=aigc-apps/sd-webui-EasyPhoto" />
+  </a>
+    </td>
+  </tr>
+</table>
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+
+<p align="right"><a href="#top">Back to top</a></p>
