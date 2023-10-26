@@ -57,6 +57,10 @@ def easyphoto_train_forward(
     if user_id in ids:
         return "User id non-repeatability."
     
+    if int(rank) < int(network_alpha):
+        return "The network alpha {} must not exceed rank {}. " \
+            "It will result in an unintended LoRA.".format(network_alpha, rank)
+    
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint: {}.".format(sd_model_checkpoint)
@@ -160,12 +164,6 @@ def easyphoto_train_forward(
             "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"),
             **os.environ.copy()
         }
-        # # SDXL LoRA training requires large GPU memory, clearing the cache models in the Web UI.
-        # We should recommend users launch SD Web UI with `--use-cpu all --no-half`.
-        # from modules import sd_models, shared
-
-        # origin_sd_model_checkpoint  = shared.opts.sd_model_checkpoint
-        # sd_models.unload_model_weights(origin_sd_model_checkpoint)
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
@@ -338,10 +336,6 @@ def easyphoto_train_forward(
                 # The cached log file will be cleared when times out or errors occur.
                 with open(cache_log_file_path, "w") as _:
                     pass
-    
-    # if sdxl_pipeline_flag:
-    #     opts.sd_model_checkpoint = origin_sd_model_checkpoint
-    #     sd_models.reload_model_weights()
 
     best_weight_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
     # Currently, SDXL training doesn't support the model selection and ensemble. We use the final
