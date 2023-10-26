@@ -134,7 +134,7 @@ def on_ui_tabs():
                                 )
                             
                             with gr.Row():
-                                sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Advance-SDXL-Training"
+                                sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Advance%E2%80%90SDXL-Training"
                                 sdxl_training_note = gr.Markdown(
                                     value = "Please check the [wiki]({}) before SDXL training.".format(sdxl_wiki_url),
                                     visible=False
@@ -246,7 +246,7 @@ def on_ui_tabs():
                         gr.Markdown(
                             '''
                             Parameter parsing:
-                            - **The base checkpoint** can be SD1 and SDXL.
+                            - **The base checkpoint** can be SD1 or SDXL.
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
@@ -327,7 +327,7 @@ def on_ui_tabs():
 
                             upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
 
-                        with gr.TabItem("SDXL-beta") as generate_tab:
+                        with gr.TabItem("text2photo") as generate_tab:
                             
                             sd_xl_resolution  = gr.Dropdown(
                                 value="(1344, 768)", elem_id='dropdown', 
