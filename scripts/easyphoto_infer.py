@@ -9,7 +9,7 @@ import torch
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from modules import script_callbacks, shared
+from modules import script_callbacks, shared, sd_vae
 from modules.images import save_image
 from modules.paths import models_path
 from modules.shared import opts, state
@@ -27,8 +27,10 @@ from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
-from scripts.sdwebui import i2i_inpaint_call, t2i_call
+from scripts.sdwebui import i2i_inpaint_call, t2i_call, sdcontext
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
+
+from modules import sd_models
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
@@ -207,6 +209,7 @@ check_hash = True
 
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator() 
+@sdcontext()
 def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
@@ -216,8 +219,16 @@ def easyphoto_infer_forward(
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
+    if sd_model_checkpoint != shared.opts.sd_model_checkpoint:
+        # sd_models.unload_model_weights()
+        shared.opts.sd_model_checkpoint = sd_model_checkpoint
+        sd_models.reload_model_weights()
+    
+    shared.opts.vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+    sd_vae.reload_vae_weights()
+
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
+    # check_files_exists_and_download(check_hash)
     check_hash = False
 
     for user_id in user_ids:
@@ -356,14 +367,18 @@ def easyphoto_infer_forward(
     if tabs == 3:
         ep_logger.info(sd_xl_input_prompt)
         sd_xl_resolution = eval(str(sd_xl_resolution))
-        template_images = txt2img(
-            [], input_prompt = sd_xl_input_prompt, \
-            diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
-            default_positive_prompt=DEFAULT_POSITIVE_XL, \
-            default_negative_prompt=DEFAULT_NEGATIVE_XL, \
-            seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
-            sampler = "DPM++ 2M SDE Karras"
-        )
+
+        with sdcontext():
+            shared.opts.sd_model_checkpoint = SDXL_MODEL_NAME
+            shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
+            template_images = txt2img(
+                [], input_prompt = sd_xl_input_prompt, \
+                diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
+                default_positive_prompt=DEFAULT_POSITIVE_XL, \
+                default_negative_prompt=DEFAULT_NEGATIVE_XL, \
+                seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
+                sampler = "DPM++ 2M SDE Karras"
+            )
         template_images = [np.uint8(template_images)]
 
     outputs, face_id_outputs    = [], []
