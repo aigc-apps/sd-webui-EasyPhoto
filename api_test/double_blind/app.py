@@ -59,8 +59,6 @@ def next_item():
         gr.Info('感谢您参与EasyPhoto的评测，本次评测已全部完成~🥰\nThank you for participating in the EasyPhoto review, this review is complete ~🥰')
         return None, [], None, None, draw_results()
     id = random.choice(list(ids))
-    print("fuck next : ", id)
-    # 随机放置img1 和 img2
     if random.random() < 0.5:
         id2data[id]['left'] = 'img1'
         left_img = id2data[id]['img1']
@@ -129,6 +127,8 @@ if __name__=="__main__":
 
     args = parser.parse_args()
     # global data
+    if not os.path.exists(args.template_file):
+        args.template_file = './double_blind/default_template.json'
     template = read_json(args.template_file)
     data = read_json(args.data_path)
 

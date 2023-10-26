@@ -24,20 +24,26 @@
 
 
 ### 双盲测试
-基于上述的推理代码，我们可以可以实现预定模板和预定人物的Lora的批量生成，并由此对两个版本的代码的生成结果进行双盲测试，下面，我们简单的使用一个例子进行双盲测试。
+基于上述的推理代码，我们可以实现预定模板和预定人物的Lora的批量测试图片生成，形成某个版本的记录。并基于此对两个版本的代码的生成结果进行双盲测试，下面，我们简单的使用一个例子进行双盲测试。
 
-- 准备预设模板
-- 准备预设Lora
+- 按照环境准备，在环境准备相关的user_id模型
+- 准备预设模板和上面user_id对应的真人图片
+    - templates
+        - 1.jpg
+        - 2.jpg
+    - ref_image
+        - id1.jpg
+        - id2.jpg
 - 运行批量推理代码
 ```python
-python3 post_infer.py --template_dir xx --lora_path xx --output_path data/version1
+python3 post_infer.py --template_dir templates --output_path test_data/version1
 ```
 - 运行数据整理代码
 ```python
-python3 ./double_blind/format_data2json.py data/version1 data/version2 
+python3 ./double_blind/format_data2json.py ref_image test_data/version1 test_data/version2 
 ```
 - 运行./double_blind/app.py 获取如下双盲测试页面。
 ```python
-python3 app.py --data-path compare_version1_version2.json  --result-path result.json
+python3 ./double_blind/app.py --data-path compare_version1_version2.json  --result-path result.json
 ```
 运行上述代码后，会得到一个如下页面。如果在域名指定的机器，则可分享相关测试域名(待补充)，然后获得 version1 和version2的 winning rate，作为PR记录。
