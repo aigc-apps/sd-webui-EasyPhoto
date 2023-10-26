@@ -27,7 +27,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
-from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call, get_checkpoint_type, get_lora_type
+from scripts.sdwebui import i2i_inpaint_call, t2i_call, get_checkpoint_type, get_lora_type
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -135,6 +135,7 @@ def txt2img(
     default_positive_prompt = DEFAULT_POSITIVE,
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
+    sd_vae = None,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
     sampler = "DPM++ 2M SDE Karras"
 ):
@@ -157,6 +158,7 @@ def txt2img(
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
+        sd_vae=sd_vae,
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_txt2img_samples,
         sampler=sampler,
@@ -252,7 +254,6 @@ def easyphoto_infer_forward(
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []  
             # Check if the type of the stable diffusion model and the user LoRA match.
-            # sdxl_lora_flag = True if "sdxl" in user_id else False
             sdxl_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
             sdxl_lora_flag = True if sdxl_lora_type == 3 else False
             if sdxl_lora_flag != sdxl_pipeline_flag:
@@ -411,7 +412,7 @@ def easyphoto_infer_forward(
             diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
             default_positive_prompt=DEFAULT_POSITIVE_XL, \
             default_negative_prompt=DEFAULT_NEGATIVE_XL, \
-            seed = seed, sd_model_checkpoint = SDXL_MODEL_NAME, 
+            seed = seed, sd_vae=None, sd_model_checkpoint = SDXL_MODEL_NAME, 
             sampler = "DPM++ 2M SDE Karras"
         )
         template_images = [np.uint8(template_images)]
@@ -422,6 +423,7 @@ def easyphoto_infer_forward(
         template_idx_info = f'''
             Start Generate template                 : {str(template_idx + 1)};
             user_ids                                : {str(user_ids)};
+            sd_model_checkpoint                     : {str(sd_model_checkpoint)};
             input_prompts                           : {str(input_prompts)};
             before_face_fusion_ratio                : {str(before_face_fusion_ratio)}; 
             after_face_fusion_ratio                 : {str(after_face_fusion_ratio)};
@@ -436,9 +438,13 @@ def easyphoto_infer_forward(
             color_shift_middle                      : {str(color_shift_middle)}
             color_shift_last                        : {str(color_shift_last)}
             super_resolution                        : {str(super_resolution)}
+            super_resolution_method                 : {str(super_resolution_method)}
             display_score                           : {str(display_score)}
             background_restore                      : {str(background_restore)}
             background_restore_denoising_strength   : {str(background_restore_denoising_strength)}
+            makeup_transfer                         : {str(makeup_transfer)}
+            makeup_transfer_ratio                   : {str(makeup_transfer_ratio)}
+            skin_retouching_bool                    : {str(skin_retouching_bool)}
         '''
         ep_logger.info(template_idx_info)
         try:
@@ -537,7 +543,6 @@ def easyphoto_infer_forward(
                 # Paste user images onto template images
                 replaced_input_image = crop_and_paste(face_id_images[index], face_id_retinaface_masks[index], input_image, face_id_retinaface_keypoints[index], input_image_retinaface_keypoint, face_id_retinaface_boxes[index])
                 replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
-                # replaced_input_image.save("replaced_input_image.png")  # debug: hkz
                 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
@@ -586,9 +591,8 @@ def easyphoto_infer_forward(
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
                 else:
-                    controlnet_pairs = [["sdxl_canny", input_image, 0.50], ["sdxl_openpose", replaced_input_image, 0.50]]
-                    # controlnet_pairs = []  # hkz: Debug
-                # input_image.save("first_diffusion_input_image.png")  # hkz: Debug
+                    # controlnet_pairs = [["sdxl_canny", input_image, 0.50], ["sdxl_openpose", replaced_input_image, 0.50]]
+                    controlnet_pairs = []
                 first_diffusion_output_image = inpaint(
                     input_image,
                     input_mask,
@@ -601,7 +605,6 @@ def easyphoto_infer_forward(
                     sd_vae=sd_vae,
                     sd_model_checkpoint=sd_model_checkpoint,
                 )
-                # first_diffusion_output_image.save("first_diffusion_output_image.png")  # hkz: Debug
 
                 if color_shift_middle:
                     # apply color shift
@@ -662,8 +665,7 @@ def easyphoto_infer_forward(
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                 else:
                     # controlnet_pairs = [["sdxl_canny", fusion_image, 1.00]]
-                    controlnet_pairs = []  # debug: hkz
-                # input_image.save("second_diffusion_input_image.png")  # debug: hkz
+                    controlnet_pairs = []
                 second_diffusion_output_image = inpaint(
                     input_image,
                     input_mask,
@@ -676,7 +678,6 @@ def easyphoto_infer_forward(
                     sd_vae=sd_vae,
                     sd_model_checkpoint=sd_model_checkpoint
                 )
-                # second_diffusion_output_image.save("second_diffusion_output_image.png")  # debug: hkz
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -758,7 +759,7 @@ def easyphoto_infer_forward(
 
             try:
                 if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1 or background_restore:
-                    ep_logger.info("Start Thirt diffusion for background.")
+                    ep_logger.info("Start Third diffusion for background.")
                     output_image    = Image.fromarray(np.uint8(output_image))
                     short_side      = min(output_image.width, output_image.height)
                     if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
@@ -773,7 +774,7 @@ def easyphoto_infer_forward(
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
                     else:
-                        controlnet_pairs = [["sdxl_canny", output_image, 1.00]]
+                        controlnet_pairs = []
                     output_image = inpaint(
                         output_image,
                         output_mask,
