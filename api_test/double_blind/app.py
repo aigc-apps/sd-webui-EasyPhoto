@@ -7,7 +7,6 @@ import gradio as gr
 import pandas as pd
 
 
-
 def read_json(file_path: str):
     return json.load(open(file_path))
 
@@ -32,7 +31,13 @@ def save_result(id, submit_cnt, *eval_results):
         return None, [], None, None, draw_results(), submit_cnt
         
     if not all(eval_results):
-        raise gr.Error('请完整填写所有问题的答案。\nPlease complete the answers to all questions.')
+        gr.Warning('请完整填写所有问题的答案。\nPlease complete the answers to all questions.')
+        return next_item(id) + (submit_cnt,)
+
+    if id is None:
+        gr.Info('感谢您参与EasyPhoto的评测，本次评测已全部完成~🥰\nThank you for participating in the EasyPhoto review, this review is complete ~🥰')
+        return None, [], None, None, draw_results(), submit_cnt
+
     if id in ids:
         ids.remove(id)
     item = id2data[id]
@@ -52,13 +57,15 @@ def save_result(id, submit_cnt, *eval_results):
     results.append(result)
     write_jsonl(result, args.result_path)
 
-    return next_item() + (submit_cnt + 1,)
+    return next_item(None) + (submit_cnt + 1,)
 
-def next_item():
+def next_item(id):
     if len(ids) <= 0:
         gr.Info('感谢您参与EasyPhoto的评测，本次评测已全部完成~🥰\nThank you for participating in the EasyPhoto review, this review is complete ~🥰')
         return None, [], None, None, draw_results()
-    id = random.choice(list(ids))
+    if id is None:
+        id = random.choice(list(ids))
+    
     if random.random() < 0.5:
         id2data[id]['left'] = 'img1'
         left_img = id2data[id]['img1']
@@ -69,7 +76,7 @@ def next_item():
         right_img = id2data[id]['img1']
         
     item = id2data[id]
-    
+
     return item['id'], [(x, '') for x in item['reference_imgs']], left_img, right_img, draw_results()
 
 def draw_results():
@@ -105,6 +112,7 @@ def draw_results():
 
     results_for_drawing['Winner'] = [data[0]['method1']] * (num_questions + 1) + ['Tie'] * (num_questions + 1) + [data[0]['method2']] * (num_questions + 1)
     results_for_drawing = pd.DataFrame(results_for_drawing)
+
     return gr.BarPlot(
         results_for_drawing,
         x="Questions",
@@ -204,6 +212,7 @@ if __name__=="__main__":
             }\
         ", inputs=None, outputs=[]
         )
+
         submit.click(save_result, inputs=[id, submit_cnt] + eval_results, outputs=[id, reference_imgs, left_img, right_img, plot, submit_cnt])
         next_btn.click(next_item, inputs=None, outputs=[id, reference_imgs, left_img, right_img, plot])
 
