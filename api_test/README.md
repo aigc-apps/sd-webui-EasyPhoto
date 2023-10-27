@@ -37,7 +37,7 @@
     - ref_image
         - id1.jpg
         - id2.jpg
-- 运行批量推理代码
+- 运行批量推理代码: version1, version2 需要分别推理一次。
 ```python
 python3 post_infer.py --template_dir templates --output_path test_data/version1 --user_ids your_id
 ```
