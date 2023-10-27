@@ -28,7 +28,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "init_image"            : encoded_image, 
 
-        "first_diffusion_steps"     : 50,
+        "first_diffusion_steps"     : 20,
         "first_denoising_strength"  : 0.45,
         "second_diffusion_steps"    : 20,
         "second_denoising_strength" : 0.35,
@@ -99,9 +99,13 @@ if __name__ == '__main__':
 
     # When selecting a local file as a parameter input.
     else:
-        img_list = glob(os.path.join(template_dir, '*.jpg'))
+        image_formats = ['*.jpg', '*.jpeg', '*.png', '*.webp']
+        img_list = []
+        for image_format in image_formats:
+            img_list.extend(glob(os.path.join(template_dir, image_format)))
+      
         if len(img_list) == 0:
-            print(f' Input template dir {template_dir} contains not jpg images')
+            print(f' Input template dir {template_dir} contains no images')
         else:
             print(f' Total {len(img_list)} templates to test for {len(user_ids)} ID')
 
@@ -110,14 +114,19 @@ if __name__ == '__main__':
         for user_id in tqdm(user_ids):
             for img_path in tqdm(img_list):
                 print(f' Call generate for ID ({user_id}) and Template ({img_path})')
+                cv2.imread(img_path)
                 with open(img_path, 'rb') as f:
                     encoded_image = base64.b64encode(f.read()).decode('utf-8')
                     outputs = post(encoded_image, user_id)
                     outputs = json.loads(outputs)
-                    image = decode_image_from_base64jpeg(outputs["outputs"][0])
-                    toutput_path = os.path.join(os.path.join(output_path), f'{user_id}_' + os.path.basename(img_path))
-                    print(output_path)
-                    cv2.imwrite(toutput_path, image)
+
+                    if len(outputs["outputs"]):
+                        image = decode_image_from_base64jpeg(outputs["outputs"][0])
+                        toutput_path = os.path.join(os.path.join(output_path), f'{user_id}_' + os.path.basename(img_path))
+                        print(output_path)
+                        cv2.imwrite(toutput_path, image)
+                    else:
+                        print('Error!', outputs['message'])
 
     # End of record time
     # The calculated time difference is the execution time of the program, expressed in seconds / s

@@ -34,16 +34,19 @@ if __name__=="__main__":
 
     args = parser.parse_args()
 
-
-    ref_images = glob(os.path.join(args.ref_images, '*.jpg')) + glob(os.path.join(args.ref_images, '*.jpg'))
+    image_formats = ['*.jpg', '*.jpeg', '*.png', '*.webp']
+    ref_images = []
+    for image_format in image_formats:
+        ref_images.extend(glob(os.path.join(args.ref_images, image_format)))
+        
     if len(ref_images) == 0:
-        print(f'Your test_dirs/{args.ref_images} contains no reference images')
+        print(f'Your reference dir contains no reference images. Set --ref_images to your user_id reference directory')
     else:
         print(f'reference images contains : {ref_images}')
 
     ref_dicts = format_ref_images(ref_images)
-
     # print(ref_dicts)
+
     result_data = []
     abs_path=True
 
@@ -57,24 +60,31 @@ if __name__=="__main__":
             if filename.endswith(".jpg"):
                 file_path = os.path.join(root, filename)
                 file_path2 = os.path.join(version2_dir, filename)
+                
                 reference = find_value_for_key(file_path, ref_dicts)
-                if abs_path:
-                    file_path = os.path.abspath(file_path)
-                    file_path2 = os.path.abspath(file_path2)
-                    reference = [os.path.abspath(t) for t in reference]
-                if  os.path.exists(file_path2) and reference is not None:
-                    data_item = {
-                        "id": len(result_data), 
-                        "method1": method_a,  
-                        "img1": file_path,  
-                        "method2": method_b,  
-                        "img2": file_path2, 
-                        "reference_imgs": reference 
-                    }
-       
-                    result_data.append(data_item)
+                
+                if reference:
+                    if abs_path:
+                        file_path = os.path.abspath(file_path)
+                        file_path2 = os.path.abspath(file_path2)
+                        reference = [os.path.abspath(t) for t in reference]
+                    if  os.path.exists(file_path2) and reference is not None:
+                        data_item = {
+                            "id": len(result_data), 
+                            "method1": method_a,  
+                            "img1": file_path,  
+                            "method2": method_b,  
+                            "img2": file_path2, 
+                            "reference_imgs": reference 
+                        }
+        
+                        result_data.append(data_item)
+                    else:
+                        pass
                 else:
-                    pass
+                    user_id = file_path.split('/')[-1].split('_')[0]
+                    print(f'No matching user_id for {file_path}. Aborting! \
+                            Please rename the ref image as {user_id}.jpg')
 
     output_json = args.output_json
     with open(output_json, "w") as json_file:
