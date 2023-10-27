@@ -28,7 +28,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "init_image"            : encoded_image, 
 
-        "first_diffusion_steps"     : 20,
+        "first_diffusion_steps"     : 50,
         "first_denoising_strength"  : 0.45,
         "second_diffusion_steps"    : 20,
         "second_denoising_strength" : 0.35,
@@ -114,7 +114,7 @@ if __name__ == '__main__':
         for user_id in tqdm(user_ids):
             for img_path in tqdm(img_list):
                 print(f' Call generate for ID ({user_id}) and Template ({img_path})')
-                cv2.imread(img_path)
+     
                 with open(img_path, 'rb') as f:
                     encoded_image = base64.b64encode(f.read()).decode('utf-8')
                     outputs = post(encoded_image, user_id)
