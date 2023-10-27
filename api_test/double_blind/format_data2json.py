@@ -92,9 +92,8 @@ if __name__=="__main__":
                         file_path = os.path.abspath(file_path)
                         file_path2 = os.path.abspath(file_path2)
                         reference = [os.path.abspath(t) for t in reference]
-                    print(os.path.exists(file_path2))
 
-                    if  os.path.exists(file_path2) and reference is not None:
+                    if os.path.exists(file_path2) and reference is not None:
                         data_item = {
                             "id": len(result_data), 
                             "method1": method_a,  
