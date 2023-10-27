@@ -10,16 +10,37 @@ def format_ref_images(file_paths):
 
     return result_dict
 
+def remove_last_underscore(input_string):
+    parts = input_string.split('_')
+
+    if len(parts) > 1:
+        parts = parts[:-1]
+
+    result = '_'.join(parts)
+    
+    return result
+    
+def match_prefix(file_name,image_formats):
+    for img_prefix in image_formats:
+        if os.path.exists(file_name):
+            return file_name
+        else:
+            current_prefix = file_name.split('/')[-1].split('.')[-1]
+            file_name = file_name.replace(current_prefix,img_prefix)
+
+    print('Warning: No match file in compared version!')
+    return file_name
+
 def find_value_for_key(file_name, dictionary):
     parts = file_name.split('/')
-    last_part = parts[-1]
-    words = last_part.split('_')
-    # print(words, dictionary.keys())
-    for word in words:
-        if word in dictionary:
-            return dictionary[word]
-    
-    return None
+    last_part = parts[-1].split('.')[0]
+
+    user_id = remove_last_underscore(last_part)
+
+    if user_id in dictionary.keys():
+        return dictionary[user_id]
+    else:
+        return None
 
 
 if __name__=="__main__":
@@ -55,12 +76,15 @@ if __name__=="__main__":
     method_a = version1_dir.strip().split('/')[-1]
     method_b = version2_dir.strip().split('/')[-1]
 
+    image_formats = ['jpg', 'jpeg', 'png', 'webp']
+
     for root, dirs, files in os.walk(version1_dir):
         for filename in files:
-            if filename.endswith(".jpg"):
+            if filename.split('.')[-1] in image_formats:
                 file_path = os.path.join(root, filename)
-                file_path2 = os.path.join(version2_dir, filename)
-                
+                file_path2 = os.path.join(version2_dir, filename)     
+                file_path2 = match_prefix(file_path2,image_formats)
+
                 reference = find_value_for_key(file_path, ref_dicts)
                 
                 if reference:
@@ -68,6 +92,8 @@ if __name__=="__main__":
                         file_path = os.path.abspath(file_path)
                         file_path2 = os.path.abspath(file_path2)
                         reference = [os.path.abspath(t) for t in reference]
+                    print(os.path.exists(file_path2))
+
                     if  os.path.exists(file_path2) and reference is not None:
                         data_item = {
                             "id": len(result_data), 
