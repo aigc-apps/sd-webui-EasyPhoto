@@ -5,8 +5,10 @@ import gradio as gr
 import modules
 import modules.scripts as scripts
 import numpy as np
+import copy
 from modules import processing, scripts, sd_models, sd_samplers, sd_vae, shared
 from modules.api.models import *
+
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
@@ -405,6 +407,8 @@ def i2i_inpaint_call(
             reload_model('sd_vae', sd_vae)
 
     if animatediff_flag:
+        before_opts = copy.deepcopy(opts.return_mask)
+        opts.return_mask = False
         motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
         motion_module._load('mm_sd_v15_v2.ckpt')
 
@@ -416,6 +420,7 @@ def i2i_inpaint_call(
     if animatediff_flag:
         animate_diff_script.postprocess(p_img2img, processed, animate_diff_process)
         motion_module.remove()
+        opts.return_mask = before_opts
 
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)

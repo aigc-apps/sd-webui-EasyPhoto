@@ -70,6 +70,48 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
             
         return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
+def safe_get_box_and_padding_image(image, retinaface_detection, crop_ratio):
+    h, w, c             = np.shape(image)
+    retinaface_result   = retinaface_detection(image) 
+    if len(retinaface_result['boxes']) == 0:
+        return None, None, None, None, None
+    retinaface_box      = np.array(retinaface_result['boxes'][0])
+
+    middle_x = (retinaface_box[0] + retinaface_box[2]) / 2
+    middle_y = (retinaface_box[1] + retinaface_box[3]) / 2
+
+    width   = retinaface_box[2] - retinaface_box[0]
+    height  = retinaface_box[3] - retinaface_box[1]
+    border_length = max(width, height) 
+
+    left    = middle_x - border_length * crop_ratio / 2
+    top     = middle_y - border_length * crop_ratio / 2
+    right   = left + border_length * crop_ratio
+    bottom  = top + border_length * crop_ratio
+
+    padding_left    = -left
+    padding_top     = -top
+    padding_right   = -(w - right)
+    padding_bottom  = -(h - bottom)
+    padding_size    = int(max([padding_left, padding_top, padding_right, padding_bottom]) + 20)
+
+    if padding_size >= 0:
+        image = np.pad(np.array(image, np.uint8), [[int(padding_size), int(padding_size)], [int(padding_size), int(padding_size)], [0, 0]], constant_values=255, mode='constant')
+    image = Image.fromarray(np.uint8(image))
+    
+    # 检测关键点
+    retinaface_keypoint = np.reshape(retinaface_result['keypoints'][0], [5, 2])
+    retinaface_keypoint = np.array(retinaface_keypoint, np.float32)
+    retinaface_keypoint = retinaface_keypoint + padding_size
+
+    retinaface_box = np.array([left, top, right, bottom], np.int32) + padding_size
+    
+    retinaface_mask = np.zeros_like(np.array(image, np.uint8))
+    retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+    retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
+
+    return image, retinaface_box, retinaface_keypoint, retinaface_mask_pil, padding_size
+
 def crop_and_paste(source_image, source_image_mask, target_image, source_five_point, target_five_point, source_box):
     """
     Applies a face replacement by cropping and pasting one face onto another image.
