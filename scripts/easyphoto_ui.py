@@ -103,8 +103,8 @@ def on_ui_tabs():
                         gr.Markdown(
                             '''
                             Training steps:
-                            1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
-                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
+                            1. Please upload a main image (clean image with only the main target), and 5-20 training images (image contain the main target).
+                            2. Click on the Start Training button below to start the training process, approximately 10 minutes on A10*1.
                             3. Switch to Inference and generate photos based on the template. 
                             4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
                             '''
@@ -407,9 +407,13 @@ def on_ui_tabs():
                                     label="Refine Boundary",  
                                     value=True
                                 )
+                                pure_image = gr.Checkbox(
+                                    label="Pure Image",  
+                                    value=True
+                                )
                                 global_inpaint = gr.Checkbox(
                                     label="Global Inpaint", 
-                                    value=True
+                                    value=False
                                 )
 
                                 # change_shape = gr.Checkbox(
@@ -445,7 +449,7 @@ def on_ui_tabs():
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
                             lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-                            global_inpaint, model_selected_tab, *uuids],
+                            pure_image, global_inpaint, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )

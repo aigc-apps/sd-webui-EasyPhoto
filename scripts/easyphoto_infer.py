@@ -47,6 +47,7 @@ from scripts.easyphoto_process_utils import (
     resize_and_stretch,
     compute_rotation_angle,
     expand_box_by_pad,
+    expand_roi
 )
 from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
@@ -178,6 +179,18 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
             resize_mode="Just Resize",
             model="control_v11f1p_sd15_depth",
         )
+
+    elif unit == "ipa":
+        control_unit = ControlNetUnit(
+            image=input_image,
+            module="ip-adapter_clip_sd15",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="ip-adapter_sd15",
+        )
+
     return control_unit
 
 
@@ -246,7 +259,7 @@ check_hash = True
 def easyphoto_infer_forward(
     sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
     lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-    global_inpaint, model_selected_tab, *user_ids,
+    pure_image, global_inpaint, model_selected_tab, *user_ids,
 ):
     # global
     global check_hash
@@ -350,23 +363,65 @@ def easyphoto_infer_forward(
     # draw_box_on_image(img2, box_template, "box2.jpg")
 
     # crop to get local img
-    img1 = crop_image(np.array(img1), box_main)
-    mask1 = crop_image(np.array(mask1), box_main)
-    img2 = crop_image(np.array(img2), box_template)
-    mask2 = crop_image(np.array(mask2), box_template)
+    W, H = np.array(img2).shape[1], np.array(img2).shape[0]
 
+    expand_ratio = 1.2
+    img1 = crop_image(np.array(img1), box_main, expand_ratio=expand_ratio)
+    mask1 = crop_image(np.array(mask1), box_main, expand_ratio=expand_ratio)
+    img2 = crop_image(np.array(img2), box_template, expand_ratio=expand_ratio)
+    mask2 = crop_image(np.array(mask2), box_template, expand_ratio=expand_ratio)
 
-    mask2_copy = copy.deepcopy(mask2)  # use for second paste
-
-    # cv2.imwrite("croped_img1.jpg", img1)
-    # cv2.imwrite("croped_img2.jpg", img2)
+    # cv2.imwrite("croped_img1.jpg", img1[:,:,::-1])
+    # cv2.imwrite("croped_img2.jpg", img2[:,:,::-1])
     # cv2.imwrite("croped_mask1.jpg", mask1)
     # cv2.imwrite("croped_mask2.jpg", mask2)
 
-    # generate image background with the most frequent color
-    # TODO  the color distribution is better in future
-    color = get_background_color(img1, mask1[:, :, 0])
-    print("color:", color)
+    box_template = expand_roi(box_template, ratio=expand_ratio, max_box=[0, 0, W, H])
+
+    mask2_copy = copy.deepcopy(mask2)  # use for second paste
+
+    # generate image background 
+    if pure_image:
+        # main background with most frequent color
+        color = get_background_color(img1, mask1[:, :, 0])
+        color_img = np.full((img2.shape[0], img2.shape[1], 3), color, dtype=np.uint8)
+        background_img = apply_mask_to_image(color_img, img2, mask2)
+        # mask_blur = cv2.GaussianBlur(
+        #     np.array(np.uint8(mask2)), (5, 5), 0
+        # )
+      
+        # color_img = np.full((img2.shape[0], img2.shape[1], 3), color, dtype=np.uint8)
+
+        # mask_blur = np.stack((mask_blur,) * 3, axis=-1)
+        # background_img = np.array(color_img, np.uint8)*(mask_blur/255.) + np.array(img2, np.uint8)*((255-mask_blur)/255.)
+
+    else:
+        # generate background_image with ipa (referenced img1)
+        controlnet_pairs = [
+                ["ipa", img1, 2.0, True],
+                ["depth", img2, 1.0, True],
+            ]
+
+        background_diffusion_steps = 20
+        background_denoising_strength = 0.8
+        background_img = inpaint(
+                Image.fromarray(np.uint8(img2)),
+                Image.fromarray(np.uint8(mask2)),
+                controlnet_pairs,
+                diffusion_steps=background_diffusion_steps,
+                denoising_strength=background_denoising_strength,
+                input_prompt=input_prompt,
+                hr_scale=1.0,
+                seed=str(seed),
+                sd_model_checkpoint=sd_model_checkpoint,
+            )
+
+        background_img = background_img.resize((img2.shape[1],img2.shape[0]), Image.Resampling.LANCZOS)
+        background_img = np.array(background_img)
+
+
+    cv2.imwrite('background_img.jpg', background_img[:,:,::-1])
+    # background_img.save('background_img.jpg')
 
     # first paste: paste img1 to img2 to get the control image
     if optimize_angle_and_ratio:
@@ -392,9 +447,9 @@ def easyphoto_infer_forward(
         rotation_angle1 = compute_rotation_angle(polygon1)
 
         # wrong result of big angle (suppose the angle is small)
-        if rotation_angle2 > 50:
+        if rotation_angle2 > 20:
             rotation_angle2 = 0
-        if rotation_angle1 > 50:
+        if rotation_angle1 > 20:
             rotation_angle1 = 0
         angle_target = rotation_angle1 - rotation_angle2
 
@@ -426,14 +481,23 @@ def easyphoto_infer_forward(
 
     print(f'Set angle:{angle}, ratio: {ratio}')
 
+    cv2.imwrite('first_img1.jpg',img1)
+    cv2.imwrite('first_img2.jpg',img2)
+    cv2.imwrite('first_mask1.jpg',mask1)
+    cv2.imwrite('first_mask2.jpg',mask2)
+    cv2.imwrite('first_background.jpg',background_img)
+
+    print('before align!')
+    print(img2.shape)
+    print(background_img.shape)
+
     result_img, rotate_img1, mask1, mask2 = align_and_overlay_images(
         np.array(img1),
-        np.array(img2),
+        np.array(background_img),
         np.array(mask1),
         np.array(mask2),
         angle=angle,
         ratio=ratio,
-        color=color,
     )
 
     # shape not the same as img2 (img1 is rotate) but in the center
@@ -461,6 +525,8 @@ def easyphoto_infer_forward(
 
     first_paste = crop_image(result_img, crop_img2_box_first)
     first_paste = Image.fromarray(np.uint8(first_paste))
+
+    first_paste.save('first_paste.jpg')
 
     second_paste = Image.fromarray(np.uint8(np.zeros((512, 512, 3))))
 
@@ -767,8 +833,8 @@ def easyphoto_infer_forward(
             sd_model_checkpoint=sd_model_checkpoint,
         )
 
-        # print("inpaint:", result_img.size)
-        # result_img.save("inpaint_res1.jpg")
+        print("inpaint:", result_img.size)
+        result_img.save("inpaint_res1.jpg")
 
         # second diffusion
         # second_diffusion_steps = 20
@@ -801,12 +867,12 @@ def easyphoto_infer_forward(
         # copy back
         template_copy = np.array(template_copy, np.uint8)
 
-        mask_blur = cv2.GaussianBlur(
-            np.array(np.uint8(resize_mask2))[:, :, 0], (5, 5), 0
-        )
+        # mask_blur = cv2.GaussianBlur(
+        #     np.array(np.uint8(resize_mask2))[:, :, 0], (5, 5), 0
+        # )
 
         init_generation = copy_white_mask_to_template(
-            np.array(result_img), mask_blur, template_copy, box_template
+            np.array(result_img), np.array(np.uint8(resize_mask2))[:, :, 0], template_copy, box_template
         )
 
         # cv2.imwrite("mask_blur.jpg", mask_blur)
@@ -900,12 +966,12 @@ def easyphoto_infer_forward(
             print(box_pad)
 
             # copy back
-            mask_blur = cv2.GaussianBlur(
-                np.array(np.uint8(input_mask_copy)), (5, 5), 0)
+            # mask_blur = cv2.GaussianBlur(
+            #     np.array(np.uint8(input_mask_copy)), (5, 5), 0)
             # cv2.imwrite("mask_blur2.jpg", mask_blur)
 
             final_generation = copy_white_mask_to_template(
-                np.array(result_img), mask_blur, template_copy, box_pad
+                np.array(result_img), np.array(np.uint8(input_mask_copy)), template_copy, box_pad
             )
 
             return_res.append(Image.fromarray(np.uint8(final_generation)))
