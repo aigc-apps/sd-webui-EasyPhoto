@@ -134,9 +134,9 @@ def on_ui_tabs():
                                 )
                             
                             with gr.Row():
-                                sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Advance%E2%80%90SDXL-Training"
+                                sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki#4sdxl-training"
                                 sdxl_training_note = gr.Markdown(
-                                    value = "Please check the [wiki]({}) before SDXL training.".format(sdxl_wiki_url),
+                                    value = "**Please check the [[wiki]]({}) before SDXL training**.".format(sdxl_wiki_url),
                                     visible=False
                                 )
 

@@ -77,7 +77,7 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
 
     pipeline.to(accelerator.device, torch_dtype=weight_dtype)
     pipeline.safety_checker = None
-    pipeline.set_progress_bar_config(disable=False)
+    # pipeline.set_progress_bar_config(disable=False)
 
     generator = torch.Generator(device=accelerator.device)
     if args.seed is not None:
@@ -1053,7 +1053,7 @@ def main():
                 break
 
             # Step-level validation.
-            if accelerator.is_main_process:
+            if accelerator.sync_gradients and accelerator.is_main_process:
                 if (
                     args.validation_steps is not None
                     and args.validation_prompt is not None
