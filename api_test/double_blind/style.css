@@ -1,0 +1,40 @@
+.contain {
+    display: flex;
+}
+
+#component-0 {
+    flex-grow: 1;
+}
+
+#start {
+    margin-top: -20vh;
+    text-align: center;
+    justify-content: center;
+}
+
+#start h3 {
+    margin: 0;
+}
+
+#start #component-5 {
+    display: block;
+}
+#start button {
+    width: 40%;
+    min-width: 280px;
+    max-width: 500px;
+}
+
+#reference-imgs .grid-wrap {
+    min-height: 0 !important;
+    max-height: 60vh;
+}
+
+.question span {
+    font-size: 1.1rem;
+}
+
+.question input {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+}
