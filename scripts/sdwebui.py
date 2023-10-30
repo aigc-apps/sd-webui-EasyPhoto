@@ -23,10 +23,9 @@ InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputIm
 
 
 class unload_sd(ContextDecorator):
-    """Context-manager that unload SD checkpoint to free VRAM."""
+    """Context-manager that unloads SD checkpoint to free VRAM."""
     def __enter__(self):
         sd_models.unload_model_weights()
-        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sd_models.reload_model_weights()
