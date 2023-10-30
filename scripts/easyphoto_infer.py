@@ -23,7 +23,7 @@ from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       user_id_outpath_samples,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
-                                     check_id_valid)
+                                     check_id_valid, unload_models)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
@@ -755,8 +755,7 @@ def easyphoto_infer_forward(
             loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
     if not shared.opts.data.get("easyphoto_cache_model", True):
-        del retinaface_detection; del image_face_fusion; del skin_retouching; del portrait_enhancement; del face_skin; del face_recognition
-        retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None
+        unload_models()
 
     torch.cuda.empty_cache()
     return loop_message, outputs, face_id_outputs  

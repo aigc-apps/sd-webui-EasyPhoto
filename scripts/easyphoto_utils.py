@@ -1,11 +1,13 @@
 import datetime
 import hashlib
 import logging
+import gc
 import os
 import time
 from glob import glob
 
 import requests
+import torch
 from modules.paths import models_path
 from tqdm import tqdm
 
@@ -167,3 +169,17 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
+
+def unload_models():
+    """Unload models to free VRAM.
+    """
+    scripts.easyphoto_infer.retinaface_detection = None
+    scripts.easyphoto_infer.image_face_fusion = None
+    scripts.easyphoto_infer.skin_retouching = None
+    scripts.easyphoto_infer.portrait_enhancement = None
+    scripts.easyphoto_infer.face_skin = None
+    scripts.easyphoto_infer.face_recognition = None
+    scripts.easyphoto_infer.psgan_inference = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
