@@ -11,6 +11,7 @@ import torch
 from modules.paths import models_path
 from tqdm import tqdm
 
+import scripts.easyphoto_infer
 from scripts.easyphoto_config import data_path
 from modelscope.utils.logger import get_logger as ms_get_logger
 

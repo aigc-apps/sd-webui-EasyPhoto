@@ -17,12 +17,14 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid,
                                      unload_models)
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
+from scripts.sdwebui import unload_sd
 
 
 python_executable_path = sys.executable
 check_hash             = True
 
 # Attention! Output of js is str or list, not float or int
+@unload_sd()
 def easyphoto_train_forward(
     sd_model_checkpoint: str,
     id_task: str,

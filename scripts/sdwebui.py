@@ -1,5 +1,6 @@
 import os
 import logging
+from contextlib import ContextDecorator
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -19,6 +20,17 @@ output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
 InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
+
+
+class unload_sd(ContextDecorator):
+    """Context-manager that unload SD checkpoint to free VRAM."""
+    def __enter__(self):
+        sd_models.unload_model_weights()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sd_models.reload_model_weights()
+
 
 class ControlMode(Enum):
     """
