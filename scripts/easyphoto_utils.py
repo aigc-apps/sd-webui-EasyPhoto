@@ -46,10 +46,13 @@ def check_files_exists_and_download(check_hash):
     
     if os.path.exists(controlnet_extensions_path):
         controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
     elif os.path.exists(controlnet_extensions_builtin_path):
         controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
     else:
         controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
 
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
     urls        = [
@@ -58,7 +61,8 @@ def check_files_exists_and_download(check_hash):
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/dpt_hybrid-midas-501f0c75.pt",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11f1p_sd15_depth.pth",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/sam_vit_l_0b3195.pth",
-        
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/clip_h.pth",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/ip-adapter_sd15.pth"
         # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_v1.pth",
         # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_lightglue.pth",
     ]
@@ -69,6 +73,8 @@ def check_files_exists_and_download(check_hash):
         os.path.join(controlnet_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
         os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "sam_vit_l_0b3195.pth"),
+        os.path.join(controlnet_annotator_cache_path_ipa, f"clip_h.pth"),
+        os.path.join(models_path, f"ControlNet/ip-adapter_sd15.pth"),
         # os.path.join('~/.cache/torch/hub/checkpoints', "superpoint_v1.pth"),
         # os.path.join('~/.cache/torch/hub/checkpoints', "superpoint_lightglue.pth"),
     ]
