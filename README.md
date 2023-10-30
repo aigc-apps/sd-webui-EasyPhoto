@@ -68,7 +68,7 @@ Our UI interface is as follows:
 #### a. From AliyunDSW
 DSW has free GPU time, which can be applied once by a user and is valid for 3 months after applying.
 
-Aliyun provide free GPU time in [Freetier](https://help.aliyun.com/document_detail/2567864.html), get it and use in Aliyun PAI-DSW to start EasyPhoto within 3min!
+Aliyun provide free GPU time in [Free tier](https://help.aliyun.com/document_detail/2567864.html), get it and use in Aliyun PAI-DSW to start EasyPhoto within 3min!
 
 [![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
