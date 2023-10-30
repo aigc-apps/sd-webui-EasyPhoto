@@ -691,7 +691,7 @@ def on_ui_tabs():
                                     value=16,
                                 )
                                 save_as = gr.Dropdown(
-                                    value="gif", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
+                                    value="mp4", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
                                 )
 
                             with gr.Row():
@@ -714,6 +714,10 @@ def on_ui_tabs():
                                     step=0.05, label='Video First Diffusion denoising strength'
                                 )
                             with gr.Row():
+                                crop_face_preprocess = gr.Checkbox(
+                                    label="Video Crop Face Preprocess",  
+                                    value=True
+                                )
                                 apply_face_fusion_before = gr.Checkbox(
                                     label="Video Apply Face Fusion Before", 
                                     value=True
@@ -722,11 +726,11 @@ def on_ui_tabs():
                                     label="Video Apply Face Fusion After",  
                                     value=True
                                 )
+                            with gr.Row():
                                 color_shift_middle = gr.Checkbox(
                                     label="Video Apply color shift first",  
                                     value=True
                                 )
-                            with gr.Row():
                                 super_resolution = gr.Checkbox(
                                     label="Video Super Resolution at last",  
                                     value=False
@@ -735,11 +739,11 @@ def on_ui_tabs():
                                     label="Video Skin Retouching",  
                                     value=False
                                 )
+                            with gr.Row():
                                 makeup_transfer = gr.Checkbox(
                                     label="Video MakeUp Transfer",
                                     value=False
                                 )
-                            with gr.Row():
                                 face_shape_match = gr.Checkbox(
                                     label="Video Face Shape Match",
                                     value=False
@@ -748,7 +752,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
                                     value="gpen", \
-                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=True
+                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=False
                                 )
                                 makeup_transfer_ratio = gr.Slider(
                                     minimum=0.00, maximum=1.00, value=0.50,
@@ -776,15 +780,13 @@ def on_ui_tabs():
                     with gr.Column():
                         gr.Markdown('Generated Results')
 
-                        output_images = gr.Gallery(
-                            label='Output',
-                            show_label=False
-                        ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
-
                         output_video = gr.Video(
                             label='Output Video', 
-                            show_label=False, 
                         )
+
+                        output_images = gr.Gallery(
+                            label='Output Frames',
+                        ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
@@ -795,10 +797,10 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_video_infer_forward,
                     inputs=[sd_model_checkpoint, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
-                            first_diffusion_steps, first_denoising_strength, seed, apply_face_fusion_before, apply_face_fusion_after, \
+                            first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                             color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
                             makeup_transfer, makeup_transfer_ratio, face_shape_match, model_selected_tab, *uuids],
-                    outputs=[infer_progress, output_images, output_video]
+                    outputs=[infer_progress, output_video, output_images]
 
                 )
 

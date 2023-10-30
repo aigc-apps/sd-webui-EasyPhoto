@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional
 
 import torch
@@ -11,6 +12,23 @@ from einops import rearrange, repeat
 import math
 
 
+class MotionModuleType(Enum):
+    AnimateDiffV1 = "AnimateDiff V1, Yuwei GUo, Shanghai AI Lab"
+    AnimateDiffV2 = "AnimateDiff V2, Yuwei Guo, Shanghai AI Lab"
+    HotShotXL = "HotShot-XL, John Mullan, Natural Synthetics Inc"
+
+
+    @staticmethod
+    def get_mm_type(state_dict: dict):
+        keys = list(state_dict.keys())
+        if any(["mid_block" in k for k in keys]):
+            return MotionModuleType.AnimateDiffV2
+        elif any(["temporal_attentions" in k for k in keys]):
+            return MotionModuleType.HotShotXL
+        else:
+            return MotionModuleType.AnimateDiffV1
+
+
 def zero_module(module):
     # Zero out the parameters of a module and return it.
     for p in module.parameters():
@@ -19,37 +37,38 @@ def zero_module(module):
 
 
 class MotionWrapper(nn.Module):
-    def __init__(self, mm_hash: str, using_v2: bool):
+    def __init__(self, mm_name: str, mm_hash: str, mm_type: MotionModuleType):
         super().__init__()
-        if using_v2:
-            max_len = 32
-        else:
-            max_len = 24
+        self.is_v2 = mm_type == MotionModuleType.AnimateDiffV2
+        self.is_sdxl = mm_type == MotionModuleType.HotShotXL
+        max_len = 32 if self.is_v2 else 24
+        in_channels = (320, 640, 1280) if self.is_sdxl else (320, 640, 1280, 1280)
         self.down_blocks = nn.ModuleList([])
         self.up_blocks = nn.ModuleList([])
-        for c in (320, 640, 1280, 1280):
-            self.down_blocks.append(MotionModule(c, max_len=max_len))
-        for c in (1280, 1280, 640, 320):
-            self.up_blocks.append(MotionModule(c, is_up=True, max_len=max_len))
-        if using_v2:
-            self.mid_block = MotionModule(1280, max_len=max_len, is_mid=using_v2)
+        for c in in_channels:
+            self.down_blocks.append(MotionModule(c, num_mm=2, max_len=max_len, is_sdxl=self.is_sdxl))
+            self.up_blocks.insert(0,MotionModule(c, num_mm=3, max_len=max_len, is_sdxl=self.is_sdxl))
+        if self.is_v2:
+            self.mid_block = MotionModule(1280, num_mm=1, max_len=max_len)
+        self.mm_name = mm_name
+        self.mm_type = mm_type
         self.mm_hash = mm_hash
-        self.using_v2 = using_v2
 
 
 class MotionModule(nn.Module):
-    def __init__(self, in_channels, is_up=False, is_mid=False, max_len=24):
+    def __init__(self, in_channels, num_mm, max_len, is_sdxl=False):
         super().__init__()
-        if is_mid:
-            self.motion_modules = nn.ModuleList([get_motion_module(in_channels, max_len)])
+        motion_modules = nn.ModuleList([get_motion_module(in_channels, max_len, is_sdxl) for _ in range(num_mm)])
+        if is_sdxl:
+            self.temporal_attentions = motion_modules
         else:
-            self.motion_modules = nn.ModuleList([get_motion_module(in_channels, max_len), get_motion_module(in_channels, max_len)])
-            if is_up:
-                self.motion_modules.append(get_motion_module(in_channels, max_len))
+            self.motion_modules = motion_modules
 
 
-def get_motion_module(in_channels, max_len):
-    return VanillaTemporalModule(in_channels=in_channels, temporal_position_encoding_max_len=max_len)
+
+def get_motion_module(in_channels, max_len, is_sdxl):
+    vtm = VanillaTemporalModule(in_channels=in_channels, temporal_position_encoding_max_len=max_len, is_sdxl=is_sdxl)
+    return vtm.temporal_transformer if is_sdxl else vtm
 
 
 class VanillaTemporalModule(nn.Module):
@@ -64,6 +83,7 @@ class VanillaTemporalModule(nn.Module):
         temporal_position_encoding_max_len = 24,
         temporal_attention_dim_div         = 1,
         zero_initialize                    = True,
+        is_sdxl                            = False,
     ):
         super().__init__()
         
@@ -76,6 +96,7 @@ class VanillaTemporalModule(nn.Module):
             cross_frame_attention_mode=cross_frame_attention_mode,
             temporal_position_encoding=temporal_position_encoding,
             temporal_position_encoding_max_len=temporal_position_encoding_max_len,
+            is_sdxl=is_sdxl,
         )
         
         if zero_initialize:
@@ -105,6 +126,7 @@ class TemporalTransformer3DModel(nn.Module):
         cross_frame_attention_mode         = None,
         temporal_position_encoding         = False,
         temporal_position_encoding_max_len = 24,
+        is_sdxl                            = False,
     ):
         super().__init__()
 
@@ -129,6 +151,7 @@ class TemporalTransformer3DModel(nn.Module):
                     cross_frame_attention_mode=cross_frame_attention_mode,
                     temporal_position_encoding=temporal_position_encoding,
                     temporal_position_encoding_max_len=temporal_position_encoding_max_len,
+                    is_sdxl=is_sdxl,
                 )
                 for d in range(num_layers)
             ]
@@ -173,6 +196,7 @@ class TemporalTransformerBlock(nn.Module):
         cross_frame_attention_mode         = None,
         temporal_position_encoding         = False,
         temporal_position_encoding_max_len = 24,
+        is_sdxl                            = False,
     ):
         super().__init__()
 
@@ -195,6 +219,7 @@ class TemporalTransformerBlock(nn.Module):
                     cross_frame_attention_mode=cross_frame_attention_mode,
                     temporal_position_encoding=temporal_position_encoding,
                     temporal_position_encoding_max_len=temporal_position_encoding_max_len,
+                    is_sdxl=is_sdxl,
                 )
             )
             norms.append(nn.LayerNorm(dim))
@@ -226,7 +251,8 @@ class PositionalEncoding(nn.Module):
         self, 
         d_model, 
         dropout = 0., 
-        max_len = 24
+        max_len = 24,
+        is_sdxl = False,
     ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -235,10 +261,11 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe)
+        self.register_buffer('positional_encoding' if is_sdxl else 'pe', pe)
+        self.is_sdxl = is_sdxl
 
     def forward(self, x):
-        x = x + self.pe[:, :x.size(1)]
+        x = x + (self.positional_encoding[:, :x.size(1)] if self.is_sdxl else self.pe[:, :x.size(1)])
         return self.dropout(x)
 
 
@@ -497,7 +524,8 @@ class VersatileAttention(CrossAttention):
             attention_mode                     = None,
             cross_frame_attention_mode         = None,
             temporal_position_encoding         = False,
-            temporal_position_encoding_max_len = 24,            
+            temporal_position_encoding_max_len = 24,
+            is_sdxl                            = False,       
             *args, **kwargs
         ):
         super().__init__(*args, **kwargs)
@@ -509,7 +537,8 @@ class VersatileAttention(CrossAttention):
         self.pos_encoder = PositionalEncoding(
             kwargs["query_dim"],
             dropout=0., 
-            max_len=temporal_position_encoding_max_len
+            max_len=temporal_position_encoding_max_len,
+            is_sdxl=is_sdxl,
         ) if (temporal_position_encoding and attention_mode == "Temporal") else None
 
     def extra_repr(self):
@@ -583,4 +612,3 @@ class VersatileAttention(CrossAttention):
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d)
 
         return hidden_states
-

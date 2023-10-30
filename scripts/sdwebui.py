@@ -1,3 +1,4 @@
+import copy
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -5,19 +6,16 @@ import gradio as gr
 import modules
 import modules.scripts as scripts
 import numpy as np
-import copy
 from modules import processing, scripts, sd_models, sd_samplers, sd_vae, shared
 from modules.api.models import *
-
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
 from modules.sd_models import get_closet_checkpoint_match, load_model
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
-from scripts.animatediff import AnimateDiffScript
-from scripts.animatediff.animatediff_mm import mm_animatediff as motion_module
-from scripts.animatediff.animatediff_ui import AnimateDiffProcess
+from scripts.animatediff import AnimateDiffProcess, AnimateDiffScript
+from scripts.animatediff import mm_animatediff as motion_module
 from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
@@ -393,6 +391,17 @@ def i2i_inpaint_call(
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
+    if animatediff_flag:
+        before_opts = copy.deepcopy(opts.return_mask)
+        opts.return_mask = False
+        motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
+        motion_module._load('mm_sd_v15_v2.ckpt')
+
+        animate_diff_process = AnimateDiffProcess(enable=True, video_length=len(images), fps=animatediff_fps)
+        animate_diff_script = AnimateDiffScript()
+        animate_diff_script.before_process(p_img2img, animate_diff_process)
+        controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
+
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if alwayson_scripts.name is None:
             continue
@@ -405,16 +414,6 @@ def i2i_inpaint_call(
     if sd_vae is not None:
         if origin_sd_vae != sd_vae:
             reload_model('sd_vae', sd_vae)
-
-    if animatediff_flag:
-        before_opts = copy.deepcopy(opts.return_mask)
-        opts.return_mask = False
-        motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
-        motion_module._load('mm_sd_v15_v2.ckpt')
-
-        animate_diff_process = AnimateDiffProcess(enable=True, video_length=len(images), fps=animatediff_fps)
-        animate_diff_script = AnimateDiffScript()
-        animate_diff_script.before_process(p_img2img, animate_diff_process)
 
     processed = processing.process_images(p_img2img)
     if animatediff_flag:

@@ -56,52 +56,35 @@ def resize_image(input_image, resolution, nearest = False, crop264 = True):
 # this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
 def get_controlnet_unit(unit, input_image, weight, batch_images=None):
     if unit == "canny":
-        if batch_images is None:
-            control_unit = ControlNetUnit(
-                input_image=input_image, module='canny',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                threshold_a=100,
-                threshold_b=200,
-                model='control_v11p_sd15_canny'
-            )
-        else:
+        if batch_images is not None:
             batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
-            control_unit = ControlNetUnit(
-                batch_images=batch_images,
-                module='canny',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                threshold_a=100,
-                threshold_b=200,
-                model='control_v11p_sd15_canny'
-            )
-    elif unit == "openpose":
-        if batch_images is None:
-            control_unit = ControlNetUnit(
-                input_image=input_image, module='openpose_full',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                model='control_v11p_sd15_openpose'
-            )
-        else:
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
-            control_unit = ControlNetUnit(
-                batch_images=batch_images,
-                module='openpose_full',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                model='control_v11p_sd15_openpose'
-            )
 
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None,
+            batch_images=batch_images,
+            module='canny',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1, 
+            resize_mode='Just Resize',
+            threshold_a=100,
+            threshold_b=200,
+            model='control_v11p_sd15_canny'
+        )
+    elif unit == "openpose":
+        if batch_images is not None:
+            batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
+
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None,
+            batch_images=batch_images,
+            module='openpose_full',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1, 
+            resize_mode='Just Resize',
+            model='control_v11p_sd15_openpose'
+        )
     elif unit == "color":
         if batch_images is None:
             blur_ratio      = 24
@@ -115,13 +98,6 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
             color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
             color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
             color_image = Image.fromarray(np.uint8(color_image))
-
-            control_unit = ControlNetUnit(input_image=color_image, module='none',
-                                                weight=weight,
-                                                guidance_end=1,
-                                                control_mode=1,
-                                                resize_mode='Just Resize',
-                                                model='control_sd15_random_color')
         else:
             new_batch_images = []
             for _input_image in batch_images:
@@ -139,40 +115,34 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
                 new_batch_images.append(color_image)
 
             batch_images = [np.array(_input_image, np.uint8) for _input_image in new_batch_images]
-            control_unit = ControlNetUnit(
-                batch_images=batch_images,
-                module='none',
-                weight=weight,
-                guidance_end=1,
-                control_mode=0,
-                resize_mode='Just Resize',
-                model='control_sd15_random_color'
-            )
+
+        control_unit = dict(
+            input_image={'image': np.asarray(color_image), 'mask': None} if batch_images is None else None, 
+            batch_images=batch_images,
+            module='none',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode='Just Resize',
+            model='control_sd15_random_color'
+        )
     elif unit == "tile":
-        if batch_images is None:
-            control_unit = ControlNetUnit(
-                input_image=input_image, module='tile_resample',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                threshold_a=1,
-                threshold_b=200,
-                model='control_v11f1e_sd15_tile'
-            )
-        else:
+        if batch_images is not None:
             batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
-            control_unit = ControlNetUnit(
-                batch_images=batch_images,
-                module='tile_resample',
-                weight=weight,
-                guidance_end=1,
-                control_mode=1, 
-                resize_mode='Just Resize',
-                threshold_a=1,
-                threshold_b=200,
-                model='control_v11f1e_sd15_tile'
-            )
+
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None, 
+            batch_images=batch_images,
+            module='tile_resample',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1, 
+            resize_mode='Just Resize',
+            threshold_a=1,
+            threshold_b=200,
+            model='control_v11f1e_sd15_tile'
+        )
+
     return control_unit
 
 def txt2img(
@@ -831,7 +801,7 @@ def easyphoto_infer_forward(
 
 def easyphoto_video_infer_forward(
     sd_model_checkpoint, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
-    first_diffusion_steps, first_denoising_strength, seed, apply_face_fusion_before, apply_face_fusion_after, \
+    first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
 ): 
@@ -981,7 +951,6 @@ def easyphoto_video_infer_forward(
             super_resolution                        : {str(super_resolution)}
         '''
         ep_logger.info(template_idx_info)
-        crop_face_preprocess = True
 
         try:
             # open the template image
@@ -1253,4 +1222,4 @@ def easyphoto_video_infer_forward(
         retinaface_detection = None; image_face_fusion = None; skin_retouching = None; portrait_enhancement = None; face_skin = None; face_recognition = None
 
     torch.cuda.empty_cache()
-    return loop_message, outputs, output_video
+    return loop_message, output_video, outputs

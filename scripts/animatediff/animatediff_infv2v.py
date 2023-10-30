@@ -10,18 +10,9 @@ from modules.script_callbacks import CFGDenoisedParams, cfg_denoised_callback
 from modules.script_callbacks import AfterCFGCallbackParams, cfg_after_cfg_callback
 from modules.sd_samplers_cfg_denoiser import CFGDenoiser, catenate_conds, subscript_cond, pad_cond
 
-# from scripts.animatediff_logger import logger_animatediff as logger
-# from scripts.animatediff_ui import AnimateDiffProcess
-# from scripts.animatediff_prompt import AnimateDiffPromptSchedule
-
-try:
-    from scripts.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff_ui import AnimateDiffProcess
-    from scripts.animatediff_prompt import AnimateDiffPromptSchedule
-except ImportError:
-    from scripts.animatediff.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff.animatediff_ui import AnimateDiffProcess
-    from scripts.animatediff.animatediff_prompt import AnimateDiffPromptSchedule
+from .animatediff_logger import logger_animatediff as logger
+from .animatediff_ui import AnimateDiffProcess
+from .animatediff_prompt import AnimateDiffPromptSchedule
 
 
 class AnimateDiffInfV2V:
@@ -109,7 +100,6 @@ class AnimateDiffInfV2V:
 
         def mm_cn_select(context: List[int]):
             # take control images for current context.
-            # controlllite is for sdxl and we do not support it. reserve here for future use is needed.
             if cn_script is not None and cn_script.latest_network is not None:
                 from scripts.hook import ControlModelType
                 for control in cn_script.latest_network.control_params:
@@ -141,11 +131,11 @@ class AnimateDiffInfV2V:
                         control.control_model.image_emb = control.control_model.image_emb[context]
                         control.control_model.uncond_image_emb_backup = control.control_model.uncond_image_emb
                         control.control_model.uncond_image_emb = control.control_model.uncond_image_emb[context]
-                    # if control.control_model_type == ControlModelType.Controlllite:
-                    #     for module in control.control_model.modules.values():
-                    #         if module.cond_image.shape[0] > len(context):
-                    #             module.cond_image_backup = module.cond_image
-                    #             module.set_cond_image(module.cond_image[context])
+                    if control.control_model_type == ControlModelType.Controlllite:
+                        for module in control.control_model.modules.values():
+                            if module.cond_image.shape[0] > len(context):
+                                module.cond_image_backup = module.cond_image
+                                module.set_cond_image(module.cond_image[context])
         
         def mm_cn_restore(context: List[int]):
             # restore control images for next context
@@ -181,10 +171,10 @@ class AnimateDiffInfV2V:
                         # control.control_model.uncond_image_emb_backup[context] = control.control_model.uncond_image_emb
                         control.control_model.image_emb = control.control_model.image_emb_backup
                         control.control_model.uncond_image_emb = control.control_model.uncond_image_emb_backup
-                    # if control.control_model_type == ControlModelType.Controlllite:
-                    #     for module in control.control_model.modules.values():
-                    #         if module.cond_image.shape[0] > len(context):
-                    #             module.set_cond_image(module.cond_image_backup)
+                    if control.control_model_type == ControlModelType.Controlllite:
+                        for module in control.control_model.modules.values():
+                            if module.cond_image.shape[0] > len(context):
+                                module.set_cond_image(module.cond_image_backup)
 
         def mm_sd_forward(self, x_in, sigma_in, cond_in, image_cond_in, make_condition_dict):
             x_out = torch.zeros_like(x_in)
@@ -194,7 +184,11 @@ class AnimateDiffInfV2V:
                 else:
                     _context = context
                 mm_cn_select(_context)
-                out = self.inner_model(x_in[_context], sigma_in[_context], cond=make_condition_dict(cond_in[_context], image_cond_in[_context]))
+                out = self.inner_model(
+                    x_in[_context], sigma_in[_context],
+                    cond=make_condition_dict(
+                        cond_in[_context] if not isinstance(cond_in, dict) else {k: v[_context] for k, v in cond_in.items()},
+                        image_cond_in[_context]))
                 x_out = x_out.to(dtype=out.dtype)
                 x_out[_context] = out
                 mm_cn_restore(_context)

@@ -4,41 +4,18 @@ import gradio as gr
 from modules import script_callbacks, scripts, shared
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img)
+from modules.scripts import PostprocessBatchListArgs, PostprocessImageArgs
 
-# from scripts.animatediff_cn import AnimateDiffControl
-# from scripts.animatediff_infv2v import AnimateDiffInfV2V
-# from scripts.animatediff_latent import AnimateDiffI2VLatent
-# from scripts.animatediff_logger import logger_animatediff as logger
-# from scripts.animatediff_lora import AnimateDiffLora
-# from scripts.animatediff_mm import mm_animatediff as motion_module
-# from scripts.animatediff_prompt import AnimateDiffPromptSchedule
-# from scripts.animatediff_output import AnimateDiffOutput
-# from scripts.animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
-# from scripts.animatediff_infotext import update_infotext
-
-try:
-    from scripts.animatediff_cn import AnimateDiffControl
-    from scripts.animatediff_infv2v import AnimateDiffInfV2V
-    from scripts.animatediff_latent import AnimateDiffI2VLatent
-    from scripts.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff_lora import AnimateDiffLora
-    from scripts.animatediff_mm import mm_animatediff as motion_module
-    from scripts.animatediff_prompt import AnimateDiffPromptSchedule
-    from scripts.animatediff_output import AnimateDiffOutput
-    from scripts.animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
-    from scripts.animatediff_infotext import update_infotext
-except ImportError:
-    from scripts.animatediff.animatediff_cn import AnimateDiffControl
-    from scripts.animatediff.animatediff_infv2v import AnimateDiffInfV2V
-    from scripts.animatediff.animatediff_latent import AnimateDiffI2VLatent
-    from scripts.animatediff.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff.animatediff_lora import AnimateDiffLora
-    from scripts.animatediff.animatediff_mm import mm_animatediff as motion_module
-    from scripts.animatediff.animatediff_prompt import AnimateDiffPromptSchedule
-    from scripts.animatediff.animatediff_output import AnimateDiffOutput
-    from scripts.animatediff.animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
-    from scripts.animatediff.animatediff_infotext import update_infotext
-
+from .animatediff_cn import AnimateDiffControl
+from .animatediff_infv2v import AnimateDiffInfV2V
+from .animatediff_latent import AnimateDiffI2VLatent
+from .animatediff_logger import logger_animatediff as logger
+from .animatediff_lora import AnimateDiffLora
+from .animatediff_mm import mm_animatediff as motion_module
+from .animatediff_prompt import AnimateDiffPromptSchedule
+from .animatediff_output import AnimateDiffOutput
+from .animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
+from .animatediff_infotext import update_infotext
 
 script_dir = scripts.basedir()
 motion_module.set_script_dir(script_dir)
@@ -73,7 +50,7 @@ class AnimateDiffScript(scripts.Script):
             params.set_p(p)
             motion_module.inject(p.sd_model, params.model)
             self.prompt_scheduler = AnimateDiffPromptSchedule()
-            self.lora_hacker = AnimateDiffLora(motion_module.mm.using_v2)
+            self.lora_hacker = AnimateDiffLora(motion_module.mm.is_v2)
             self.lora_hacker.hack()
             self.cfg_hacker = AnimateDiffInfV2V(p, self.prompt_scheduler)
             self.cfg_hacker.hack(params)
@@ -84,14 +61,26 @@ class AnimateDiffScript(scripts.Script):
 
     def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
-        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img):
+        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
             AnimateDiffI2VLatent().randomize(p, params)
+
+
+    def postprocess_batch_list(self, p: StableDiffusionProcessing, pp: PostprocessBatchListArgs, params: AnimateDiffProcess, **kwargs):
+        if isinstance(params, dict): params = AnimateDiffProcess(**params)
+        if params.enable:
+            self.prompt_scheduler.save_infotext_img(p)
+
+
+    def postprocess_image(self, p: StableDiffusionProcessing, pp: PostprocessImageArgs, params: AnimateDiffProcess, *args):
+        if isinstance(params, dict): params = AnimateDiffProcess(**params)
+        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and hasattr(p, '_animatediff_paste_to_full'):
+            p.paste_to = p._animatediff_paste_to_full[p.batch_index]
 
 
     def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
         if params.enable:
-            self.prompt_scheduler.set_infotext(res)
+            self.prompt_scheduler.save_infotext_txt(res)
             self.cn_hacker.restore()
             self.cfg_hacker.restore()
             self.lora_hacker.restore()
@@ -125,6 +114,28 @@ def on_ui_settings():
         shared.OptionInfo(
             False,
             "Optimize GIFs with gifsicle, reduces file size",
+            gr.Checkbox,
+            section=section
+        )
+    )
+    shared.opts.add_option(
+        "animatediff_webp_quality",
+        shared.OptionInfo(
+            80,
+            "WebP Quality (if lossless=True, increases compression and CPU usage)",
+            gr.Slider,
+            {
+                "minimum": 1,
+                "maximum": 100,
+                "step": 1},
+            section=section
+        )
+    )
+    shared.opts.add_option(
+        "animatediff_webp_lossless",
+        shared.OptionInfo(
+            False,
+            "Save WebP in lossless format (highest quality, largest file size)",
             gr.Checkbox,
             section=section
         )

@@ -1,64 +1,48 @@
 import base64
 from pathlib import Path
 
-import copy
 import imageio.v3 as imageio
 import numpy as np
 from PIL import Image, PngImagePlugin
+import PIL.features
+import piexif
 from modules import images, shared
 from modules.processing import Processed, StableDiffusionProcessing
 
-# from scripts.animatediff_logger import logger_animatediff as logger
-# from scripts.animatediff_ui import AnimateDiffProcess
-
-try:
-    from scripts.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff_ui import AnimateDiffProcess
-except ImportError:
-    from scripts.animatediff.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff.animatediff_ui import AnimateDiffProcess
+from .animatediff_logger import logger_animatediff as logger
+from .animatediff_ui import AnimateDiffProcess
 
 
 class AnimateDiffOutput:
     def output(
-        self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess, select = False
+        self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess
     ):
         video_paths = []
         logger.info("Merging images into GIF.")
         Path(f"{p.outpath_samples}/AnimateDiff").mkdir(exist_ok=True, parents=True)
         step = params.video_length if params.video_length > params.batch_size else params.batch_size
-        
-        origin_video = []
-        index = 0
         for i in range(res.index_of_first_image, len(res.images), step):
             # frame interpolation replaces video_list with interpolated frames
             # so make a copy instead of a slice (reference), to avoid modifying res
             video_list = [image.copy() for image in res.images[i : i + params.video_length]]
 
             seq = images.get_next_sequence_number(f"{p.outpath_samples}/AnimateDiff", "")
-            filename = f"{seq:05}-{res.seed}"
+            filename = f"{seq:05}-{res.all_seeds[(i-res.index_of_first_image)]}"
             video_path_prefix = f"{p.outpath_samples}/AnimateDiff/{filename}"
 
             video_list = self._add_reverse(params, video_list)
             video_list = self._interp(p, params, video_list, filename)
             video_paths += self._save(params, video_list, video_path_prefix, res, i)
-            if index == 0:
-                origin_video = copy.deepcopy(video_list)
-            index += 1
 
         if len(video_paths) > 0:
-            # if not p.is_api:
-            #     res.images = video_paths
-            # else:
-                # res.images = self._encode_video_to_b64(video_paths)
-            res.images = origin_video
+            res.images = video_list if p.is_api else video_paths
 
     def _add_reverse(self, params: AnimateDiffProcess, video_list: list):
-        if 0 in params.reverse:
+        if params.video_length <= params.batch_size and params.closed_loop in ['A']:
             video_list_reverse = video_list[::-1]
-            if 1 in params.reverse:
+            if len(video_list_reverse) > 0:
                 video_list_reverse.pop(0)
-            if 2 in params.reverse:
+            if len(video_list_reverse) > 0:
                 video_list_reverse.pop(-1)
             return video_list + video_list_reverse
         return video_list
@@ -143,7 +127,7 @@ class AnimateDiffOutput:
     ):
         video_paths = []
         video_array = [np.array(v) for v in video_list]
-        infotext = res.info
+        infotext = res.infotexts[index]
         use_infotext = shared.opts.enable_pnginfo and infotext is not None
         if "PNG" in params.format and shared.opts.data.get("animatediff_save_to_custom", False):
             Path(video_path_prefix).mkdir(exist_ok=True, parents=True)
@@ -201,7 +185,7 @@ class AnimateDiffOutput:
                             exif_tool = exiftool.ExifTool()
                             with exif_tool:
                                 escaped_infotext = infotext.replace('\n', r'\n')
-                                exif_tool.execute(f"-Comment={escaped_infotext}", video_path_gif)
+                                exif_tool.execute("-overwrite_original", f"-Comment={escaped_infotext}", video_path_gif)
                         except FileNotFoundError:
                             logger.warn(
                                 "exiftool not found, required for infotext with optimized GIF palette, try: apt install libimage-exiftool-perl or https://exiftool.org/"
@@ -232,6 +216,26 @@ class AnimateDiffOutput:
         if "TXT" in params.format and res.images[index].info is not None:
             video_path_txt = video_path_prefix + ".txt"
             self._save_txt(video_path_txt, infotext)
+        if "WEBP" in params.format:
+            if PIL.features.check('webp_anim'):            
+                video_path_webp = video_path_prefix + ".webp"
+                video_paths.append(video_path_webp)
+                exif_bytes = b''
+                if use_infotext:
+                    exif_bytes = piexif.dump({
+                        "Exif":{
+                            piexif.ExifIFD.UserComment:piexif.helper.UserComment.dump(infotext, encoding="unicode")
+                        }})
+                lossless = shared.opts.data.get("animatediff_webp_lossless", False)
+                quality = shared.opts.data.get("animatediff_webp_quality", 80)
+                logger.info(f"Saving {video_path_webp} with lossless={lossless} and quality={quality}")
+                imageio.imwrite(video_path_webp, video_array, plugin='pillow',
+                    duration=int(1 / params.fps * 1000), loop=params.loop_number,
+                    lossless=lossless, quality=quality, exif=exif_bytes
+                )
+                # see additional Pillow WebP options at https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#webp
+            else:
+                logger.warn("WebP animation in Pillow requires system WebP library v0.5.0 or later")
         return video_paths
 
     def _optimize_gif(self, video_path: str):
