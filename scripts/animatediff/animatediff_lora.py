@@ -5,13 +5,7 @@ import sys
 from modules import sd_models, shared
 from modules.paths import extensions_builtin_dir
 
-# from scripts.animatediff_logger import logger_animatediff as logger
-
-try:
-    from scripts.animatediff_logger import logger_animatediff as logger
-except ImportError:
-    from scripts.animatediff.animatediff_logger import logger_animatediff as logger
-
+from .animatediff_logger import logger_animatediff as logger
 
 sys.path.append(f"{extensions_builtin_dir}/Lora")
 
