@@ -27,8 +27,12 @@ def is_installed(package: str):
     try:
         spec = importlib.util.find_spec(package)
     except ModuleNotFoundError:
+        message = f"is_installed check for {str(package)} failed as error ModuleNotFoundError"
+        print(message)
         return False
     if spec is None:
+        message = f"is_installed check for {str(package)} failed as 'spec is None'"
+        print(message)
         return False
     if not version_check:
         return True
@@ -37,7 +41,9 @@ def is_installed(package: str):
     try:
         pkg_version = version(package)
         return parse(min_version) <= parse(pkg_version) <= parse(max_version)
-    except Exception:
+    except Exception as e:
+        message = f"is_installed check for {str(package)} failed as error {str(e)}"
+        print(message)
         return False
 # End of Package check util
 
