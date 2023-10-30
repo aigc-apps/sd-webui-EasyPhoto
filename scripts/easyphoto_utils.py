@@ -58,6 +58,7 @@ def check_files_exists_and_download(check_hash):
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/dpt_hybrid-midas-501f0c75.pt",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11f1p_sd15_depth.pth",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/sam_vit_l_0b3195.pth",
+        
         # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_v1.pth",
         # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_lightglue.pth",
     ]

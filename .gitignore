@@ -161,3 +161,4 @@ cython_debug/
 # weight
 *.pth
 *.onnx
+*.safetensors
