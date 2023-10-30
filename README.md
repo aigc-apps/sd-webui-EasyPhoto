@@ -52,7 +52,7 @@ These are our generated results:
 ![results_2](images/results_2.jpg)
 ![results_3](images/results_3.jpg)
 
-Our ui interface is as follows:  
+Our UI interface is as follows:  
 **train part:**
 ![train_ui](images/train_ui.jpg)
 **inference part:**
@@ -187,7 +187,7 @@ If you want to set parameters, the parsing of each parameter is as follows:
 ![single_people](images/single_people.jpg)
 
 #### b. multi people
-- Step 1: Go to the settings page of EasyPhoto and set `num_of_faceid` is greater than `1`.
+- Step 1: Go to the settings page of EasyPhoto and set `num_of_faceid` as greater than `1`.
 - Step 2: Apply settings.
 - Step 3: Restart the ui interface of the webui.
 - Step 4: Return to EasyPhoto and upload the two person template.
@@ -278,6 +278,6 @@ Thanks goes to these wonderful people :
   </tr>
 </table>
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!
 
 <p align="right"><a href="#top">Back to top</a></p>
