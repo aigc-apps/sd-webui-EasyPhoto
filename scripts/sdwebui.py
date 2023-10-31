@@ -22,6 +22,15 @@ InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
 
 
+class unload_sd(ContextDecorator):
+    """Context-manager that unloads SD checkpoint to free VRAM."""
+    def __enter__(self):
+        sd_models.unload_model_weights()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sd_models.reload_model_weights()
+
+        
 class switch_sd_model_vae(ContextDecorator):
     """Context-manager that supports switch SD checkpoint and VAE.
     """
@@ -37,6 +46,7 @@ class switch_sd_model_vae(ContextDecorator):
         shared.opts.sd_vae = self.origin_sd_vae
         # SD Web UI will check self.origin_sd_vae == shared.opts.sd_vae automatically.
         sd_vae.reload_vae_weights()
+
 
 
 class ControlMode(Enum):
