@@ -35,6 +35,8 @@ def easyphoto_train_forward(
     enable_rl: bool,
     max_rl_time: float,
     timestep_fraction: float,
+    refine_mask: bool,
+    use_mask: bool,
     *args
 ):  
     global check_hash
@@ -102,6 +104,13 @@ def easyphoto_train_forward(
         f'--ref_image_path={ref_image_path}',
         f'--sam_model_path={model_path}'
     ]
+
+    if refine_mask:
+        command += ["--refine_mask"]
+
+    if use_mask:
+        command += ["--use_mask"]
+
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:

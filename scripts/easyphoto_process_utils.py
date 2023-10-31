@@ -1108,8 +1108,17 @@ def find_best_angle_ratio(
         poly2 = Polygon(polygon2)
 
         # Calculate IoU
-        iou = poly1.intersection(poly2).area / poly1.union(poly2).area
-        in_iou = poly1.intersection(poly2).area / poly2.area
+        try:
+            iou = poly1.intersection(poly2).area / poly1.union(poly2).area
+            in_iou = poly1.intersection(poly2).area / poly2.area
+        except:
+            if not poly1.is_valid:
+                poly1 = poly1.buffer(0)
+            if not poly2.is_valid:
+                poly2 = poly2.buffer(0)
+
+            iou = poly1.intersection(poly2).area / poly1.union(poly2).area
+            in_iou = poly1.intersection(poly2).area / poly2.area
 
         print(f'iou: {iou}, in_iou: {in_iou}, angle:{angle}, ratio:{ratio}')
 

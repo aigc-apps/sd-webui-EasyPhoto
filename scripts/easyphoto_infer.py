@@ -343,7 +343,10 @@ def easyphoto_infer_forward(
     )
 
     # box cal & refine mask
-    _, box_main = mask_to_box(np.uint8(mask1[:, :, 0]))
+    if len(mask1.shape)==2:
+        mask1 = np.repeat(mask1[:, :, np.newaxis], 3, axis=2)
+
+    _, box_main = mask_to_box(np.uint8(mask1[:,:,0]))
     # draw_box_on_image(img1, box_main, "box1.jpg")
 
     # get mask2

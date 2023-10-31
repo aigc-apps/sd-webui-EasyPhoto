@@ -21,12 +21,15 @@ from lightglue import DISK, LightGlue, SuperPoint, viz2d
 from lightglue.utils import load_image, rbd
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
+from modelscope.utils.constant import Tasks
 import numpy as np
 import torch
 import cv2
 from sklearn.cluster import KMeans
 from segment_anything import SamPredictor, sam_model_registry
-from easyphoto_process_utils import rotate_resize_image
+from easyphoto_process_utils import rotate_resize_image, apply_mask_to_image, mask_to_box, crop_image
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
@@ -86,6 +89,16 @@ def parse_args():
             "The path of Sam model."
         ),
     )
+    parser.add_argument(
+        "--refine_mask", 
+        action="store_true",
+        help="whether to refine mask by salient detection.",
+    )
+    parser.add_argument(
+        "--use_mask", 
+        action="store_true",
+        help="whether to use masked training images.",
+    )
     args = parser.parse_args()
     return args
 
@@ -110,6 +123,7 @@ def get_match_points(img_path1, img_path2, extractor, matcher):
 
         MATCH_CACHE[key] = {'m_kpts0':m_kpts0.cpu().numpy(), 'm_kpts1':m_kpts1.cpu().numpy(), 'matches':matches.cpu().numpy()}
         torch.cuda.empty_cache()
+        
     return MATCH_CACHE[key]
     
 def find_farthest_points(points, k):
@@ -189,9 +203,21 @@ def refine_matched_pairs_per_image(matched_pairs_per_image, sam_points=5):
             filtered_pairs_per_image[key] = closest_pairs
         
         return filtered_pairs_per_image
+
     centers = find_k_centers(matched_pairs_per_image, sam_points)
     filtered_pairs_per_image = filter_pairs_by_centers(matched_pairs_per_image, centers)
+
     return filtered_pairs_per_image
+
+
+def draw_points_on_image(img, points):
+    img_with_points = img.copy()
+    for point in points:
+        x, y = point
+        cv2.circle(img_with_points, (int(x), int(y)), 20, (0, 0, 255), -1)
+
+    return img_with_points
+
 
 def plot_sam_result(image_list, matched_pairs_per_image, idx, pair_idx=1):
     # mask_idx in 0,1,2
@@ -207,6 +233,9 @@ def plot_sam_result(image_list, matched_pairs_per_image, idx, pair_idx=1):
         pair_1 = matched_pairs_per_image[idx]
         
     kpts1 = np.array([pair[pair_idx] for pair in pair_1])
+    # print(len(kpts1))
+    # img_plot = draw_points_on_image(image1,kpts1)
+    # cv2.imwrite(f'point_{idx}_{pair_idx}.jpg',img_plot)
 
     input_point = kpts1
     input_label = np.array([1]*kpts1.shape[0])
@@ -253,26 +282,29 @@ def extract_subimage_with_mask_and_kpts(image, mask, kpts, kernel_size=5, safe_e
 
     kernel_size = min(kernel_size, min(mask.shape[0], mask.shape[1])//20)
     kernel = np.ones((kernel_size, kernel_size), np.uint8)
+
     eroded_mask = cv2.erode(mask, kernel)
     dilated_mask = cv2.dilate(eroded_mask, kernel)
     
-    # 寻找联通区域
+    # get mask box
     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    # 找到面积最大的联通区域（主体）
     max_contour = max(contours, key=cv2.contourArea)
-    
-    # 获取主体的矩形框
+
     x, y, w, h = cv2.boundingRect(max_contour)
-    # 获取 mask 中为 1 的点的坐标
+    # expand
     x, y, w, h = safe_expand(x, y, w, h, image.shape[1], image.shape[0], safe_expand_ratio)
     
-    mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
-    # print(mask.shape, image.shape, mask_3d.shape)
-    image[mask_3d == 0] = background
+    # mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+    # # print(mask.shape, image.shape, mask_3d.shape)
+    # image[mask_3d == 0] = background
     cropped_image = image[y:y+h, x:x+w]
-    cropped_mask = mask_3d[y:y+h, x:x+w]
-    return cropped_image, cropped_mask
+    cropped_mask = mask[y:y+h, x:x+w]
+
+    background = np.full((cropped_mask.shape[0], cropped_mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+    cropped_image_mask = apply_mask_to_image(cropped_image, background, cropped_mask, expand_kernal=3)
+
+    return cropped_image_mask, cropped_mask, cropped_image
+
 
 if __name__ == "__main__":
     args                = parse_args()
@@ -283,7 +315,11 @@ if __name__ == "__main__":
     main_image_path     = args.main_image_path
     ref_image_path      = args.ref_image_path
     sam_model_path      = args.sam_model_path
+    refine_mask         = args.refine_mask
+    use_mask            = args.use_mask
 
+    print(refine_mask, use_mask)
+    
     max_match_num       = 2048
     final_point         = 50
     sigma_ratio         = -0.4
@@ -299,37 +335,52 @@ if __name__ == "__main__":
     # image list and main image
     image_list          = glob(f'{inputs_dir}/*.jpg')  + glob(f'{inputs_dir}/*.png') + glob(f'{inputs_dir}/*.jpeg') 
     main_path           = main_image_path
+
+    # preprocess main path
+    remove_background = True
+    salient_detect = pipeline(Tasks.semantic_segmentation, model='damo/cv_u2net_salient-detection')
+    if remove_background:
+        result = salient_detect(main_path)
+        mask = result[OutputKeys.MASKS]
+        background = np.full((mask.shape[0], mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+        result_img = apply_mask_to_image(cv2.imread(main_path), background, mask)
+        cv2.imwrite(main_path,result_img)
+
     if main_path is not None:
         image_list      = [main_path] + image_list
+
     N                   = len(image_list)
     
     # cache init
     MATCH_CACHE         = defaultdict(lambda: {'m_kpts0':[], 'm_kpts1':[]})
-    keypoint_counter    = defaultdict(lambda: {'count': 0, 'score': 0})
-    keypoint_matches    = defaultdict(list)
-    image_pair_scores   = defaultdict(int)
-    keypoints_info      = {}
+    # keypoint_counter    = defaultdict(lambda: {'count': 0, 'score': 0})
+    # keypoint_matches    = defaultdict(list)
+    image_pair_scores   = defaultdict(int) # {'(i,j)':num_match_points)}
+    # keypoints_info      = {}
     num_matches_list    = []
 
     # Loop to collect data
     start_time = time.time()
     for i in range(1, N):
+        print(f'Matching {image_list[0]} to {image_list[i]}')
         iter_start_time             = time.time()
         match_points                = get_match_points(image_list[0], image_list[i], default_extractor, default_matcher)
         m_kpts0, m_kpts1, matches   = match_points['m_kpts0'], match_points['m_kpts1'], match_points['matches']
 
         num_matches                 = m_kpts0.shape[0]
-        keypoints_info[(0, i)]      = matches
+        print(f'Matched Points: {num_matches}')
+
+        # keypoints_info[(0, i)]      = matches
         image_pair_scores[(0, i)]   = num_matches
         num_matches_list.append(num_matches)
         
         # Update the number of occurrences and trust scores of keypoints and record the matches in the top K images
-        for idx, (kpt0, kpt1) in enumerate(zip(m_kpts0, m_kpts1)):
-            key_tuple = tuple(map(int, kpt0))
-            keypoint_counter[key_tuple]['count'] += 1
-            keypoint_counter[key_tuple]['score'] += 1 / (idx + 1)
-            if i < K:
-                keypoint_matches[key_tuple].append(tuple(map(int, kpt1)))
+        # for idx, (kpt0, kpt1) in enumerate(zip(m_kpts0, m_kpts1)):
+            # key_tuple = tuple(map(int, kpt0))
+            # keypoint_counter[key_tuple]['count'] += 1
+            # keypoint_counter[key_tuple]['score'] += 1 / (idx + 1)
+            # if i < K:
+            #     keypoint_matches[key_tuple].append(tuple(map(int, kpt1)))
         logging.info(f"Time taken for image {i}: {time.time() - iter_start_time:.2f} seconds")
 
     # set threshold dynamic
@@ -346,8 +397,12 @@ if __name__ == "__main__":
             selected_image_indices.add(i)
             selected_image_indices.add(j)
 
-    logging.info(f"Dynamic threshold is set at: {threshold}")
-    logging.info(f"Selected images for the common subject are: {sorted(list(selected_image_indices))}")
+    print(f"Dynamic threshold is set at: {threshold}")
+    print(f"Selected images for the common subject are: {sorted(list(selected_image_indices))}")
+    print(f"After remove few point image, now image: {len(list(selected_image_indices))}")
+
+    # import pdb
+    # pdb.set_trace()
 
     # get final list
     image_list = [image_list[i] for i in sorted(selected_image_indices)]
@@ -366,6 +421,7 @@ if __name__ == "__main__":
         match_points = get_match_points(image_list[0], image_list[i], default_extractor, default_matcher)
         m_kpts0, m_kpts1, matches = itemgetter('m_kpts0', 'm_kpts1', 'matches')(match_points)
 
+
         # Update keypoint counter and collect matches
         for idx, (kpt0, kpt1) in enumerate(zip(m_kpts0, m_kpts1)):
             key_tuple = tuple(map(int, kpt0))
@@ -378,20 +434,32 @@ if __name__ == "__main__":
         logging.info(f"Time taken for image {i}: {time.time() - iter_start_time:.2f} seconds")
 
     # Sort and Select Top 50 Keypoints
+    # sorted_keypoints = sorted(
+    #     keypoint_counter.keys(), 
+    #     key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']), 
+    #     reverse=True)[:final_point]
+    # keypoint_counter (key: point in main) " 'count':match_nums, matches: {img_id: [point_lists]} 
     sorted_keypoints = sorted(
-        keypoint_counter.keys(), 
-        key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']), 
-        reverse=True)[:final_point]
+            keypoint_counter.keys(), 
+            key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']), 
+            reverse=True)
 
     # Collect Matched Pairs for Each Image
-    for kpt in sorted_keypoints:
+    # matched_pairs_per_image {key(img_id): key points}
+    for kpt in sorted_keypoints: 
         for image_idx, matched_kpts in keypoint_counter[kpt]['matches'].items():
             matched_pairs_per_image[image_idx].extend((kpt, mkpt) for mkpt in matched_kpts)
 
-    plot_num = min(5, len(image_list))
+
+    # plot_num = min(5, len(image_list))
+    plot_num = len(image_list)
+    # key point pairs [((img1 point,)(img2 point,)), ..., ...]
     filtered_pairs_per_image = refine_matched_pairs_per_image(matched_pairs_per_image, 5)
+
+
     mask_list = []
     ref_list = []
+
 
     os.makedirs(images_save_path, exist_ok=True)
     for i in range(0, plot_num):
@@ -403,8 +471,23 @@ if __name__ == "__main__":
         else:
             tkpts =  np.array([pair[1] for pair in matched_pairs_per_image[i]])
 
-        sub_image, sub_mask = extract_subimage_with_mask_and_kpts(image, mask, tkpts)
+        sub_image_mask, sub_mask, sub_image = extract_subimage_with_mask_and_kpts(image, mask, tkpts)
+        # cv2.imwrite(f'sub_image_{i}.jpg',sub_image)
+        # cv2.imwrite(f'sub_mask_bf_{i}.jpg',sub_mask)
+        
+        # refine_mask = False
+        if refine_mask:
+            # refine sam mask
+            result = salient_detect(sub_image)
+            sub_mask = result[OutputKeys.MASKS]
+            background = np.full((sub_mask.shape[0], sub_mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+            sub_image_mask = apply_mask_to_image(sub_image, background, sub_mask)
+            # cv2.imwrite(f'sub_image_refine_{i}.jpg',sub_image_mask)
+            # cv2.imwrite(f'sub_mask_{i}.jpg',sub_mask)
 
+        # use_mask = False
+        if use_mask:
+            sub_image = sub_image_mask
         # rotate
         # angle_low = -60
         # angle_high = 60
@@ -429,10 +512,8 @@ if __name__ == "__main__":
             f.write(validation_prompt)
 
         if i == 0:
-            cv2.imwrite(ref_image_path, sub_image[:, :, ::-1])
-            cv2.imwrite(os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), sub_mask[:, :, ::-1])
-
-
+            cv2.imwrite(ref_image_path, sub_image_mask[:, :, ::-1])
+            cv2.imwrite(os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), sub_mask)
 
     with open(json_save_path, 'w', encoding="utf-8") as f:
         for root, dirs, files in os.walk(images_save_path, topdown=False):
