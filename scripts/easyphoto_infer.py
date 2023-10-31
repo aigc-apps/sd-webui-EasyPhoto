@@ -247,7 +247,6 @@ def easyphoto_infer_forward(
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
-    sd_vae = None if sdxl_pipeline_flag else "vae-ft-mse-840000-ema-pruned.ckpt"
 
     for user_id in user_ids:
         if user_id != "none":
@@ -289,7 +288,7 @@ def easyphoto_infer_forward(
         elif tabs == 3:
             shared.opts.sd_model_checkpoint = SDXL_MODEL_NAME
             sd_models.reload_model_weights()
-            shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"  # hkz: add it in easyphoto_utils.py
+            shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
             sd_vae.reload_vae_weights()
 
             ep_logger.info(sd_xl_input_prompt)
@@ -310,8 +309,9 @@ def easyphoto_infer_forward(
     
     shared.opts.sd_model_checkpoint = sd_model_checkpoint
     sd_models.reload_model_weights()
-    # hkz: SD1: "vae-ft-mse-840000-ema-pruned.ckpt"; SDXL: "madebyollin-sdxl-vae-fp16-fix.safetensors"
     shared.opts.sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+    if sdxl_pipeline_flag:
+        shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
     sd_vae.reload_vae_weights()
     
     # create modelscope model
@@ -378,7 +378,7 @@ def easyphoto_infer_forward(
     # or do txt2img with SDXL once before img2img.
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
     if sdxl_pipeline_flag and not sdxl_txt2img_flag:
-        txt2img([], diffusion_steps=2, sd_model_checkpoint=SDXL_MODEL_NAME)
+        txt2img([], diffusion_steps=2)
         sdxl_txt2img_flag = True
     for user_id in user_ids:
         if user_id == 'none':
@@ -681,8 +681,6 @@ def easyphoto_infer_forward(
                     input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
                 
                 ep_logger.info("Start Second diffusion.")
-                controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
-                second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed))
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                 else:
@@ -791,8 +789,6 @@ def easyphoto_infer_forward(
                     output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                     denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
-                    controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
-                    output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
                     else:
