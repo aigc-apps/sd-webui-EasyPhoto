@@ -15,15 +15,17 @@ from scripts.easyphoto_config import (easyphoto_outpath_samples, models_path, ca
                                       user_id_outpath_samples,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
-                                     check_id_valid)
+                                     check_id_valid,
+                                     unload_models)
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
-from scripts.sdwebui import get_checkpoint_type
+from scripts.sdwebui import get_checkpoint_type, unload_sd
 
 
 python_executable_path = sys.executable
 check_hash             = True
 
 # Attention! Output of js is str or list, not float or int
+@unload_sd()
 def easyphoto_train_forward(
     sd_model_checkpoint: str,
     id_task: str,
@@ -149,7 +151,7 @@ def easyphoto_train_forward(
     print("cache_log_file_path:", cache_log_file_path)
     if not os.path.exists(os.path.dirname(cache_log_file_path)):
         os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
-
+    
     # Extra arguments to run SDXL training.
     env = None
     if sdxl_pipeline_flag:
@@ -164,6 +166,7 @@ def easyphoto_train_forward(
             "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"),
             **os.environ.copy()
         }
+    unload_models()
     if platform.system() == 'Windows':
         pwd = os.getcwd()
         dataloader_num_workers = 0 # for solve multi process bug
