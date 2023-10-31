@@ -188,6 +188,16 @@ def on_ui_tabs():
                                     interactive=True
                                 )
                             with gr.Row():
+                                refine_mask = gr.Checkbox(
+                                    label="Refine Mask",  
+                                    value=True
+                                )
+                                use_mask = gr.Checkbox(
+                                    label="Use Mask", 
+                                    value=True
+                                )
+
+                            with gr.Row():
                                 validation = gr.Checkbox(
                                     label="Validation",  
                                     value=False,
@@ -262,8 +272,8 @@ def on_ui_tabs():
                                     sd_model_checkpoint, dummy_component,
                                     uuid,
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, \
-                                    learning_rate, rank, network_alpha, validation, main_image, instance_images,
-                                    enable_rl, max_rl_time, timestep_fraction
+                                    learning_rate, rank, network_alpha, validation, main_image, instance_images, \
+                                    enable_rl, max_rl_time, timestep_fraction,refine_mask,use_mask
                                 ],
                                 outputs=[output_message])
                                 
