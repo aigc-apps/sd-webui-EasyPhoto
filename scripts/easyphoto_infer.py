@@ -342,7 +342,7 @@ def easyphoto_infer_forward(
             face_id_retinaface_masks.append([])
         else:
             # get prompt
-            input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
