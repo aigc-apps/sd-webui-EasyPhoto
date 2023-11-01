@@ -956,10 +956,11 @@ def easyphoto_video_infer_forward(
         template_images = inpaint(
             image, None, [], 
             input_prompt = selected_template_prompts, \
-            diffusion_steps=50, denoising_strength=0.70, hr_scale=1, \
+            diffusion_steps=30, denoising_strength=0.70, hr_scale=1, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras",
+            sd_model_checkpoint = sd_model_checkpoint,
             animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
         )
         template_images = [template_images]
