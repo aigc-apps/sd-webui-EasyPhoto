@@ -16,6 +16,7 @@ from modules.shared import opts, state
 from PIL import Image
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL,
+                                      DEFAULT_POSITIVE_AD, DEFAULT_NEGATIVE_AD,
                                       SDXL_MODEL_NAME,
                                       easyphoto_img2img_samples,
                                       easyphoto_outpath_samples,
@@ -197,23 +198,24 @@ def inpaint(
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
     sampler = "DPM++ 2M SDE Karras",
     animatediff_flag = False,
+    animatediff_video_length = 0,
     animatediff_fps = 0,
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
-    w = int(input_image.width) if not animatediff_flag else int(input_image[0].width)
-    h = int(input_image.height) if not animatediff_flag else int(input_image[0].height)
+    w = int(input_image.width) if type(input_image) is not list else int(input_image[0].width)
+    h = int(input_image.height) if type(input_image) is not list else int(input_image[0].height)
 
     for pair in controlnet_pairs:
         controlnet_units_list.append(
-            get_controlnet_unit(pair[0], pair[1], pair[2]) if not animatediff_flag else get_controlnet_unit(pair[0], None, pair[2], pair[1])
+            get_controlnet_unit(pair[0], pair[1], pair[2]) if type(input_image) is not list else get_controlnet_unit(pair[0], None, pair[2], pair[1])
         )
 
     positive = f'{input_prompt}, {default_positive_prompt}'
     negative = f'{default_negative_prompt}'
 
     image = i2i_inpaint_call(
-        images=[input_image] if not animatediff_flag else input_image,
+        images=[input_image] if type(input_image) is not list else input_image,
         mask_image=select_mask_input,
         inpainting_fill=1, 
         steps=diffusion_steps,
@@ -231,6 +233,7 @@ def inpaint(
         outpath_samples=easyphoto_img2img_samples,
         sampler=sampler,
         animatediff_flag=animatediff_flag,
+        animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
     )
 
@@ -800,7 +803,7 @@ def easyphoto_infer_forward(
     return loop_message, outputs, face_id_outputs  
 
 def easyphoto_video_infer_forward(
-    sd_model_checkpoint, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    sd_model_checkpoint, selected_template_images, selected_template_prompts, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
@@ -809,7 +812,7 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
+    # check_files_exists_and_download(check_hash)
     check_hash = False
 
     for user_id in user_ids:
@@ -831,10 +834,18 @@ def easyphoto_video_infer_forward(
         seed = np.random.randint(0, 65536)
 
     try:
-        max_frames = int(max_frames)
-        max_fps = int(max_fps)
-        template_images, actual_fps = get_mov_all_images(init_video, max_fps)
-        template_images = [template_images[:max_frames]] if max_frames != -1 else [template_images]
+        # choose tabs select
+        if tabs == 0:
+            template_images = selected_template_images
+            actual_fps = int(max_fps)
+        elif tabs == 1:
+            template_images = []
+            actual_fps = int(max_fps)
+        elif tabs == 2:
+            max_frames = int(max_frames)
+            max_fps = int(max_fps)
+            template_images, actual_fps = get_mov_all_images(init_video, max_fps)
+            template_images = [template_images[:max_frames]] if max_frames != -1 else [template_images]
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
@@ -933,6 +944,26 @@ def easyphoto_video_infer_forward(
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
+    if tabs == 0:
+        image = Image.open(template_images).convert("RGB")
+
+        # Resize the template image with short edges on 512
+        short_side  = min(image.width, image.height)
+        resize      = float(short_side / 512.0)
+        new_size    = (int(image.width//resize), int(image.height//resize))
+        image       = image.resize(new_size, Image.Resampling.LANCZOS)
+
+        template_images = inpaint(
+            image, None, [], 
+            input_prompt = selected_template_prompts, \
+            diffusion_steps=50, denoising_strength=0.70, hr_scale=1, \
+            default_positive_prompt=DEFAULT_POSITIVE_AD, \
+            default_negative_prompt=DEFAULT_NEGATIVE_AD, \
+            seed = seed, sampler = "DPM++ 2M SDE Karras",
+            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
+        )
+        template_images = [template_images]
+
     outputs = []
     loop_message = ""
     for template_idx, template_image in enumerate(template_images):
@@ -954,7 +985,7 @@ def easyphoto_video_infer_forward(
 
         try:
             # open the template image
-            template_image      = [Image.fromarray(_).convert("RGB") for _ in template_image]
+            template_image      = [Image.fromarray(np.uint8(_)).convert("RGB") for _ in template_image]
             loop_template_image = copy.deepcopy(template_image)
 
             input_image = []
@@ -971,6 +1002,7 @@ def easyphoto_video_infer_forward(
                         _loop_template_image_padding = _loop_template_image
                 else:
                     _loop_template_crop_safe_box = None
+                    _padding_size = None
                     _loop_template_image_padding = copy.deepcopy(_loop_template_image)
                     _loop_template_image = copy.deepcopy(_loop_template_image)
 
@@ -1096,7 +1128,7 @@ def easyphoto_video_infer_forward(
                     sum_input_mask.append(np.array(_input_mask))
             sum_input_mask = Image.fromarray(np.uint8(np.max(np.array(sum_input_mask), axis = 0)))
             
-            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, animatediff_flag=True, animatediff_fps=max_fps)
+            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, animatediff_flag=True, animatediff_fps=int(actual_fps))
             
             _outputs = []
             for _first_diffusion_output_image, _loop_template_image, _loop_template_crop_safe_box, _loop_template_padding_size, _input_image_retinaface_box, _template_image_original_face_area in zip(first_diffusion_output_image, loop_template_image, loop_template_crop_safe_box, loop_template_padding_size, input_image_retinaface_boxes, template_image_original_face_area):
