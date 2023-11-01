@@ -591,13 +591,41 @@ def on_ui_tabs():
                 )
     
         with gr.TabItem('Video Inference'):
-            dummy_component     = gr.Label(visible=False)
+            dummy_component = gr.Label(visible=False)
+            video_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates_videos/*.jpg'))
 
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
-                        with gr.TabItem("upload") as upload_video_tab:
-                            init_video = gr.Video(label="Video for easyphoto", elem_id="{id_part}_image", show_label=False, source="upload")
+                        video_model_selected_tab = gr.State(0)
+
+                        with gr.TabItem("template gallery") as video_template_images_tab:
+                            template_gallery_list = [(i, i) for i in video_templates]
+                            gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                            
+                            def select_function(evt: gr.SelectData):
+                                prompts = [
+                                    "smile, 1girl, head-shot photo, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32",
+                                    "smile, 1girl, head-shot photo, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the summer, daytime, rainy, f32",
+                                    "",
+                                    "",
+                                ]
+                                return [video_templates[evt.index], prompts[evt.index]]
+
+                            selected_template_images    = gr.Text(show_label=False, visible=False, placeholder="Selected")
+                            selected_template_prompts   = gr.Text(show_label=False, visible=True, placeholder="Selected")
+                            gallery.select(select_function, None, [selected_template_images, selected_template_prompts])
+
+                        with gr.TabItem("upload photo") as video_upload_image_tab:
+                            init_image          = gr.Image(label="Image for easyphoto", elem_id="{id_part}_image", show_label=False, source="upload")
+                            init_image_prompt   = gr.Text("label", show_label=False, visible=True, placeholder="Selected")
+
+                        with gr.TabItem("upload video") as video_upload_video_tab:
+                            init_video = gr.Video(label="Video for easyphoto", elem_id="{id_part}_video", show_label=False, source="upload")
+
+                        model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
+                        for i, tab in enumerate(model_selected_tabs):
+                            tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
 
                         with gr.Row():
                             def checkpoint_refresh_function():
@@ -688,7 +716,7 @@ def on_ui_tabs():
                                 )
                                 max_fps = gr.Textbox(
                                     label="Video Max fps", 
-                                    value=16,
+                                    value=8,
                                 )
                                 save_as = gr.Dropdown(
                                     value="mp4", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
@@ -796,10 +824,10 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_video_infer_forward,
-                    inputs=[sd_model_checkpoint, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                    inputs=[sd_model_checkpoint, selected_template_images, selected_template_prompts, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
                             first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                             color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
-                            makeup_transfer, makeup_transfer_ratio, face_shape_match, model_selected_tab, *uuids],
+                            makeup_transfer, makeup_transfer_ratio, face_shape_match, video_model_selected_tab, *uuids],
                     outputs=[infer_progress, output_video, output_images]
 
                 )

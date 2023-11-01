@@ -22,26 +22,28 @@ from einops import rearrange
 from modules import (hashes, images, processing, script_callbacks, scripts,
                      sd_models, sd_samplers, sd_vae, shared)
 from modules.api.models import *
-from modules.devices import cpu, device, torch_gc
+from modules.devices import cpu, device, dtype_vae, torch_gc
 from modules.paths import data_path
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
 from modules.scripts import PostprocessBatchListArgs, PostprocessImageArgs
 from modules.sd_models import get_closet_checkpoint_match, load_model
+from modules.sd_samplers_common import (approximation_indexes,
+                                        images_tensor_to_samples)
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
 from PIL import Image, PngImagePlugin
-
-from .animatediff_infotext import update_infotext
-from .animatediff_infv2v import AnimateDiffInfV2V
-from .animatediff_latent import AnimateDiffI2VLatent
-from .animatediff_logger import logger_animatediff as logger
-from .animatediff_lora import AnimateDiffLora
-from .animatediff_mm import AnimateDiffMM
-from .animatediff_output import AnimateDiffOutput
-from .animatediff_prompt import AnimateDiffPromptSchedule
-from .animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
+from scripts.animatediff.animatediff_i2ibatch import animatediff_i2ibatch
+from scripts.animatediff.animatediff_infotext import update_infotext
+from scripts.animatediff.animatediff_infv2v import AnimateDiffInfV2V
+from scripts.animatediff.animatediff_logger import logger_animatediff as logger
+from scripts.animatediff.animatediff_lora import AnimateDiffLora
+from scripts.animatediff.animatediff_mm import AnimateDiffMM
+from scripts.animatediff.animatediff_output import AnimateDiffOutput
+from scripts.animatediff.animatediff_prompt import AnimateDiffPromptSchedule
+from scripts.animatediff.animatediff_ui import (AnimateDiffProcess,
+                                                AnimateDiffUiGroup)
 
 
 class AnimateDiffControl:
@@ -738,9 +740,10 @@ class AnimateDiffOutput(AnimateDiffOutput):
         return video_paths
 
 
-class AnimateDiffMM(AnimateDiffMM):
+class AnimateDiffMM_Remake(AnimateDiffMM):
     def _load(self, model_name):
-        from .motion_module import MotionModuleType, MotionWrapper
+        from scripts.animatediff.motion_module import (MotionModuleType,
+                                                       MotionWrapper)
         model_path = os.path.join(self.script_dir, model_name)
         if not os.path.isfile(model_path):
             raise RuntimeError("Please download models manually.")
@@ -758,17 +761,222 @@ class AnimateDiffMM(AnimateDiffMM):
             self.mm.half()
 
 
-motion_module = mm_animatediff = AnimateDiffMM()
+motion_module = AnimateDiffMM_Remake()
+motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
 
 
-class AnimateDiffScript():
+class AnimateDiffUiGroup:
+    txt2img_submit_button = None
+    img2img_submit_button = None
+
+    def __init__(self):
+        self.params = AnimateDiffProcess()
+
+
+    def render(self):
+        return gr.State(value=AnimateDiffProcess)
+
+
+class AnimateDiffProcess:
+
+    def __init__(
+        self,
+        model="mm_sd_v15_v2.ckpt",
+        enable=False,
+        video_length=0,
+        fps=8,
+        loop_number=0,
+        closed_loop='R-P',
+        batch_size=16,
+        stride=1,
+        overlap=-1,
+        format=["GIF", "PNG"],
+        interp='Off',
+        interp_x=10,
+        video_source=None,
+        video_path='',
+        latent_power=1,
+        latent_scale=32,
+        last_frame=None,
+        latent_power_last=1,
+        latent_scale_last=32,
+        i2i_add_random=True
+    ):
+        self.model = model
+        self.enable = enable
+        self.video_length = video_length
+        self.fps = fps
+        self.loop_number = loop_number
+        self.closed_loop = closed_loop
+        self.batch_size = batch_size
+        self.stride = stride
+        self.overlap = overlap
+        self.format = format
+        self.interp = interp
+        self.interp_x = interp_x
+        self.video_source = video_source
+        self.video_path = video_path
+        self.latent_power = latent_power
+        self.latent_scale = latent_scale
+        self.last_frame = last_frame
+        self.latent_power_last = latent_power_last
+        self.latent_scale_last = latent_scale_last
+        self.i2i_add_random = i2i_add_random
+
+
+    def get_list(self, is_img2img: bool):
+        list_var = list(vars(self).values())
+        if is_img2img:
+            animatediff_i2ibatch.hack()
+        else:
+            list_var = list_var[:-5]
+        return list_var
+
+
+    def get_dict(self, is_img2img: bool):
+        infotext = {
+            "enable": self.enable,
+            "model": self.model,
+            "video_length": self.video_length,
+            "fps": self.fps,
+            "loop_number": self.loop_number,
+            "closed_loop": self.closed_loop,
+            "batch_size": self.batch_size,
+            "stride": self.stride,
+            "overlap": self.overlap,
+            "interp": self.interp,
+            "interp_x": self.interp_x,
+        }
+        if motion_module.mm is not None and motion_module.mm.mm_hash is not None:
+            infotext['mm_hash'] = motion_module.mm.mm_hash[:8]
+        if is_img2img:
+            infotext.update({
+                "latent_power": self.latent_power,
+                "latent_scale": self.latent_scale,
+                "latent_power_last": self.latent_power_last,
+                "latent_scale_last": self.latent_scale_last,
+            })
+        infotext_str = ', '.join(f"{k}: {v}" for k, v in infotext.items())
+        return infotext_str
+
+
+    def _check(self):
+        assert (
+            self.video_length >= 0 and self.fps > 0
+        ), "Video length and FPS should be positive."
+        assert not set(["GIF", "MP4", "PNG", "WEBP"]).isdisjoint(
+            self.format
+        ), "At least one saving format should be selected."
+
+
+    def set_p(self, p: StableDiffusionProcessing):
+        self._check()
+        if self.video_length < self.batch_size:
+            p.batch_size = self.batch_size
+        else:
+            p.batch_size = self.video_length
+        if self.video_length == 0:
+            self.video_length = p.batch_size
+            self.video_default = True
+        else:
+            self.video_default = False
+        if self.overlap == -1:
+            self.overlap = self.batch_size // 4
+        if "PNG" not in self.format or shared.opts.data.get("animatediff_save_to_custom", False):
+            p.do_not_save_samples = True
+
+
+class AnimateDiffI2VLatent:
+    def randomize(
+        self, p: StableDiffusionProcessingImg2Img, params: AnimateDiffProcess
+    ):
+        # Get init_alpha
+        init_alpha = [
+            0.55 for i in range(params.video_length)
+        ]
+        logger.info(f"Randomizing init_latent according to {init_alpha}.")
+        init_alpha = torch.tensor(init_alpha, dtype=torch.float32, device=device)[
+            :, None, None, None
+        ]
+        init_alpha[init_alpha < 0] = 0
+
+        if params.last_frame is not None:
+            last_frame = params.last_frame
+            if type(last_frame) == str:
+                from modules.api.api import decode_base64_to_image
+                last_frame = decode_base64_to_image(last_frame)
+            # Get last_alpha
+            last_alpha = [
+                1 - pow(i, params.latent_power_last) / params.latent_scale_last
+                for i in range(params.video_length)
+            ]
+            last_alpha.reverse()
+            logger.info(f"Randomizing last_latent according to {last_alpha}.")
+            last_alpha = torch.tensor(last_alpha, dtype=torch.float32, device=device)[
+                :, None, None, None
+            ]
+            last_alpha[last_alpha < 0] = 0
+
+            # Normalize alpha
+            sum_alpha = init_alpha + last_alpha
+            mask_alpha = sum_alpha > 1
+            scaling_factor = 1 / sum_alpha[mask_alpha]
+            init_alpha[mask_alpha] *= scaling_factor
+            last_alpha[mask_alpha] *= scaling_factor
+            init_alpha[0] = 1
+            init_alpha[-1] = 0
+            last_alpha[0] = 0
+            last_alpha[-1] = 1
+
+            # Calculate last_latent
+            if p.resize_mode != 3:
+                last_frame = images.resize_image(
+                    p.resize_mode, last_frame, p.width, p.height
+                )
+                last_frame = np.array(last_frame).astype(np.float32) / 255.0
+                last_frame = np.moveaxis(last_frame, 2, 0)[None, ...]
+            last_frame = torch.from_numpy(last_frame).to(device).to(dtype_vae)
+            last_latent = images_tensor_to_samples(
+                last_frame,
+                approximation_indexes.get(shared.opts.sd_vae_encode_method),
+                p.sd_model,
+            )
+            torch_gc()
+            if p.resize_mode == 3:
+                opt_f = 8
+                last_latent = torch.nn.functional.interpolate(
+                    last_latent,
+                    size=(p.height // opt_f, p.width // opt_f),
+                    mode="bilinear",
+                )
+            # Modify init_latent
+            p.init_latent = (
+                p.init_latent * init_alpha
+                + last_latent * last_alpha
+                + p.rng.next() * (1 - init_alpha - last_alpha)
+            )
+        else:
+            p.init_latent = p.init_latent * init_alpha + p.rng.next() * (1 - init_alpha)
+
+
+class AnimateDiffScript_Remake(scripts.Script):
 
     def __init__(self):
         self.lora_hacker = None
         self.cfg_hacker = None
         self.cn_hacker = None
         self.prompt_scheduler = None
+        self.name = self.title()
+        print("AnimateDiffScript init")
 
+    def title(self):
+        return "animatediff_easyphoto"
+
+    def show(self, is_img2img):
+        return scripts.AlwaysVisible
+    
+    def ui(self, is_img2img):
+        return (AnimateDiffUiGroup().render(), )
 
     def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
@@ -788,20 +996,8 @@ class AnimateDiffScript():
 
     def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
-        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
+        if params.i2i_add_random and params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
             AnimateDiffI2VLatent().randomize(p, params)
-
-
-    def postprocess_batch_list(self, p: StableDiffusionProcessing, pp: PostprocessBatchListArgs, params: AnimateDiffProcess, **kwargs):
-        if isinstance(params, dict): params = AnimateDiffProcess(**params)
-        if params.enable:
-            self.prompt_scheduler.save_infotext_img(p)
-
-
-    def postprocess_image(self, p: StableDiffusionProcessing, pp: PostprocessImageArgs, params: AnimateDiffProcess, *args):
-        if isinstance(params, dict): params = AnimateDiffProcess(**params)
-        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and hasattr(p, '_animatediff_paste_to_full'):
-            p.paste_to = p._animatediff_paste_to_full[p.batch_index]
 
 
     def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
@@ -813,4 +1009,5 @@ class AnimateDiffScript():
             self.lora_hacker.restore()
             motion_module.restore(p.sd_model)
             AnimateDiffOutput().output(p, res, params)
+            motion_module.remove()
             logger.info("AnimateDiff process end.")
