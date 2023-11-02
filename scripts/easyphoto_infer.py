@@ -24,7 +24,7 @@ from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid, ep_logger,
-                                     ms_tocpu_models, ms_tocuda_models,
+                                     modelscope_models_to_cpu, modelscope_models_to_gpu,
                                      switch_ms_model_cpu, unload_models)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
@@ -314,8 +314,9 @@ def easyphoto_infer_forward(
             traceback.print_exc()
             ep_logger.error(f"MakeUp Transfer model load error. Error Info: {e}")
     
-    # ms models to cuda
-    ms_tocuda_models()
+    # This is to increase the fault tolerance of the code. 
+    # If the code exits abnormally, it may cause the model to not function properly on the CPU
+    modelscope_models_to_gpu()
 
     # params init
     input_prompts                   = []

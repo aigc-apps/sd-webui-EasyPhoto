@@ -172,7 +172,7 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
-def ms_tocpu_models():
+def modelscope_models_to_cpu():
     """Load models to cpu to free VRAM.
     """
     ms_models = [
@@ -198,7 +198,7 @@ def ms_tocpu_models():
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
 
-def ms_tocuda_models():
+def modelscope_models_to_gpu():
     """Load models to cuda.
     """
     ms_models = [
@@ -228,10 +228,10 @@ class switch_ms_model_cpu(ContextDecorator):
     """Context-manager that supports switch modelscope models to cpu and cuda
     """
     def __enter__(self):
-        ms_tocpu_models()
+        modelscope_models_to_cpu()
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        ms_tocuda_models()
+        modelscope_models_to_gpu()
 
 def unload_models():
     """Unload models to free VRAM.
