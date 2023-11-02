@@ -203,6 +203,9 @@ def t2i_call(
         outpath_samples = "",
         sd_vae = None, 
         sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        animatediff_flag=False,
+        animatediff_video_length=0,
+        animatediff_fps=0,
 ):
     if sampler is None:
         sampler = "Euler a"
@@ -251,11 +254,24 @@ def t2i_call(
     p_txt2img.scripts = scripts.scripts_img2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
+    if animatediff_flag:
+        before_opts             = copy.deepcopy(opts.return_mask)
+        opts.return_mask        = False
+        
+        animate_diff_process    = AnimateDiffProcess(
+            enable=True, video_length=animatediff_video_length, fps=animatediff_fps
+        )
+        controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
+    else:
+        animate_diff_process    = None
+
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if alwayson_scripts.name is None:
             continue
-        if alwayson_scripts.name=='controlnet':
+        if alwayson_scripts.name == 'controlnet':
             p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+            p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
     
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', sd_model_checkpoint)
@@ -264,22 +280,27 @@ def t2i_call(
         reload_model('sd_vae', sd_vae)
 
     processed = processing.process_images(p_txt2img)
+    if animatediff_flag:
+        opts.return_mask = before_opts
 
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
     if origin_sd_vae != sd_vae:
         reload_model('sd_vae', origin_sd_vae)
 
-    if len(processed.images) > 1:
-        # get the generate image!
-        h_0, w_0, c_0 = np.shape(processed.images[0])
-        h_1, w_1, c_1 = np.shape(processed.images[1])
-        if w_1 != w_0:
-            gen_image = processed.images[1]
+    if animatediff_flag:
+        gen_image = processed.images
+    else:
+        if len(processed.images) > 1:
+            # get the generate image!
+            h_0, w_0, c_0 = np.shape(processed.images[0])
+            h_1, w_1, c_1 = np.shape(processed.images[1])
+            if w_1 != w_0:
+                gen_image = processed.images[1]
+            else:
+                gen_image = processed.images[0]
         else:
             gen_image = processed.images[0]
-    else:
-        gen_image = processed.images[0]
     return gen_image
 
 def i2i_inpaint_call(
@@ -393,26 +414,25 @@ def i2i_inpaint_call(
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
     if animatediff_flag:
-        before_opts = copy.deepcopy(opts.return_mask)
-        opts.return_mask = False
+        before_opts             = copy.deepcopy(opts.return_mask)
+        opts.return_mask        = False
         
-        # motion_module._load('mm_sd_v15_v2.ckpt')
-        i2i_add_random = False if animatediff_video_length == 0 else True
-        animate_diff_process = AnimateDiffProcess(enable=True, video_length=len(images) if animatediff_video_length == 0 else animatediff_video_length, fps=animatediff_fps, i2i_add_random=i2i_add_random)
-        # animate_diff_script = AnimateDiffScript()
-        controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
-        # animate_diff_script.before_process(p_img2img, animate_diff_process)
+        i2i_add_random          = False if animatediff_video_length == 0 else True
+        animate_diff_process    = AnimateDiffProcess(
+            enable=True, video_length=len(images) if animatediff_video_length == 0 else animatediff_video_length, 
+            fps=animatediff_fps, i2i_add_random=i2i_add_random
+        )
+        controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
-        animate_diff_process = None
+        animate_diff_process    = None
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.title() == 'animatediff_easyphoto' and animate_diff_process is not None:
-            p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-
         if alwayson_scripts.name is None:
             continue
-        if alwayson_scripts.name=='controlnet':
+        if alwayson_scripts.name == 'controlnet':
             p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+        if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+            p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
     
     if sd_model_checkpoint != origin_sd_model_checkpoint:
         reload_model('sd_model_checkpoint', sd_model_checkpoint)
@@ -423,7 +443,6 @@ def i2i_inpaint_call(
 
     processed = processing.process_images(p_img2img)
     if animatediff_flag:
-        # animate_diff_script.postprocess(p_img2img, processed, animate_diff_process)
         opts.return_mask = before_opts
 
     if sd_model_checkpoint != origin_sd_model_checkpoint:

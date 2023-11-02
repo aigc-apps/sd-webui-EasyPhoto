@@ -12,6 +12,8 @@ from modelscope.utils.constant import Tasks
 from modules import script_callbacks, shared
 from modules.images import save_image
 from modules.paths import models_path
+from PIL import ImageDraw, ImageFont, Image
+
 from modules.shared import opts, state
 from PIL import Image
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
@@ -156,7 +158,10 @@ def txt2img(
     default_negative_prompt = DEFAULT_NEGATIVE,
     seed: int = 123456,
     sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-    sampler = "DPM++ 2M SDE Karras"
+    sampler = "DPM++ 2M SDE Karras",
+    animatediff_flag = False,
+    animatediff_video_length = 0,
+    animatediff_fps = 0,
 ):
     controlnet_units_list = []
 
@@ -180,6 +185,9 @@ def txt2img(
         sd_model_checkpoint=sd_model_checkpoint,
         outpath_samples=easyphoto_txt2img_samples,
         sampler=sampler,
+        animatediff_flag=animatediff_flag,
+        animatediff_video_length=animatediff_video_length,
+        animatediff_fps=animatediff_fps,
     )
 
     return image
@@ -803,9 +811,10 @@ def easyphoto_infer_forward(
     return loop_message, outputs, face_id_outputs  
 
 def easyphoto_video_infer_forward(
-    sd_model_checkpoint, selected_template_images, selected_template_prompts, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
+    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
-    color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
+    color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
 ): 
     # global
@@ -836,10 +845,12 @@ def easyphoto_video_infer_forward(
     try:
         # choose tabs select
         if tabs == 0:
-            template_images = selected_template_images
+            template_images = None
+            max_frames = int(max_frames)
             actual_fps = int(max_fps)
         elif tabs == 1:
-            template_images = []
+            template_images = init_image
+            max_frames = int(max_frames)
             actual_fps = int(max_fps)
         elif tabs == 2:
             max_frames = int(max_frames)
@@ -887,6 +898,10 @@ def easyphoto_video_infer_forward(
             torch.cuda.empty_cache()
             traceback.print_exc()
             ep_logger.error(f"MakeUp Transfer model load error. Error Info: {e}")
+
+    # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
+    if display_score and face_recognition is None:
+        face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
 
     # params init
     input_prompts                   = []
@@ -945,7 +960,20 @@ def easyphoto_video_infer_forward(
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
     if tabs == 0:
-        image = Image.open(template_images).convert("RGB")
+        t2v_resolution = eval(str(t2v_resolution))
+
+        template_images = txt2img(
+            [], input_prompt = t2v_input_prompt, \
+            diffusion_steps=30, width=t2v_resolution[1], height=t2v_resolution[0], \
+            default_positive_prompt=DEFAULT_POSITIVE_AD, \
+            default_negative_prompt=DEFAULT_NEGATIVE_AD, \
+            seed = seed, sampler = "DPM++ 2M SDE Karras", 
+            sd_model_checkpoint = sd_model_checkpoint_for_animatediff_text2video, 
+            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
+        )
+        template_images = [template_images]
+    elif tabs == 1:
+        image = Image.fromarray(np.uint8(template_images)).convert("RGB")
 
         # Resize the template image with short edges on 512
         short_side  = min(image.width, image.height)
@@ -955,12 +983,12 @@ def easyphoto_video_infer_forward(
 
         template_images = inpaint(
             image, None, [], 
-            input_prompt = selected_template_prompts, \
+            input_prompt = init_image_prompt, \
             diffusion_steps=30, denoising_strength=0.70, hr_scale=1, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras",
-            sd_model_checkpoint = sd_model_checkpoint,
+            sd_model_checkpoint = sd_model_checkpoint_for_animatediff_image2video,
             animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
         )
         template_images = [template_images]
@@ -1132,6 +1160,7 @@ def easyphoto_video_infer_forward(
             first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, animatediff_flag=True, animatediff_fps=int(actual_fps))
             
             _outputs = []
+            frame_idx = 0
             for _first_diffusion_output_image, _loop_template_image, _loop_template_crop_safe_box, _loop_template_padding_size, _input_image_retinaface_box, _template_image_original_face_area in zip(first_diffusion_output_image, loop_template_image, loop_template_crop_safe_box, loop_template_padding_size, input_image_retinaface_boxes, template_image_original_face_area):
                 if _input_image_retinaface_box is not None:
                     if color_shift_middle:
@@ -1233,6 +1262,19 @@ def easyphoto_video_infer_forward(
                         traceback.print_exc()
                         ep_logger.error(f"Portrait enhancement error: {e}")
 
+                # Given the current user id, compute the FaceID of the second diffusion generation w.r.t the roop image.
+                # For simplicity, we don't compute the FaceID of the final output image.
+                if display_score:
+                    # count face id
+                    embedding                   = face_recognition(dict(user=Image.fromarray(np.uint8(_input_image))))[OutputKeys.IMG_EMBEDDING]
+                    roop_image_embedding        = face_recognition(dict(user=Image.fromarray(np.uint8(roop_images[0]))))[OutputKeys.IMG_EMBEDDING]
+                    loop_output_image_faceid    = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
+
+                    # define font and label
+                    _input_image = cv2.putText(np.array(_input_image, np.uint8), 'frame_idx: {}, similarity score: {:.2f}'.format(frame_idx, loop_output_image_faceid), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                    _input_image = Image.fromarray(np.uint8(_input_image))
+
+                frame_idx += 1
                 _outputs.append(_input_image)
 
             output_video = convert_to_video(easyphoto_video_outpath_samples, _outputs, actual_fps, save_as)
