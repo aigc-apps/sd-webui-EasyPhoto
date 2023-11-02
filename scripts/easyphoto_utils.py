@@ -1,19 +1,19 @@
 import datetime
+import gc
 import hashlib
 import logging
-import gc
 import os
-import time
+import traceback
+from contextlib import ContextDecorator
 from glob import glob
 
 import requests
-import torch
-from modules.paths import models_path
-from tqdm import tqdm
-
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path
+import torch
 from modelscope.utils.logger import get_logger as ms_get_logger
+from modules.paths import models_path
+from scripts.easyphoto_config import data_path
+from tqdm import tqdm
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -172,6 +172,66 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
+def modelscope_models_to_cpu():
+    """Load models to cpu to free VRAM.
+    """
+    ms_models = [
+        scripts.easyphoto_infer.retinaface_detection,
+        scripts.easyphoto_infer.image_face_fusion,
+        scripts.easyphoto_infer.skin_retouching,
+        scripts.easyphoto_infer.portrait_enhancement,
+        scripts.easyphoto_infer.face_skin,
+        scripts.easyphoto_infer.face_recognition,
+        scripts.easyphoto_infer.psgan_inference,
+    ]
+    for ms_model in ms_models:
+        if hasattr(ms_model, "__dict__"):
+            for key in ms_model.__dict__.keys():
+                try:
+                    if hasattr(getattr(ms_model, key), "cpu"):
+                        getattr(ms_model, key).cpu()
+                except Exception as e:
+                    traceback.print_exc()
+                    ep_logger.info(f"{str(ms_model)}.{key} has no cpu(), detailed error infor is {e}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
+def modelscope_models_to_gpu():
+    """Load models to cuda.
+    """
+    ms_models = [
+        scripts.easyphoto_infer.retinaface_detection,
+        scripts.easyphoto_infer.image_face_fusion,
+        scripts.easyphoto_infer.skin_retouching,
+        scripts.easyphoto_infer.portrait_enhancement,
+        scripts.easyphoto_infer.face_skin,
+        scripts.easyphoto_infer.face_recognition,
+        scripts.easyphoto_infer.psgan_inference,
+    ]
+    for ms_model in ms_models:
+        if hasattr(ms_model, "__dict__"):
+            for key in ms_model.__dict__.keys():
+                try:
+                    if hasattr(getattr(ms_model, key), "cuda"):
+                        getattr(ms_model, key).cuda()
+                except Exception as e:
+                    traceback.print_exc()
+                    ep_logger.info(f"{str(ms_model)}.{key} has no cuda(), detailed error infor is {e}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
+class switch_ms_model_cpu(ContextDecorator):
+    """Context-manager that supports switch modelscope models to cpu and cuda
+    """
+    def __enter__(self):
+        modelscope_models_to_cpu()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        modelscope_models_to_gpu()
 
 def unload_models():
     """Unload models to free VRAM.

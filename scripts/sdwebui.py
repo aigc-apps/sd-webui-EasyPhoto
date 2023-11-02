@@ -30,7 +30,6 @@ class unload_sd(ContextDecorator):
     def __exit__(self, exc_type, exc_val, exc_tb):
         sd_models.reload_model_weights()
 
-        
 class switch_sd_model_vae(ContextDecorator):
     """Context-manager that supports switch SD checkpoint and VAE.
     """
@@ -46,8 +45,6 @@ class switch_sd_model_vae(ContextDecorator):
         shared.opts.sd_vae = self.origin_sd_vae
         # SD Web UI will check self.origin_sd_vae == shared.opts.sd_vae automatically.
         sd_vae.reload_vae_weights()
-
-
 
 class ControlMode(Enum):
     """
@@ -211,6 +208,13 @@ def init_default_script_args(script_runner):
                 script_args[script.args_from:script.args_to] = ui_default_values
     return script_args
 
+def reload_sd_model_vae(sd_model, vae):
+    """Reload sd model and vae
+    """
+    shared.opts.sd_model_checkpoint = sd_model
+    sd_models.reload_model_weights()
+    shared.opts.sd_vae = vae
+    sd_vae.reload_vae_weights()
 
 def t2i_call(
         resize_mode=0,
