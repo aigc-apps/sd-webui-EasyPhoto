@@ -192,7 +192,7 @@ def modelscope_models_to_cpu():
                         getattr(ms_model, key).cpu()
                 except Exception as e:
                     traceback.print_exc()
-                    ep_logger.info(f"{str(ms_model)}.{key} has no cuda(), detailed error infor is {e}")
+                    ep_logger.info(f"{str(ms_model)}.{key} has no cpu(), detailed error infor is {e}")
 
     gc.collect()
     torch.cuda.empty_cache()
