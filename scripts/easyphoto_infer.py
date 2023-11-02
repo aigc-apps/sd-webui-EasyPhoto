@@ -935,6 +935,9 @@ def easyphoto_video_infer_forward(
     # Second diffusion hr scale
     default_hr_scale                = 1.0
     input_mask_face_part_only       = True
+    # safe params
+    crop_at_last                    = True
+    crop_at_last_ratio              = 3
 
     ep_logger.info("Start templates and user_ids preprocess.")
     for user_id in user_ids:
@@ -1042,14 +1045,31 @@ def easyphoto_video_infer_forward(
             loop_template_crop_safe_box = []
             loop_template_padding_size = []
             loop_template_image_padding = []
+
+            if crop_face_preprocess:
+                loop_template_retinaface_box = []
+                for _loop_template_image in loop_template_image:
+                    _loop_template_retinaface_boxes, _, _ = call_face_crop(retinaface_detection, _loop_template_image, 3, "loop_template_image")
+                    if len(_loop_template_retinaface_boxes) == 0:
+                        continue
+                    _loop_template_retinaface_box = _loop_template_retinaface_boxes[0]
+                    loop_template_retinaface_box.append(_loop_template_retinaface_box)
+                loop_template_retinaface_box = np.array(loop_template_retinaface_box)
+                loop_template_retinaface_box = [np.min(loop_template_retinaface_box[:, 0]), np.min(loop_template_retinaface_box[:, 1]), np.max(loop_template_retinaface_box[:, 2]), np.max(loop_template_retinaface_box[:, 3])]
+
             for _loop_template_image in loop_template_image:
                 # Crop the template image to retain only the portion of the portrait
                 if crop_face_preprocess:
-                    _loop_template_image_padding, _loop_template_crop_safe_box, _, _, _padding_size = safe_get_box_and_padding_image(_loop_template_image, retinaface_detection, 3)
-                    if _loop_template_image_padding is not None:
-                        _loop_template_image = copy.deepcopy(_loop_template_image_padding).crop(_loop_template_crop_safe_box)
-                    else:
-                        _loop_template_image_padding = _loop_template_image
+                    # backup for old code, will be delete in 2 weeks.
+                    # _loop_template_image_padding, _loop_template_crop_safe_box, _, _, _padding_size = safe_get_box_and_padding_image(_loop_template_image, retinaface_detection, 3)
+                    # if _loop_template_image_padding is not None:
+                    #     _loop_template_image = copy.deepcopy(_loop_template_image_padding).crop(_loop_template_crop_safe_box)
+                    # else:
+                    #     _loop_template_image_padding = _loop_template_image
+                    _loop_template_crop_safe_box    = loop_template_retinaface_box
+                    _padding_size                   = None
+                    _loop_template_image_padding    = copy.deepcopy(_loop_template_image)
+                    _loop_template_image            = copy.deepcopy(_loop_template_image).crop(_loop_template_crop_safe_box)
                 else:
                     _loop_template_crop_safe_box = None
                     _padding_size = None
@@ -1064,15 +1084,18 @@ def easyphoto_video_infer_forward(
 
             new_input_image = []
             for _input_image in input_image:
+                # Resize the template image with short edges on 512
+                ep_logger.info("Start Image resize to 512.")
+                short_side  = min(_input_image.width, _input_image.height)
+                resize      = float(short_side / 512.0)
+                new_size    = (int(_input_image.width//resize), int(_input_image.height//resize))
+                _input_image = _input_image.resize(new_size, Image.Resampling.LANCZOS)
+
                 if crop_face_preprocess:
-                    _input_image = _input_image.resize((512, 512), Image.Resampling.LANCZOS)
-                else:
-                    # Resize the template image with short edges on 512
-                    ep_logger.info("Start Image resize to 512.")
-                    short_side  = min(_input_image.width, _input_image.height)
-                    resize      = float(short_side / 512.0)
-                    new_size    = (int(_input_image.width//resize), int(_input_image.height//resize))
-                    _input_image = _input_image.resize(new_size, Image.Resampling.LANCZOS)
+                    new_width   = int(np.shape(_input_image)[1] // 32 * 32)
+                    new_height  = int(np.shape(_input_image)[0] // 32 * 32)
+                    _input_image = _input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
+
                 new_input_image.append(_input_image)
             input_image = new_input_image
 
@@ -1258,7 +1281,8 @@ def easyphoto_video_infer_forward(
                         _loop_template_image = np.array(_loop_template_image)
                         _loop_template_image[y1:y2,x1:x2] = np.array(_input_image.resize([x2-x1, y2-y1], Image.Resampling.LANCZOS)) 
                         
-                        _loop_template_image = _loop_template_image[_loop_template_padding_size: -_loop_template_padding_size, _loop_template_padding_size: -_loop_template_padding_size]
+                        # backup for old code, will be delete in 2 weeks.
+                        # _loop_template_image = _loop_template_image[_loop_template_padding_size: -_loop_template_padding_size, _loop_template_padding_size: -_loop_template_padding_size]
                     
                     _input_image = Image.fromarray(np.uint8(_loop_template_image))
 
@@ -1297,6 +1321,28 @@ def easyphoto_video_infer_forward(
 
                 frame_idx += 1
                 _outputs.append(_input_image)
+
+            if crop_at_last:
+                # get max box of face 
+                last_retinaface_box = []
+                for _output in _outputs:
+                    _last_retinaface_boxes, _, _ = call_face_crop(retinaface_detection, _output, crop_at_last_ratio, "last_image")
+                    if len(_last_retinaface_boxes) == 0:
+                        continue
+                    _last_retinaface_box = _last_retinaface_boxes[0]
+                    last_retinaface_box.append(_last_retinaface_box)
+                last_retinaface_box = np.array(last_retinaface_box)
+                last_retinaface_box = [np.min(last_retinaface_box[:, 0]), np.min(last_retinaface_box[:, 1]), np.max(last_retinaface_box[:, 2]), np.max(last_retinaface_box[:, 3])]
+                
+                # make width and height can be divisible by 2
+                width, height       = (last_retinaface_box[2] - last_retinaface_box[0]) // 2 * 2, (last_retinaface_box[3] - last_retinaface_box[1]) // 2 * 2
+                last_retinaface_box = [last_retinaface_box[0], last_retinaface_box[1], last_retinaface_box[0] + width, last_retinaface_box[1] + height]
+                
+                # crop
+                _new_outputs = []
+                for _output in _outputs:
+                    _new_outputs.append(_output.crop(last_retinaface_box))
+                _outputs = _new_outputs
 
             output_video = convert_to_video(easyphoto_video_outpath_samples, _outputs, actual_fps, save_as)
 
