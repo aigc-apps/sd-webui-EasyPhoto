@@ -473,7 +473,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 crop_face_preprocess = gr.Checkbox(
                                     label="Crop Face Preprocess",  
-                                    value=True
+                                    value=False
                                 )
                                 apply_face_fusion_before = gr.Checkbox(
                                     label="Apply Face Fusion Before", 
@@ -592,54 +592,118 @@ def on_ui_tabs():
     
         with gr.TabItem('Video Inference'):
             dummy_component = gr.Label(visible=False)
-            video_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates_videos/*.jpg'))
 
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
                         video_model_selected_tab = gr.State(0)
 
-                        with gr.TabItem("template gallery") as video_template_images_tab:
-                            template_gallery_list = [(i, i) for i in video_templates]
-                            gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                        with gr.TabItem("Text2Video") as video_template_images_tab:
+                            with gr.Row():
+                                mode_choose  = gr.Dropdown(value="Write Prompt Yourself", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=True)
+
+                                t2v_resolution  = gr.Dropdown(
+                                    value="(768, 512)", elem_id='dropdown', 
+                                    choices=[(768, 512), (512, 512), (512, 768)], 
+                                    label="The Resolution of Video.", visible=True
+                                )
                             
-                            def select_function(evt: gr.SelectData):
-                                prompts = [
-                                    "smile, 1girl, head-shot photo, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32",
-                                    "smile, 1girl, head-shot photo, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the summer, daytime, rainy, f32",
-                                    "",
-                                    "",
-                                ]
-                                return [video_templates[evt.index], prompts[evt.index]]
+                            t2v_input_prompt = gr.Textbox(
+                                label="Text2Video Input Prompt", interactive=True, lines=3,
+                                value="upper-body, look at viewer, 1girl, wear white dress, black eyes, black hair, hair ornament, ray tracing, volumatic light and colorful light, (cowbody shot, realistic), daytime, f32", visible=True
+                            )
 
-                            selected_template_images    = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                            selected_template_prompts   = gr.Text(show_label=False, visible=True, placeholder="Selected")
-                            gallery.select(select_function, None, [selected_template_images, selected_template_prompts])
+                            with gr.Row(visible=False) as row1:
+                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio in Video.", visible=False)
+                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person in Video.", visible=False)
+                                where           = gr.Dropdown(value="", elem_id='dropdown', choices=["", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person in Video?", visible=False)
+                            with gr.Row(visible=False) as row2:
+                                season          = gr.Dropdown(value="", elem_id='dropdown', choices=["", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season in Video?", visible=False)
+                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["", "daytime", "night"], label="Where is the Time in Video?", visible=False)
+                                light           = gr.Dropdown(value="ray tracing and volumatic light", elem_id='dropdown', choices=["", "ray tracing, volumatic light and colorful light", "ray tracing", "volumatic light", "best light", "colorful light"], label="Where is the light in Video?", visible=False)
 
-                        with gr.TabItem("upload photo") as video_upload_image_tab:
-                            init_image          = gr.Image(label="Image for easyphoto", elem_id="{id_part}_image", show_label=False, source="upload")
-                            init_image_prompt   = gr.Text("label", show_label=False, visible=True, placeholder="Selected")
+                            with gr.Row(visible=False) as row3:
+                                hair_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the hair in Video.", visible=False)
+                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="The Wear of the hair in Video.", visible=False)
+                                eyes_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the eye in Video.", visible=False)
 
-                        with gr.TabItem("upload video") as video_upload_video_tab:
-                            init_video = gr.Video(label="Video for easyphoto", elem_id="{id_part}_video", show_label=False, source="upload")
+                            with gr.Row(visible=False) as row4:
+                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth in Video.", visible=False)
+                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="The Cloth on the Person in Video.", visible=False)
+
+                            def update_t2v_input_prompt(portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth):
+
+                                # first time add gender hack for XL prompt, suggest by Nenly
+                                gender_limit_prompt_girls = {'dress':'shirt'}
+                                if gender in ['boy', 'man']:
+                                    if cloth in list(gender_limit_prompt_girls.keys()):
+                                        cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
+                                input_prompt = f"{portrait_ratio}, look at viewer, 1{gender}, wear {cloth_color} {cloth}, {eyes_color} eyes, {hair_color} hair, {hair_wear}, {light}, {where}, {time_of_photo}, {season}, realistic, f32"
+                                return input_prompt
+
+                            prompt_inputs = [
+                                portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth
+                            ]
+                            for prompt_input in prompt_inputs:
+                                prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
+                                
+                            def update_t2v_mode(mode_choose):
+                                if mode_choose == "Preset With Drowdown":
+                                    return [
+                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
+                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
+                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
+                                        gr.update(visible=False)
+                                    ]
+                                else:
+                                    return [
+                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
+                                        gr.update(visible=True)
+                                    ]
+                            mode_choose.change(update_t2v_mode, inputs=mode_choose, outputs=[row1, row2, row3, row4, portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth, t2v_input_prompt])
+
+                            sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
+
+                            gr.Markdown(
+                                value = '''
+                                Generate from prompts notes:
+                                - We recommend using a more attractive portrait model such as MajicMIX realistic for video generation, which will result in better results!!!
+                                - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
+                                ''',
+                                visible=True
+                            )
+
+                        with gr.TabItem("Image2Video") as video_upload_image_tab:
+                            init_image          = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
+                            init_image_prompt   = gr.Textbox(label="Prompt For Image2Video", value="", show_label=True, visible=True, placeholder="Selected")
+
+                            checkpoints = []
+                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                    checkpoints.append(_checkpoint)
+
+                            sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use for Image2Video(For animatediff only).", visible=True)
+
+                            gr.Markdown(
+                                value = '''
+                                Generate from image notes:
+                                - We recommend using a more attractive portrait model such as MajicMIX realistic for video generation, which will result in better results!!!
+                                - Please write the corresponding prompts using the template.
+                                - The Generate from prompts is an experimental feature aiming to generate great portrait with template for users.
+                                ''',
+                                visible=True
+                            )
+
+                        with gr.TabItem("Video2Video") as video_upload_video_tab:
+                            init_video = gr.Video(label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload")
 
                         model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
                         for i, tab in enumerate(model_selected_tabs):
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
 
                         with gr.Row():
-                            def checkpoint_refresh_function():
-                                checkpoints = []
-                                models_dir = os.path.join(models_path, "Stable-diffusion")
-                                
-                                for root, dirs, files in os.walk(models_dir):
-                                    for _checkpoint in files:
-                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                            rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
-                                            checkpoints.append(rel_path)
-                                
-                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
-                            
                             checkpoints = []
                             for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                 if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
@@ -712,7 +776,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 max_frames = gr.Textbox(
                                     label="Video Max frames", 
-                                    value=-1,
+                                    value=32,
                                 )
                                 max_fps = gr.Textbox(
                                     label="Video Max fps", 
@@ -768,6 +832,10 @@ def on_ui_tabs():
                                     value=False
                                 )
                             with gr.Row():
+                                display_score = gr.Checkbox(
+                                    label="Display Face Similarity Scores",  
+                                    value=False
+                                )
                                 makeup_transfer = gr.Checkbox(
                                     label="Video MakeUp Transfer",
                                     value=False
@@ -824,9 +892,10 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_video_infer_forward,
-                    inputs=[sd_model_checkpoint, selected_template_images, selected_template_prompts, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                    inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
+                            t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
                             first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
-                            color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, \
+                            color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                             makeup_transfer, makeup_transfer_ratio, face_shape_match, video_model_selected_tab, *uuids],
                     outputs=[infer_progress, output_video, output_images]
 
