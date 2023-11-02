@@ -1,13 +1,16 @@
 import datetime
+import gc
 import hashlib
 import logging
 import os
-import time
+import traceback
+from contextlib import ContextDecorator
 from glob import glob
 
 import cv2
 import numpy as np
 import requests
+import scripts.easyphoto_infer
 import torch
 import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
@@ -89,6 +92,7 @@ def check_files_exists_and_download(check_hash):
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
@@ -110,6 +114,7 @@ def check_files_exists_and_download(check_hash):
         os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
+        os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
@@ -181,13 +186,13 @@ def get_mov_all_images(file, frames):
     if not cap.isOpened():
         return None
     
-    # frames不可以大于实际的fps，用于采样
+    # Frames cannot be greater than the actual fps for sampling
     fps = cap.get(cv2.CAP_PROP_FPS)
     if frames > fps:
         print('Waring: The set number of frames is greater than the number of video frames')
         frames = int(fps)
 
-    # 获得所有帧
+    # Get all frames
     movies = []
     while (True):
         flag, frame = cap.read()
@@ -195,7 +200,7 @@ def get_mov_all_images(file, frames):
             break
         else:
             movies.append(frame)
-    # 获得需要的帧
+    # Obtain the required frame
     num_pics        = int(frames / int(cap.get(cv2.CAP_PROP_FPS)) * len(movies))
     target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
     image_list = []
@@ -253,3 +258,78 @@ def convert_to_video(path, frames, fps, mode="gif"):
         torchvision.io.write_video(video_path, frames, fps=fps, video_codec="libx264")
     
     return video_path
+
+def modelscope_models_to_cpu():
+    """Load models to cpu to free VRAM.
+    """
+    ms_models = [
+        scripts.easyphoto_infer.retinaface_detection,
+        scripts.easyphoto_infer.image_face_fusion,
+        scripts.easyphoto_infer.skin_retouching,
+        scripts.easyphoto_infer.portrait_enhancement,
+        scripts.easyphoto_infer.face_skin,
+        scripts.easyphoto_infer.face_recognition,
+        scripts.easyphoto_infer.psgan_inference,
+    ]
+    for ms_model in ms_models:
+        if hasattr(ms_model, "__dict__"):
+            for key in ms_model.__dict__.keys():
+                try:
+                    if hasattr(getattr(ms_model, key), "cpu"):
+                        getattr(ms_model, key).cpu()
+                except Exception as e:
+                    traceback.print_exc()
+                    ep_logger.info(f"{str(ms_model)}.{key} has no cpu(), detailed error infor is {e}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
+def modelscope_models_to_gpu():
+    """Load models to cuda.
+    """
+    ms_models = [
+        scripts.easyphoto_infer.retinaface_detection,
+        scripts.easyphoto_infer.image_face_fusion,
+        scripts.easyphoto_infer.skin_retouching,
+        scripts.easyphoto_infer.portrait_enhancement,
+        scripts.easyphoto_infer.face_skin,
+        scripts.easyphoto_infer.face_recognition,
+        scripts.easyphoto_infer.psgan_inference,
+    ]
+    for ms_model in ms_models:
+        if hasattr(ms_model, "__dict__"):
+            for key in ms_model.__dict__.keys():
+                try:
+                    if hasattr(getattr(ms_model, key), "cuda"):
+                        getattr(ms_model, key).cuda()
+                except Exception as e:
+                    traceback.print_exc()
+                    ep_logger.info(f"{str(ms_model)}.{key} has no cuda(), detailed error infor is {e}")
+
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
+class switch_ms_model_cpu(ContextDecorator):
+    """Context-manager that supports switch modelscope models to cpu and cuda
+    """
+    def __enter__(self):
+        modelscope_models_to_cpu()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        modelscope_models_to_gpu()
+
+def unload_models():
+    """Unload models to free VRAM.
+    """
+    scripts.easyphoto_infer.retinaface_detection = None
+    scripts.easyphoto_infer.image_face_fusion = None
+    scripts.easyphoto_infer.skin_retouching = None
+    scripts.easyphoto_infer.portrait_enhancement = None
+    scripts.easyphoto_infer.face_skin = None
+    scripts.easyphoto_infer.face_recognition = None
+    scripts.easyphoto_infer.psgan_inference = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
