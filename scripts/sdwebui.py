@@ -1,5 +1,8 @@
 import copy
 import os
+import logging
+from contextlib import ContextDecorator
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import gradio as gr
@@ -22,6 +25,58 @@ output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
 InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
+
+
+class unload_sd(ContextDecorator):
+    """Context-manager that unloads SD checkpoint to free VRAM."""
+    def __enter__(self):
+        sd_models.unload_model_weights()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sd_models.reload_model_weights()
+
+class switch_sd_model_vae(ContextDecorator):
+    """Context-manager that supports switch SD checkpoint and VAE.
+    """
+    def __enter__(self):
+        self.origin_sd_model_checkpoint = shared.opts.sd_model_checkpoint
+        self.origin_sd_vae = shared.opts.sd_vae
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        shared.opts.sd_model_checkpoint = self.origin_sd_model_checkpoint
+        # SD Web UI will check self.origin_sd_model_checkpoint == shared.opts.sd_model_checkpoint automatically.
+        sd_models.reload_model_weights()
+        shared.opts.sd_vae = self.origin_sd_vae
+        # SD Web UI will check self.origin_sd_vae == shared.opts.sd_vae automatically.
+        sd_vae.reload_vae_weights()
+
+class ControlMode(Enum):
+    """
+    The improved guess mode.
+    """
+
+    BALANCED = "Balanced"
+    PROMPT = "My prompt is more important"
+    CONTROL = "ControlNet is more important"
+
+class ResizeMode(Enum):
+    """
+    Resize modes for ControlNet input images.
+    """
+
+    RESIZE = "Just Resize"
+    INNER_FIT = "Crop and Resize"
+    OUTER_FIT = "Resize and Fill"
+
+    def int_value(self):
+        if self == ResizeMode.RESIZE:
+            return 0
+        elif self == ResizeMode.INNER_FIT:
+            return 1
+        elif self == ResizeMode.OUTER_FIT:
+            return 2
+        assert False, "NOTREACHED"
 
 class ControlNetUnit:
     """
@@ -160,12 +215,13 @@ def init_default_script_args(script_runner):
                 script_args[script.args_from:script.args_to] = ui_default_values
     return script_args
 
-def reload_model(k, v):
-    opts.set(k, v)
-    if k == 'sd_model_checkpoint':
-        sd_models.reload_model_weights()
-    if k == 'sd_vae':
-        sd_vae.reload_vae_weights()
+def reload_sd_model_vae(sd_model, vae):
+    """Reload sd model and vae
+    """
+    shared.opts.sd_model_checkpoint = sd_model
+    sd_models.reload_model_weights()
+    shared.opts.sd_vae = vae
+    sd_vae.reload_vae_weights()
 
 def t2i_call(
         resize_mode=0,
@@ -211,26 +267,12 @@ def t2i_call(
         sampler = "Euler a"
     if steps is None:
         steps = 20
-
-    try:
-        origin_sd_model_checkpoint  = opts.sd_model_checkpoint
-        origin_sd_vae               = opts.sd_vae
-    except Exception as e:
-        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in t2i_call, use None instead!"
-        ep_logger.error(f"{message} with Error: {e}")
-        origin_sd_model_checkpoint  = ""
-        origin_sd_vae               = ""
-
-    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
-    if sd_vae is not None:
-        sd_vae = os.path.basename(vae_near_checkpoint = find_vae_near_checkpoint(sd_vae))
-    else:
-        sd_vae = None
-
+    
+    # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
+    # We should modify shared.opts.sd_model_checkpoint instead.
     p_txt2img = StableDiffusionProcessingTxt2Img(
-        sd_model=origin_sd_model_checkpoint,
         outpath_samples=outpath_samples,
-        outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
+        outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
         styles=[],
@@ -251,7 +293,7 @@ def t2i_call(
         override_settings=override_settings
     )
 
-    p_txt2img.scripts = scripts.scripts_img2img
+    p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
     if animatediff_flag:
@@ -266,27 +308,24 @@ def t2i_call(
         animate_diff_process    = None
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.name is None:
-            continue
-        if alwayson_scripts.name == 'controlnet':
-            p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-        if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
-            p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-    
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', sd_model_checkpoint)
-    
-    if origin_sd_vae != sd_vae:
-        reload_model('sd_vae', sd_vae)
+        if hasattr(alwayson_scripts, "name"):
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name == 'controlnet':
+                p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+        else:
+            if alwayson_scripts.title().lower() is None:
+                continue
+            if alwayson_scripts.title().lower() == 'controlnet':
+                p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.title().lower() == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
 
     processed = processing.process_images(p_txt2img)
     if animatediff_flag:
         opts.return_mask = before_opts
-
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
-    if origin_sd_vae != sd_vae:
-        reload_model('sd_vae', origin_sd_vae)
 
     if animatediff_flag:
         gen_image = processed.images
@@ -357,25 +396,10 @@ def i2i_inpaint_call(
         sampler = "Euler a"
     if steps is None:
         steps = 20
-
-    try:
-        origin_sd_model_checkpoint  = opts.sd_model_checkpoint
-        origin_sd_vae               = opts.sd_vae
-    except Exception as e:
-        message = f"Setting opts.sd_model_checkpoint, opts.sd_vae in i2i_inpaint_call, use None instead!"
-        ep_logger.error(f"{message} with Error: {e}")
-        origin_sd_model_checkpoint  = ""
-        origin_sd_vae               = ""
-
-    sd_model_checkpoint = get_closet_checkpoint_match(sd_model_checkpoint).model_name
-    vae_near_checkpoint = find_vae_near_checkpoint(sd_vae)
-    if vae_near_checkpoint is not None:
-        sd_vae = os.path.basename(vae_near_checkpoint)
-    else:
-        sd_vae = None
-
+    
+    # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
+    # We should modify shared.opts.sd_model_checkpoint instead.
     p_img2img = StableDiffusionProcessingImg2Img(
-        sd_model=origin_sd_model_checkpoint,
         outpath_samples=outpath_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
         prompt=prompt,
@@ -427,29 +451,24 @@ def i2i_inpaint_call(
         animate_diff_process    = None
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
-        if alwayson_scripts.name is None:
-            continue
-        if alwayson_scripts.name == 'controlnet':
-            p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
-        if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
-            p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-    
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', sd_model_checkpoint)
-    
-    if sd_vae is not None:
-        if origin_sd_vae != sd_vae:
-            reload_model('sd_vae', sd_vae)
+        if hasattr(alwayson_scripts, "name"):
+            if alwayson_scripts.name is None:
+                continue
+            if alwayson_scripts.name == 'controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+        else:
+            if alwayson_scripts.title().lower() is None:
+                continue
+            if alwayson_scripts.title().lower() == 'controlnet':
+                p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.title().lower() == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
 
     processed = processing.process_images(p_img2img)
     if animatediff_flag:
         opts.return_mask = before_opts
-
-    if sd_model_checkpoint != origin_sd_model_checkpoint:
-        reload_model('sd_model_checkpoint', origin_sd_model_checkpoint)
-    if sd_vae is not None:
-        if origin_sd_vae != sd_vae:
-            reload_model('sd_vae', origin_sd_vae)
 
     if animatediff_flag:
         gen_image = processed.images
