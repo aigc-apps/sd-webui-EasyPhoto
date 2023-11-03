@@ -940,6 +940,7 @@ def easyphoto_video_infer_forward(
     crop_at_last_ratio              = 3
 
     ep_logger.info("Start templates and user_ids preprocess.")
+    # TODO ： multiuser in VideoModel is unable to use at 23/11/03, we keep code for future test
     for user_id in user_ids:
         if user_id == 'none':
             # use some placeholder 
