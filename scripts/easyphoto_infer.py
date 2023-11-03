@@ -25,7 +25,7 @@ from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       validation_prompt)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid, ep_logger,
-                                     modelscope_models_to_cpu, modelscope_models_to_gpu,
+                                     modelscope_models_to_gpu,
                                      switch_ms_model_cpu, unload_models)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
@@ -534,6 +534,9 @@ def easyphoto_infer_forward(
                     input_image = copy.deepcopy(loop_template_image).crop(loop_template_crop_safe_box)
                 else:
                     input_image = copy.deepcopy(loop_template_image)
+                
+                import pdb
+                pdb.set_trace()
 
                 if sdxl_pipeline_flag:
                     # Fix total pixels in the generated image in SDXL.
@@ -792,10 +795,8 @@ def easyphoto_infer_forward(
                     output_image = loop_output_image 
 
             try:
-                if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1 or background_restore:
-                    ep_logger.info("Start Third diffusion for background.")
                 if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1 or background_restore:
-                    ep_logger.info("Start Thirt diffusion for background.")
+                    ep_logger.info("Start Third diffusion for background.")
                     output_image    = Image.fromarray(np.uint8(output_image))
                     short_side      = min(output_image.width, output_image.height)
                     if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
