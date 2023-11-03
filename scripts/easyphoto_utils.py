@@ -178,7 +178,21 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
-def get_mov_all_images(file, frames):
+def get_mov_all_images(file: str, required_fps: int) -> tuple:
+    """
+    Extracts a specific number of frames uniformly from a video file and converts them to a list of RGB images.
+
+    required_fps < video fps , uniform sampling frames
+    required_fps >= video fps, get all frames
+
+    Parameters:
+    - file (str): The path to the video file.
+    - required_fps (int): The required frame per second to extract.
+
+    Returns:
+    - tuple: A tuple containing a list of RGB images and the actual number of frames extracted.
+             Returns None if the file cannot be opened or if 'file' is None.
+    """
     if file is None:
         return None
     cap = cv2.VideoCapture(file)
@@ -187,10 +201,10 @@ def get_mov_all_images(file, frames):
         return None
     
     # Frames cannot be greater than the actual fps for sampling
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if frames > fps:
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    if required_fps > fps:
         print('Waring: The set number of frames is greater than the number of video frames')
-        frames = int(fps)
+        required_fps = fps
 
     # Get all frames
     movies = []
@@ -201,7 +215,7 @@ def get_mov_all_images(file, frames):
         else:
             movies.append(frame)
     # Obtain the required frame
-    num_pics        = int(frames / int(cap.get(cv2.CAP_PROP_FPS)) * len(movies))
+    num_pics        = int(required_fps / fps * len(movies))
     target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
     image_list = []
     for index in target_indexs:
