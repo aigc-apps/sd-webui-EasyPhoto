@@ -1208,6 +1208,7 @@ def easyphoto_video_infer_forward(
             frame_idx = 0
             for _first_diffusion_output_image, _loop_template_image, _loop_template_crop_safe_box, _loop_template_padding_size, _input_image_retinaface_box, _template_image_original_face_area in zip(first_diffusion_output_image, loop_template_image, loop_template_crop_safe_box, loop_template_padding_size, input_image_retinaface_boxes, template_image_original_face_area):
                 if _input_image_retinaface_box is not None:
+                    # TODO : this color shift is too hardcode and naive for video
                     if color_shift_middle:
                         # apply color shift
                         ep_logger.info("Start color shift middle.")
