@@ -1,5 +1,6 @@
 import copy
 import glob
+import math
 import os
 import traceback
 
@@ -9,10 +10,10 @@ import torch
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from modules import script_callbacks, shared, sd_vae
+from modules import shared, sd_models, sd_vae
 from modules.images import save_image
 from modules.paths import models_path
-from modules.shared import opts, state
+from modules.shared import opts
 from PIL import Image
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL,
@@ -31,7 +32,6 @@ from scripts.sdwebui import i2i_inpaint_call, t2i_call, switch_sd_model_vae
 from scripts.sdwebui import get_checkpoint_type, get_lora_type
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
-from modules import sd_models
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
     H, W, C = input_image.shape
@@ -67,9 +67,10 @@ def get_controlnet_unit(unit, input_image, weight):
             threshold_b=200,
             model='control_v11p_sd15_canny'
         )
-    elif unit == "sdxl_canny":
-        control_unit = ControlNetUnit(
-            input_image=input_image, module='canny',
+    elif unit == "sdxl_canny_mid":
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None},
+            module='canny',
             weight=weight,
             guidance_end=1,
             control_mode=1, 
@@ -77,7 +78,7 @@ def get_controlnet_unit(unit, input_image, weight):
             resize_mode='Just Resize',
             threshold_a=100,
             threshold_b=200,
-            model='diffusers_xl_canny_full'
+            model='diffusers_xl_canny_mid'
         )
     elif unit == "openpose":
         control_unit = dict(
@@ -90,8 +91,9 @@ def get_controlnet_unit(unit, input_image, weight):
             model='control_v11p_sd15_openpose'
         )
     elif unit == "sdxl_openpose":
-        control_unit = ControlNetUnit(
-            input_image=input_image, module='openpose_full',
+        control_unit = dict(
+            input_image={'image': np.asarray(input_image), 'mask': None},
+            module='openpose_full',
             weight=weight,
             guidance_end=1,
             control_mode=1, 
@@ -398,7 +400,7 @@ def easyphoto_infer_forward(
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
             
             if sdxl_pipeline_flag:
-                input_prompt = f"{validation_prompt}, <lora:{user_id}>" + additional_prompt
+                input_prompt = f"{validation_prompt}, <lora:{user_id}>, " + additional_prompt
 
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -525,14 +527,21 @@ def easyphoto_infer_forward(
                 else:
                     input_image = copy.deepcopy(loop_template_image)
 
-                # Resize the template image with short edges on 512 (SD1)/1024 (SDXL)
-                input_short_size = 512.0 if not sdxl_pipeline_flag else 1024.0
-                ep_logger.info("Start Image resize to {}.".format(input_short_size))
-                short_side  = min(input_image.width, input_image.height)
-                resize      = float(short_side / input_short_size)
-                new_size    = (int(input_image.width//resize), int(input_image.height//resize))
+                if sdxl_pipeline_flag:
+                    # Fix total pixels in the generated image in SDXL.
+                    target_area = 1024 * 1024
+                    ratio = math.sqrt(target_area / (input_image.width * input_image.height))
+                    new_size = (int(input_image.width * ratio), int(input_image.height * ratio))
+                    ep_logger.info("Start resize image from {} to {}.".format(input_image.size, new_size))
+                else:
+                    input_short_size = 512.0
+                    ep_logger.info("Start Image resize to {}.".format(input_short_size))
+                    short_side  = min(input_image.width, input_image.height)
+                    resize      = float(short_side / input_short_size)
+                    new_size    = (int(input_image.width//resize), int(input_image.height//resize))
                 input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
-                if crop_face_preprocess:
+
+                if crop_face_preprocess and not sdxl_pipeline_flag:
                     new_width   = int(np.shape(input_image)[1] // 32 * 32)
                     new_height  = int(np.shape(input_image)[0] // 32 * 32)
                     input_image = input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
@@ -600,12 +609,12 @@ def easyphoto_infer_forward(
                 if not face_shape_match:
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
                     if sdxl_pipeline_flag:
-                        controlnet_pairs = []
+                        controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
                 else:
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
                     if sdxl_pipeline_flag:
-                        controlnet_pairs = []
+                        controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                     first_diffusion_output_image = inpaint(input_image, None, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
 
                     # detect face area
@@ -684,8 +693,7 @@ def easyphoto_infer_forward(
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                 else:
-                    # controlnet_pairs = [["sdxl_canny", fusion_image, 1.00]]
-                    controlnet_pairs = []
+                    controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
                 second_diffusion_output_image = inpaint(
                     input_image,
                     input_mask,
@@ -792,7 +800,7 @@ def easyphoto_infer_forward(
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
                     else:
-                        controlnet_pairs = []
+                        controlnet_pairs = [["sdxl_canny_mid", output_image, 1.00]]
                     output_image = inpaint(
                         output_image,
                         output_mask,
