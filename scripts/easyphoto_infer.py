@@ -1228,7 +1228,6 @@ def easyphoto_video_infer_forward(
                             _first_diffusion_output_image_crop_color_shift * face_skin_mask + np.array(_first_diffusion_output_image_crop) * (1 - face_skin_mask)
                         _first_diffusion_output_image = Image.fromarray(np.uint8(_first_diffusion_output_image_uint8))
                 
-                    # Second diffusion
                     if roop_images[0] is not None and apply_face_fusion_after:
                         # Fusion of facial photos with user photos
                         ep_logger.info("Start second face fusion.")
