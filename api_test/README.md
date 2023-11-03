@@ -45,7 +45,7 @@ python3 post_infer.py --template_dir templates --output_path test_data/version1 
 ```python
 python3 ./double_blind/format_data2json.py  --ref_images ref_image  --version1_dir test_data/version1 --version2_dir test_data/version2 --output_json test_v1_v2.json
 ```
-- 运行./double_blind/app.py 获取如下双盲测试页面。
+- 运行./double_blind/app.py 获取如下双盲测试页面, 请注意，gradio 存在很多bug，我们稳定可以运行的版本是gradio==3.48.0, 否则会出现gradio， BarPlot的奇怪问题。
 ```python
 python3 ./double_blind/app.py --data-path test_v1_v2.json  --result-path ./result.jsonl
 ```

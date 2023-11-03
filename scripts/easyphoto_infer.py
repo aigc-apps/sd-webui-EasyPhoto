@@ -23,13 +23,15 @@ from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       easyphoto_txt2img_samples, models_path,
                                       user_id_outpath_samples,
                                       validation_prompt)
-from scripts.easyphoto_utils import (check_files_exists_and_download, ep_logger,
-                                     check_id_valid, unload_models)
+from scripts.easyphoto_utils import (check_files_exists_and_download,
+                                     check_id_valid, ep_logger,
+                                     modelscope_models_to_cpu, modelscope_models_to_gpu,
+                                     switch_ms_model_cpu, unload_models)
 from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
-from scripts.sdwebui import i2i_inpaint_call, t2i_call, switch_sd_model_vae
-from scripts.sdwebui import get_checkpoint_type, get_lora_type
+from scripts.sdwebui import (i2i_inpaint_call, reload_sd_model_vae,
+                             switch_sd_model_vae, t2i_call)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -135,6 +137,7 @@ def get_controlnet_unit(unit, input_image, weight):
         )
     return control_unit
 
+@switch_ms_model_cpu()
 def txt2img(
     controlnet_pairs: list,
     input_prompt = '1girl',
@@ -171,6 +174,7 @@ def txt2img(
 
     return image
 
+@switch_ms_model_cpu()
 def inpaint(
     input_image: Image.Image,
     select_mask_input: Image.Image,
@@ -268,11 +272,15 @@ def easyphoto_infer_forward(
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
+    last_user_id_none_num = 0
     for idx, user_id in enumerate(user_ids):
         if user_id == "none":
+            last_user_id_none_num += 1
             passed_userid_list.append(idx)
+        else:
+            last_user_id_none_num = 0
 
-    if len(user_ids) == len(passed_userid_list):
+    if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
 
     # get random seed 
@@ -288,11 +296,7 @@ def easyphoto_infer_forward(
         elif tabs == 2:
             template_images = [file_d['name'] for file_d in uploaded_template_images]
         elif tabs == 3:
-            shared.opts.sd_model_checkpoint = SDXL_MODEL_NAME
-            sd_models.reload_model_weights()
-            shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
-            sd_vae.reload_vae_weights()
-
+            reload_sd_model_vae(SDXL_MODEL_NAME, "madebyollin-sdxl-vae-fp16-fix.safetensors")
             ep_logger.info(sd_xl_input_prompt)
             sd_xl_resolution = eval(str(sd_xl_resolution))
             template_images = txt2img(
@@ -309,12 +313,10 @@ def easyphoto_infer_forward(
         traceback.print_exc()
         return "Please choose or upload a template.", [], []
     
-    shared.opts.sd_model_checkpoint = sd_model_checkpoint
-    sd_models.reload_model_weights()
-    shared.opts.sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
-    if sdxl_pipeline_flag:
-        shared.opts.sd_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
-    sd_vae.reload_vae_weights()
+    if not sdxl_pipeline_flag:
+        reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
+    else:
+        reload_sd_model_vae(sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
     
     # create modelscope model
     if retinaface_detection is None:
@@ -356,6 +358,10 @@ def easyphoto_infer_forward(
             torch.cuda.empty_cache()
             traceback.print_exc()
             ep_logger.error(f"MakeUp Transfer model load error. Error Info: {e}")
+    
+    # This is to increase the fault tolerance of the code. 
+    # If the code exits abnormally, it may cause the model to not function properly on the CPU
+    modelscope_models_to_gpu()
 
     # params init
     input_prompts                   = []
@@ -455,6 +461,7 @@ def easyphoto_infer_forward(
             makeup_transfer                         : {str(makeup_transfer)}
             makeup_transfer_ratio                   : {str(makeup_transfer_ratio)}
             skin_retouching_bool                    : {str(skin_retouching_bool)}
+            face_shape_match                        : {str(face_shape_match)}
         '''
         ep_logger.info(template_idx_info)
         try:
@@ -470,13 +477,13 @@ def easyphoto_infer_forward(
             template_detected_facenum = len(template_face_safe_boxes)
             
             # use some print/log to record mismatch of detectionface and user_ids
-            if template_detected_facenum > len(user_ids) - len(passed_userid_list):
-                ep_logger.info(f"User set {len(user_ids) - len(passed_userid_list)} face but detected {template_detected_facenum} face in template image,\
-                the last {template_detected_facenum-len(user_ids) - len(passed_userid_list)} face will remains")
+            if template_detected_facenum > len(user_ids) - last_user_id_none_num:
+                ep_logger.info(f"User set {len(user_ids) - last_user_id_none_num} face but detected {template_detected_facenum} face in template image,\
+                the last {template_detected_facenum - len(user_ids) - last_user_id_none_num} face will remains")
             
-            if len(user_ids) - len(passed_userid_list) > template_detected_facenum:
-                ep_logger.info(f"User set {len(user_ids) - len(passed_userid_list)} face but detected {template_detected_facenum} face in template image,\
-                the last {len(user_ids) - len(passed_userid_list)-template_detected_facenum} set user_ids is useless")
+            if len(user_ids) - last_user_id_none_num > template_detected_facenum:
+                ep_logger.info(f"User set {len(user_ids) - last_user_id_none_num} face but detected {template_detected_facenum} face in template image,\
+                the last {len(user_ids) - last_user_id_none_num - template_detected_facenum} set user_ids is useless")
 
             if background_restore:
                 output_image = np.array(copy.deepcopy(template_image))
@@ -487,7 +494,7 @@ def easyphoto_infer_forward(
                     output_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 0
                 output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
             else:
-                if min(template_detected_facenum, len(user_ids) - len(passed_userid_list)) > 1:
+                if min(template_detected_facenum, len(user_ids) - last_user_id_none_num) > 1:
                     output_image = np.array(copy.deepcopy(template_image))
                     output_mask  = np.ones_like(output_image)
 
@@ -502,7 +509,7 @@ def easyphoto_infer_forward(
                     output_mask  = Image.fromarray(np.uint8(cv2.dilate(np.array(output_mask), np.ones((64, 64), np.uint8), iterations=1) - cv2.erode(np.array(output_mask), np.ones((32, 32), np.uint8), iterations=1)))
 
             total_processed_person = 0
-            for index in range(min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list))):
+            for index in range(min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num)):
                 # pass this userid, not do anything
                 if index in passed_userid_list:
                     continue
@@ -511,7 +518,7 @@ def easyphoto_infer_forward(
                 loop_template_image = copy.deepcopy(template_image)
 
                 # mask other people face use 255 in this term, to transfer multi user to single user situation
-                if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1:
+                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1:
                     loop_template_image = np.array(loop_template_image)
                     for sub_index in range(len(template_face_safe_boxes)):
                         if index != sub_index:
@@ -776,7 +783,7 @@ def easyphoto_infer_forward(
                     face_id_outputs.append((roop_images[index], "{}, {:.2f}".format(user_ids[index][:10], loop_output_image_faceid)))
                     loop_output_image = Image.fromarray(loop_output_image)
                 
-                if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1:
+                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1:
                     ep_logger.info("Start paste crop image to origin template in multi people.")
                     template_face_safe_box = template_face_safe_boxes[index]
                     output_image[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = np.array(loop_output_image, np.float32)[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]]
@@ -786,6 +793,8 @@ def easyphoto_infer_forward(
             try:
                 if min(len(template_face_safe_boxes), len(user_ids) - len(passed_userid_list)) > 1 or background_restore:
                     ep_logger.info("Start Third diffusion for background.")
+                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1 or background_restore:
+                    ep_logger.info("Start Thirt diffusion for background.")
                     output_image    = Image.fromarray(np.uint8(output_image))
                     short_side      = min(output_image.width, output_image.height)
                     if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
@@ -817,31 +826,31 @@ def easyphoto_infer_forward(
                 ep_logger.error(f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}")
                 return f"Background Restore Failed, Please check the ratio of height and width in template. Error Info: {e}", outputs, []
 
-            if skin_retouching_bool:
-                try:
-                    ep_logger.info("Start Skin Retouching.")
-                    # Skin Retouching is performed here. 
-                    output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))  
-                except Exception as e:
-                    torch.cuda.empty_cache()
-                    traceback.print_exc()
-                    ep_logger.error(f"Skin Retouching error: {e}")
+            if total_processed_person != 0:
+                if skin_retouching_bool:
+                    try:
+                        ep_logger.info("Start Skin Retouching.")
+                        # Skin Retouching is performed here. 
+                        output_image = Image.fromarray(cv2.cvtColor(skin_retouching(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))  
+                    except Exception as e:
+                        torch.cuda.empty_cache()
+                        traceback.print_exc()
+                        ep_logger.error(f"Skin Retouching error: {e}")
 
-            if super_resolution:
-                try:
-                    ep_logger.info("Start Portrait enhancement.")
-                    h, w, c = np.shape(np.array(output_image))
-                    # Super-resolution is performed here. 
-                    output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-                except Exception as e:
-                    torch.cuda.empty_cache()
-                    traceback.print_exc()
-                    ep_logger.error(f"Portrait enhancement error: {e}")
-
-            if total_processed_person == 0:
-                output_image = template_image
+                if super_resolution:
+                    try:
+                        ep_logger.info("Start Portrait enhancement.")
+                        h, w, c = np.shape(np.array(output_image))
+                        # Super-resolution is performed here. 
+                        output_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                    except Exception as e:
+                        torch.cuda.empty_cache()
+                        traceback.print_exc()
+                        ep_logger.error(f"Portrait enhancement error: {e}")
             else:
-                outputs.append(output_image)
+                output_image = template_image
+
+            outputs.append(output_image)
             save_image(output_image, easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
             
             if loop_message != "":
