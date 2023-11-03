@@ -234,13 +234,13 @@ def on_ui_tabs():
                             def update_train_parameters(sd_model_checkpoint):
                                 checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
                                 if checkpoint_type == 3:  # SDXL
-                                    return gr.Markdown.update(visible=True), 1024, 64, 32, gr.Checkbox.update(value=False)
-                                return gr.Markdown.update(visible=False), 512, 128, 64, gr.Checkbox.update(value=True)
+                                    return gr.Markdown.update(visible=True), 1024, 600, 32, 16, gr.Checkbox.update(value=False)
+                                return gr.Markdown.update(visible=False), 512, 800, 128, 64, gr.Checkbox.update(value=True)
                             
                             sd_model_checkpoint.change(
                                 fn=update_train_parameters,
                                 inputs=sd_model_checkpoint,
-                                outputs=[sdxl_training_note, resolution, rank, network_alpha, validation]
+                                outputs=[sdxl_training_note, resolution, max_train_steps, rank, network_alpha, validation]
                             )
 
                         gr.Markdown(
