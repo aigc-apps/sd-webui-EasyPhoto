@@ -31,7 +31,8 @@ from scripts.face_process_utils import (Face_Skin, call_face_crop,
                                         color_transfer, crop_and_paste)
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (i2i_inpaint_call, reload_sd_model_vae,
-                             switch_sd_model_vae, t2i_call)
+                             switch_sd_model_vae, t2i_call,
+                             get_checkpoint_type, get_lora_type)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
