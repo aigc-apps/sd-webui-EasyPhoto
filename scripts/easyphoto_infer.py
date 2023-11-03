@@ -534,9 +534,6 @@ def easyphoto_infer_forward(
                     input_image = copy.deepcopy(loop_template_image).crop(loop_template_crop_safe_box)
                 else:
                     input_image = copy.deepcopy(loop_template_image)
-                
-                import pdb
-                pdb.set_trace()
 
                 if sdxl_pipeline_flag:
                     # Fix total pixels in the generated image in SDXL.
@@ -776,8 +773,11 @@ def easyphoto_infer_forward(
                 # For simplicity, we don't compute the FaceID of the final output image.
                 if display_score:
                     loop_output_image = np.array(loop_output_image)
-                    x1, y1, x2, y2 = loop_template_crop_safe_box
-                    loop_output_image_face = loop_output_image[y1:y2, x1:x2]
+                    if crop_face_preprocess:
+                        x1, y1, x2, y2 = loop_template_crop_safe_box
+                        loop_output_image_face = loop_output_image[y1:y2, x1:x2]
+                    else:
+                        loop_output_image_face = loop_output_image
 
                     embedding = face_recognition(dict(user=Image.fromarray(np.uint8(loop_output_image_face))))[OutputKeys.IMG_EMBEDDING]
                     roop_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(roop_images[index]))))[OutputKeys.IMG_EMBEDDING]
