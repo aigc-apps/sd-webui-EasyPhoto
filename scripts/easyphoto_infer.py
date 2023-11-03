@@ -860,15 +860,15 @@ def easyphoto_video_infer_forward(
 
     try:
         # choose tabs select
-        if tabs == 0:
+        if tabs == 0: # t2v
             template_images = None
             max_frames = int(max_frames)
             actual_fps = int(max_fps)
-        elif tabs == 1:
+        elif tabs == 1: # i2v
             template_images = init_image
             max_frames = int(max_frames)
             actual_fps = int(max_fps)
-        elif tabs == 2:
+        elif tabs == 2: # v2v
             max_frames = int(max_frames)
             max_fps = int(max_fps)
             template_images, actual_fps = get_mov_all_images(init_video, max_fps)
