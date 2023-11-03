@@ -74,6 +74,9 @@ def easyphoto_train_forward(
             return "EasyPhoto does not support RL with the SDXL checkpoint: {}.".format(sd_model_checkpoint)
         if int(resolution) < 1024:
             return "The resolution for SDXL Training needs to be 1024."
+        if validation:
+            # We do not ensemble models by validation in SDXL training.
+            return "To save training time and VRAM, please turn off validation in SDXL training."
 
     check_files_exists_and_download(check_hash)
     check_hash = False

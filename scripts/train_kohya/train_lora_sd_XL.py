@@ -45,6 +45,8 @@ from tqdm.auto import tqdm
 from utils.lora_diffusers import merge_lora_weights
 import utils.lora_utils as network_module
 
+torch.backends.cudnn.benchmark = True
+
 if is_wandb_available():
     import wandb
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
@@ -673,7 +675,7 @@ def main():
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
+    if args.allow_tf32 or os.environ.get('ENABLE_TF32'):
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.scale_lr:
@@ -692,7 +694,17 @@ def main():
 
         optimizer_class = bnb.optim.AdamW8bit
     else:
-        optimizer_class = torch.optim.AdamW
+        if os.environ.get('ENABLE_APEX_OPT'):
+            try:
+                import apex
+                optimizer_class=apex.optimizers.FusedAdam
+            except ImportError:
+                logger.warn(
+                    "To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex."
+                )
+                optimizer_class=torch.optim.AdamW
+        else:
+            optimizer_class = torch.optim.AdamW
 
     # Optimizer creation
     optimizer = optimizer_class(
@@ -812,12 +824,16 @@ def main():
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
+    persistent_workers = True
+    if args.dataloader_num_workers == 0:
+        persistent_workers = False
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
+        persistent_workers=persistent_workers
     )
 
     # Scheduler and math around the number of training steps.
