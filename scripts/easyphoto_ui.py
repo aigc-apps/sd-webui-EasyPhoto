@@ -600,45 +600,49 @@ def on_ui_tabs():
 
                         with gr.TabItem("Text2Video") as video_template_images_tab:
                             with gr.Row():
-                                mode_choose  = gr.Dropdown(value="Write Prompt Yourself", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=True)
+                                mode_choose  = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=False)
 
                                 t2v_resolution  = gr.Dropdown(
                                     value="(768, 512)", elem_id='dropdown', 
                                     choices=[(768, 512), (512, 512), (512, 768)], 
                                     label="The Resolution of Video.", visible=True
                                 )
+
+                            with gr.Row(visible=True) as row1:
+                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio in Video.", visible=True)
+                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person in Video.", visible=True)
+                                where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person in Video?", visible=True)
+                            with gr.Row(visible=True) as row2:
+                                season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season in Video?", visible=True)
+                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["none", "daytime", "night"], label="Where is the Time in Video?", visible=True)
+                                light           = gr.Dropdown(value="ray tracing and volumatic light", elem_id='dropdown', choices=["none", "ray tracing, volumatic light and colorful light", "ray tracing", "volumatic light", "best light", "colorful light"], label="Where is the light in Video?", visible=True)
+
+                            with gr.Row(visible=True) as row3:
+                                hair_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the hair in Video.", visible=True)
+                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="The Wear of the hair in Video.", visible=True)
+                                eyes_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the eye in Video.", visible=True)
+
+                            with gr.Row(visible=True) as row4:
+                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth in Video.", visible=True)
+                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="The Cloth on the Person in Video.", visible=True)
                             
                             t2v_input_prompt = gr.Textbox(
-                                label="Text2Video Input Prompt", interactive=True, lines=3,
-                                value="upper-body, look at viewer, 1girl, wear white dress, black eyes, black hair, hair ornament, ray tracing, volumatic light and colorful light, (cowbody shot, realistic), daytime, f32", visible=True
+                                label="Text2Video Input Prompt", interactive=False, lines=3,
+                                value="upper-body, look at viewer, 1girl, wear white dress, black eyes, black hair, hair ornament, ray tracing and volumatic light, , (cowbody shot, realistic), daytime, , realistic, f32", visible=False
                             )
 
-                            with gr.Row(visible=False) as row1:
-                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio in Video.", visible=False)
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person in Video.", visible=False)
-                                where           = gr.Dropdown(value="", elem_id='dropdown', choices=["", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person in Video?", visible=False)
-                            with gr.Row(visible=False) as row2:
-                                season          = gr.Dropdown(value="", elem_id='dropdown', choices=["", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season in Video?", visible=False)
-                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["", "daytime", "night"], label="Where is the Time in Video?", visible=False)
-                                light           = gr.Dropdown(value="ray tracing and volumatic light", elem_id='dropdown', choices=["", "ray tracing, volumatic light and colorful light", "ray tracing", "volumatic light", "best light", "colorful light"], label="Where is the light in Video?", visible=False)
-
-                            with gr.Row(visible=False) as row3:
-                                hair_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the hair in Video.", visible=False)
-                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="The Wear of the hair in Video.", visible=False)
-                                eyes_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the eye in Video.", visible=False)
-
-                            with gr.Row(visible=False) as row4:
-                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth in Video.", visible=False)
-                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="The Cloth on the Person in Video.", visible=False)
-
-                            def update_t2v_input_prompt(portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth):
+                            def update_t2v_input_prompt(*args):
+                                # preprocess
+                                args = ["" if arg == "none" else arg for arg in args]
+                                portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth = args
 
                                 # first time add gender hack for XL prompt, suggest by Nenly
                                 gender_limit_prompt_girls = {'dress':'shirt'}
                                 if gender in ['boy', 'man']:
                                     if cloth in list(gender_limit_prompt_girls.keys()):
                                         cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
-                                input_prompt = f"{portrait_ratio}, look at viewer, 1{gender}, wear {cloth_color} {cloth}, {eyes_color} eyes, {hair_color} hair, {hair_wear}, {light}, {where}, {time_of_photo}, {season}, realistic, f32"
+
+                                input_prompt = f"{portrait_ratio}, look at viewer, 1{gender}, wear {cloth_color} {cloth}, {eyes_color} eyes, {hair_color} hair, {hair_wear}, {light}, {where}, (cowbody shot, realistic), {time_of_photo}, {season}, realistic, f32"
                                 return input_prompt
 
                             prompt_inputs = [
@@ -664,8 +668,16 @@ def on_ui_tabs():
                                     ]
                             mode_choose.change(update_t2v_mode, inputs=mode_choose, outputs=[row1, row2, row3, row4, portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth, t2v_input_prompt])
 
-                            sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
+                            with gr.Row():
+                                sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
 
+                                checkpoint_refresh = ToolButton(value="\U0001f504")
+                                checkpoint_refresh.click(
+                                    fn=checkpoint_refresh_function,
+                                    inputs=[],
+                                    outputs=[sd_model_checkpoint_for_animatediff_text2video]
+                                )
+                                
                             gr.Markdown(
                                 value = '''
                                 Generate from prompts notes:
@@ -677,15 +689,17 @@ def on_ui_tabs():
 
                         with gr.TabItem("Image2Video") as video_upload_image_tab:
                             init_image          = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
-                            init_image_prompt   = gr.Textbox(label="Prompt For Image2Video", value="", show_label=True, visible=True, placeholder="Selected")
+                            init_image_prompt   = gr.Textbox(label="Prompt For Image2Video", value="", show_label=True, visible=True, placeholder="Please write the corresponding prompts using the template.")
 
-                            checkpoints = []
-                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                    checkpoints.append(_checkpoint)
+                            with gr.Row():
+                                sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Image2Video(For animatediff only).", visible=True)
 
-                            sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use for Image2Video(For animatediff only).", visible=True)
-
+                                checkpoint_refresh = ToolButton(value="\U0001f504")
+                                checkpoint_refresh.click(
+                                    fn=checkpoint_refresh_function,
+                                    inputs=[],
+                                    outputs=[sd_model_checkpoint_for_animatediff_image2video]
+                                )
                             gr.Markdown(
                                 value = '''
                                 Generate from image notes:
@@ -704,10 +718,6 @@ def on_ui_tabs():
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
 
                         with gr.Row():
-                            checkpoints = []
-                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                    checkpoints.append(_checkpoint)
                             sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
                             checkpoint_refresh = ToolButton(value="\U0001f504")
@@ -903,7 +913,7 @@ def on_ui_tabs():
 
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
-# 注册设置页的配置项
+# Configuration items for registration settings page
 def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(

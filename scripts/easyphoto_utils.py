@@ -190,8 +190,9 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
     - required_fps (int): The required frame per second to extract.
 
     Returns:
-    - tuple: A tuple containing a list of RGB images and the actual number of frames extracted.
+    - image_list (tuple): A tuple containing a list of RGB images and the actual number of frames extracted.
              Returns None if the file cannot be opened or if 'file' is None.
+    - required_fps (int): The actual fps after extracting a specific number of frames uniformly from a video file.
     """
     if file is None:
         return None
@@ -215,6 +216,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
         else:
             movies.append(frame)
     # Obtain the required frame
+    # Extracts a specific number of frames uniformly from a video
     num_pics        = int(required_fps / fps * len(movies))
     target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
     image_list = []
@@ -225,7 +227,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
     cap.release()
 
     image_list = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in image_list]
-    return image_list, frames
+    return image_list, required_fps
 
 def convert_to_video(path, frames, fps, mode="gif"):
     if not os.path.exists(path):
