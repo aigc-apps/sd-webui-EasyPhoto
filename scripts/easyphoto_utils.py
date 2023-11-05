@@ -83,6 +83,7 @@ def check_files_exists_and_download(check_hash):
     urls        = [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
@@ -105,6 +106,7 @@ def check_files_exists_and_download(check_hash):
     filenames = [
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
+        os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
@@ -190,8 +192,9 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
     - required_fps (int): The required frame per second to extract.
 
     Returns:
-    - tuple: A tuple containing a list of RGB images and the actual number of frames extracted.
+    - image_list (tuple): A tuple containing a list of RGB images and the actual number of frames extracted.
              Returns None if the file cannot be opened or if 'file' is None.
+    - required_fps (int): The actual fps after extracting a specific number of frames uniformly from a video file.
     """
     if file is None:
         return None
@@ -215,6 +218,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
         else:
             movies.append(frame)
     # Obtain the required frame
+    # Extracts a specific number of frames uniformly from a video
     num_pics        = int(required_fps / fps * len(movies))
     target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
     image_list = []
@@ -225,7 +229,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
     cap.release()
 
     image_list = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in image_list]
-    return image_list, frames
+    return image_list, required_fps
 
 def convert_to_video(path, frames, fps, mode="gif"):
     if not os.path.exists(path):

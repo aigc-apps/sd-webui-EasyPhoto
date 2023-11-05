@@ -2,6 +2,7 @@ import copy
 import glob
 import os
 import traceback
+from typing import Any, Dict, List, Optional, Union
 
 import cv2
 import numpy as np
@@ -30,9 +31,9 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      modelscope_models_to_cpu,
                                      modelscope_models_to_gpu,
                                      switch_ms_model_cpu, unload_models)
-from scripts.face_process_utils import (Face_Skin, call_face_crop,
-                                        color_transfer, crop_and_paste,
-                                        safe_get_box_and_padding_image)
+from scripts.face_process_utils import (
+    Face_Skin, call_face_crop, color_transfer, crop_and_paste,
+    safe_get_box_mask_keypoints_and_padding_image)
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
@@ -61,13 +62,22 @@ def resize_image(input_image, resolution, nearest = False, crop264 = True):
 
 # Add control_mode=1 means Prompt is more important, to better control lips and eyes,
 # this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
-def get_controlnet_unit(unit, input_image, weight, batch_images=None):
+def get_controlnet_unit(
+    unit: str,
+    input_image: Union[Any, List[Any]], # Any should be replaced with a more specific image type
+    weight: float,
+    is_batch: bool = False # Default to False, assuming single image input by default
+):
     if unit == "canny":
-        if batch_images is not None:
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
+        if is_batch:
+            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
+            input_image     = None
+        else:
+            batch_images    = None
+            input_image     = {'image': np.asarray(input_image), 'mask': None}
 
         control_unit = dict(
-            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None,
+            input_image=input_image,
             batch_images=batch_images,
             module='canny',
             weight=weight,
@@ -79,11 +89,15 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
             model='control_v11p_sd15_canny'
         )
     elif unit == "openpose":
-        if batch_images is not None:
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
+        if is_batch:
+            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
+            input_image     = None
+        else:
+            batch_images    = None
+            input_image     = {'image': np.asarray(input_image), 'mask': None}
 
         control_unit = dict(
-            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None,
+            input_image=input_image,
             batch_images=batch_images,
             module='openpose_full',
             weight=weight,
@@ -93,22 +107,10 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
             model='control_v11p_sd15_openpose'
         )
     elif unit == "color":
-        if batch_images is None:
-            blur_ratio      = 24
-            h, w, c         = np.shape(input_image)
-            color_image     = np.array(input_image, np.uint8)
-
-            color_image     = resize_image(color_image, 1024)
-            now_h, now_w    = color_image.shape[:2]
-
-            color_image = cv2.resize(color_image, (int(now_w//blur_ratio), int(now_h//blur_ratio)), interpolation=cv2.INTER_CUBIC)  
-            color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
-            color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
-            color_image = Image.fromarray(np.uint8(color_image))
-        else:
-            new_batch_images = []
-            for _input_image in batch_images:
-                blur_ratio      = 24
+        blur_ratio = 24
+        if is_batch:
+            new_input_image = []
+            for _input_image in input_image:
                 h, w, c         = np.shape(_input_image)
                 color_image     = np.array(_input_image, np.uint8)
 
@@ -119,12 +121,27 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
                 color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
                 color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
                 color_image = Image.fromarray(np.uint8(color_image))
-                new_batch_images.append(color_image)
+                new_input_image.append(color_image)
 
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in new_batch_images]
+            batch_images = [np.array(_input_image, np.uint8) for _input_image in new_input_image]
+            input_image  = None
+        else:
+            h, w, c         = np.shape(input_image)
+            color_image     = np.array(input_image, np.uint8)
+
+            color_image     = resize_image(color_image, 1024)
+            now_h, now_w    = color_image.shape[:2]
+
+            color_image = cv2.resize(color_image, (int(now_w//blur_ratio), int(now_h//blur_ratio)), interpolation=cv2.INTER_CUBIC)  
+            color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
+            color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
+            color_image = Image.fromarray(np.uint8(color_image))
+
+            batch_images = None
+            input_image  = {'image': np.asarray(color_image), 'mask': None}
 
         control_unit = dict(
-            input_image={'image': np.asarray(color_image), 'mask': None} if batch_images is None else None, 
+            input_image=input_image, 
             batch_images=batch_images,
             module='none',
             weight=weight,
@@ -134,11 +151,15 @@ def get_controlnet_unit(unit, input_image, weight, batch_images=None):
             model='control_sd15_random_color'
         )
     elif unit == "tile":
-        if batch_images is not None:
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in batch_images]
+        if is_batch:
+            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
+            input_image     = None
+        else:
+            batch_images    = None
+            input_image     = {'image': np.asarray(input_image), 'mask': None}
 
         control_unit = dict(
-            input_image={'image': np.asarray(input_image), 'mask': None} if batch_images is None else None, 
+            input_image=input_image,
             batch_images=batch_images,
             module='tile_resample',
             weight=weight,
@@ -213,6 +234,8 @@ def inpaint(
     animatediff_flag = False,
     animatediff_video_length = 0,
     animatediff_fps = 0,
+    animatediff_reserve_scale = 1,
+    animatediff_last_image = None,
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -221,7 +244,7 @@ def inpaint(
 
     for pair in controlnet_pairs:
         controlnet_units_list.append(
-            get_controlnet_unit(pair[0], pair[1], pair[2]) if type(input_image) is not list else get_controlnet_unit(pair[0], None, pair[2], pair[1])
+            get_controlnet_unit(pair[0], pair[1], pair[2], False if type(input_image) is not list else True)
         )
 
     positive = f'{input_prompt}, {default_positive_prompt}'
@@ -247,6 +270,8 @@ def inpaint(
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
+        animatediff_reserve_scale=animatediff_reserve_scale,
+        animatediff_last_image=animatediff_last_image
     )
 
     return image
@@ -406,6 +431,7 @@ def easyphoto_infer_forward(
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
             
+            # TODO: face_id_image_path may have to be picked with pitch yaw angle in video mode.
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
             # get roop image
@@ -828,7 +854,7 @@ def easyphoto_infer_forward(
 @switch_sd_model_vae()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
@@ -860,19 +886,26 @@ def easyphoto_video_infer_forward(
 
     try:
         # choose tabs select
+        # 
+        # max_frames represents the maximum frames in t2v and i2v; 
+        # it represents the max_frames before interception for conversion in v2v.
+        #
+        # max_fps represents the desired frame rate; 
+        # in v2v, if the frame rate of video is less than max_fps, the frame rate of video will be used as the desired frame rate.
         if tabs == 0: # t2v
+            max_frames      = int(max_frames)
+            actual_fps      = int(max_fps)
             template_images = None
-            max_frames = int(max_frames)
-            actual_fps = int(max_fps)
         elif tabs == 1: # i2v
+            max_frames      = int(max_frames)
+            actual_fps      = int(max_fps)
             template_images = init_image
-            max_frames = int(max_frames)
-            actual_fps = int(max_fps)
         elif tabs == 2: # v2v
-            max_frames = int(max_frames)
-            max_fps = int(max_fps)
+            max_frames      = int(max_frames)
+            max_fps         = int(max_fps)
+
             template_images, actual_fps = get_mov_all_images(init_video, max_fps)
-            template_images = [template_images[:max_frames]] if max_frames != -1 else [template_images]
+            template_images             = [template_images[:max_frames]] if max_frames != -1 else [template_images]
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
@@ -999,6 +1032,13 @@ def easyphoto_video_infer_forward(
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
+        if last_image is not None:
+            last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
+            animatediff_reserve_scale = 1.00
+            denoising_strength = 0.55
+        else:
+            animatediff_reserve_scale = 0.75
+            denoising_strength = 0.65
 
         # Resize the template image with short edges on 512
         short_side  = min(image.width, image.height)
@@ -1009,11 +1049,13 @@ def easyphoto_video_infer_forward(
         template_images = inpaint(
             image, None, [], 
             input_prompt = init_image_prompt, \
-            diffusion_steps=30, denoising_strength=0.70, hr_scale=1, \
+            diffusion_steps=30, denoising_strength=denoising_strength, hr_scale=1, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras",
-            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
+            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps),
+            animatediff_reserve_scale = animatediff_reserve_scale, animatediff_last_image = last_image,
+            
         )
         template_images = [template_images]
 
@@ -1055,6 +1097,8 @@ def easyphoto_video_infer_forward(
                         continue
                     _loop_template_retinaface_box = _loop_template_retinaface_boxes[0]
                     loop_template_retinaface_box.append(_loop_template_retinaface_box)
+                if len(loop_template_retinaface_box) == 0:
+                    raise ValueError("There is no face in video.")
                 loop_template_retinaface_box = np.array(loop_template_retinaface_box)
                 loop_template_retinaface_box = [np.min(loop_template_retinaface_box[:, 0]), np.min(loop_template_retinaface_box[:, 1]), np.max(loop_template_retinaface_box[:, 2]), np.max(loop_template_retinaface_box[:, 3])]
 
@@ -1202,7 +1246,7 @@ def easyphoto_video_infer_forward(
                     sum_input_mask.append(np.array(_input_mask))
             sum_input_mask = Image.fromarray(np.uint8(np.max(np.array(sum_input_mask), axis = 0)))
             
-            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, animatediff_flag=True, animatediff_fps=int(actual_fps))
+            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, default_positive_prompt=DEFAULT_POSITIVE_AD, default_negative_prompt=DEFAULT_NEGATIVE_AD, animatediff_flag=True, animatediff_fps=int(actual_fps))
             
             _outputs = []
             frame_idx = 0
