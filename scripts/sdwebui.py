@@ -263,6 +263,52 @@ def t2i_call(
         animatediff_video_length=0,
         animatediff_fps=0,
 ):
+    """
+    Perform text-to-image generation.
+
+    Args:
+        resize_mode (int): Resize mode.
+        prompt (str): Prompt text.
+        styles (list): List of styles.
+        seed (int): Seed value.
+        subseed (int): Subseed value.
+        subseed_strength (int): Subseed strength.
+        seed_resize_from_h (int): Seed resize height.
+        seed_resize_from_w (int): Seed resize width.
+        batch_size (int): Batch size.
+        n_iter (int): Number of iterations.
+        steps (list): List of steps.
+        cfg_scale (float): Configuration scale.
+        width (int): Output image width.
+        height (int): Output image height.
+        restore_faces (bool): Restore faces flag.
+        tiling (bool): Tiling flag.
+        do_not_save_samples (bool): Do not save samples flag.
+        do_not_save_grid (bool): Do not save grid flag.
+        negative_prompt (str): Negative prompt text.
+        eta (float): Eta value.
+        s_churn (int): Churn value.
+        s_tmax (int): Tmax value.
+        s_tmin (int): Tmin value.
+        s_noise (int): Noise value.
+        override_settings (dict): Dictionary of override settings.
+        override_settings_restore_afterwards (bool): Flag to restore override settings afterwards.
+        sampler (object): Sampler object.
+        include_init_images (bool): Include initial images flag.
+        controlnet_units (List[ControlNetUnit]): List of control net units.
+        use_deprecated_controlnet (bool): Use deprecated control net flag.
+        outpath_samples (str): Output path for samples.
+        sd_vae (str): VAE model checkpoint.
+        sd_model_checkpoint (str): Model checkpoint.
+        animatediff_flag (bool): Animatediff flag.
+        animatediff_video_length (int): Animatediff video length.
+        animatediff_fps (int): Animatediff video FPS.
+
+    Returns:
+        gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
+            When animatediff_flag is True, outputs is list.
+            When animatediff_flag is False, outputs is PIL.Image.Image.
+    """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
@@ -391,7 +437,65 @@ def i2i_inpaint_call(
         animatediff_flag=False,
         animatediff_video_length=0,
         animatediff_fps=0,
+        animatediff_reserve_scale=1,
+        animatediff_last_image=None,
 ):
+    """
+    Perform image-to-image inpainting.
+
+    Args:
+        images (list): List of input images.
+        resize_mode (int): Resize mode.
+        denoising_strength (float): Denoising strength.
+        image_cfg_scale (float): Image configuration scale.
+        mask_image (PIL.Image.Image): Mask image.
+        mask_blur (int): Mask blur strength.
+        inpainting_fill (int): Inpainting fill value.
+        inpaint_full_res (bool): Flag to inpaint at full resolution.
+        inpaint_full_res_padding (int): Padding size for full resolution inpainting.
+        inpainting_mask_invert (int): Invert the mask flag.
+        initial_noise_multiplier (int): Initial noise multiplier.
+        prompt (str): Prompt text.
+        styles (list): List of styles.
+        seed (int): Seed value.
+        subseed (int): Subseed value.
+        subseed_strength (int): Subseed strength.
+        seed_resize_from_h (int): Seed resize height.
+        seed_resize_from_w (int): Seed resize width.
+        batch_size (int): Batch size.
+        n_iter (int): Number of iterations.
+        steps (list): List of steps.
+        cfg_scale (float): Configuration scale.
+        width (int): Output image width.
+        height (int): Output image height.
+        restore_faces (bool): Restore faces flag.
+        tiling (bool): Tiling flag.
+        do_not_save_samples (bool): Do not save samples flag.
+        do_not_save_grid (bool): Do not save grid flag.
+        negative_prompt (str): Negative prompt text.
+        eta (float): Eta value.
+        s_churn (int): Churn value.
+        s_tmax (int): Tmax value.
+        s_tmin (int): Tmin value.
+        s_noise (int): Noise value.
+        override_settings (dict): Dictionary of override settings.
+        override_settings_restore_afterwards (bool): Flag to restore override settings afterwards.
+        sampler: Sampler.
+        include_init_images (bool): Include initial images flag.
+        controlnet_units (List[ControlNetUnit]): List of control net units.
+        use_deprecated_controlnet (bool): Use deprecated control net flag.
+        outpath_samples (str): Output path for samples.
+        sd_vae (str): VAE model checkpoint.
+        sd_model_checkpoint (str): Model checkpoint.
+        animatediff_flag (bool): Animatediff flag.
+        animatediff_video_length (int): Animatediff video length.
+        animatediff_fps (int): Animatediff video FPS.
+
+    Returns:
+        gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
+            When animatediff_flag is True, outputs is list.
+            When animatediff_flag is False, outputs is PIL.Image.Image.
+    """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
@@ -441,10 +545,11 @@ def i2i_inpaint_call(
         before_opts             = copy.deepcopy(opts.return_mask)
         opts.return_mask        = False
         
-        i2i_add_random          = False if animatediff_video_length == 0 else True
         animate_diff_process    = AnimateDiffProcess(
             enable=True, video_length=len(images) if animatediff_video_length == 0 else animatediff_video_length, 
-            fps=animatediff_fps, i2i_add_random=i2i_add_random
+            fps=animatediff_fps, i2i_reserve_scale=animatediff_reserve_scale, last_frame = animatediff_last_image,
+            latent_scale=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 3), 
+            latent_scale_last=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 1)
         )
         controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
