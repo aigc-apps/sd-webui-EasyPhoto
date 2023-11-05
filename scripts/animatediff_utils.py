@@ -800,7 +800,7 @@ class AnimateDiffProcess:
         last_frame=None,
         latent_power_last=1,
         latent_scale_last=32,
-        i2i_add_random=True
+        i2i_reserve_scale=1,
     ):
         self.model = model
         self.enable = enable
@@ -821,7 +821,7 @@ class AnimateDiffProcess:
         self.last_frame = last_frame
         self.latent_power_last = latent_power_last
         self.latent_scale_last = latent_scale_last
-        self.i2i_add_random = i2i_add_random
+        self.i2i_reserve_scale = i2i_reserve_scale
 
 
     def get_list(self, is_img2img: bool):
@@ -891,16 +891,26 @@ class AnimateDiffI2VLatent:
         self, p: StableDiffusionProcessingImg2Img, params: AnimateDiffProcess
     ):
         # Get init_alpha
-        init_alpha = [
-            0.55 for i in range(params.video_length)
+        reserve_scale = [
+            params.i2i_reserve_scale for i in range(params.video_length)
         ]
-        logger.info(f"Randomizing init_latent according to {init_alpha}.")
-        init_alpha = torch.tensor(init_alpha, dtype=torch.float32, device=device)[
+        logger.info(f"Randomizing reserve_scale according to {reserve_scale}.")
+        reserve_scale = torch.tensor(reserve_scale, dtype=torch.float32, device=device)[
             :, None, None, None
         ]
-        init_alpha[init_alpha < 0] = 0
+        reserve_scale[reserve_scale < 0] = 0
 
         if params.last_frame is not None:
+            init_alpha = [
+                1 - pow(i, params.latent_power) / params.latent_scale
+                for i in range(params.video_length)
+            ]
+            logger.info(f"Randomizing init_latent according to {init_alpha}.")
+            init_alpha = torch.tensor(init_alpha, dtype=torch.float32, device=device)[
+                :, None, None, None
+            ]
+            init_alpha[init_alpha < 0] = 0
+
             last_frame = params.last_frame
             if type(last_frame) == str:
                 from modules.api.api import decode_base64_to_image
@@ -949,14 +959,17 @@ class AnimateDiffI2VLatent:
                     size=(p.height // opt_f, p.width // opt_f),
                     mode="bilinear",
                 )
+            reserve_scale[0] = 1
+            reserve_scale[-1] = 1
             # Modify init_latent
             p.init_latent = (
-                p.init_latent * init_alpha
+                (p.init_latent * init_alpha
                 + last_latent * last_alpha
-                + p.rng.next() * (1 - init_alpha - last_alpha)
+                + p.rng.next() * (1 - init_alpha - last_alpha)) * reserve_scale
+                + p.rng.next() * (1 - reserve_scale)
             )
         else:
-            p.init_latent = p.init_latent * init_alpha + p.rng.next() * (1 - init_alpha)
+            p.init_latent = p.init_latent * reserve_scale + p.rng.next() * (1 - reserve_scale)
 
 
 class AnimateDiffScript_Remake(scripts.Script):
@@ -996,7 +1009,7 @@ class AnimateDiffScript_Remake(scripts.Script):
 
     def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
-        if params.i2i_add_random and params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
+        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
             AnimateDiffI2VLatent().randomize(p, params)
 
 

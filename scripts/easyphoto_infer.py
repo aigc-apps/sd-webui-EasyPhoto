@@ -234,6 +234,8 @@ def inpaint(
     animatediff_flag = False,
     animatediff_video_length = 0,
     animatediff_fps = 0,
+    animatediff_reserve_scale = 1,
+    animatediff_last_image = None,
 ):
     assert input_image is not None, f'input_image must not be none'
     controlnet_units_list = []
@@ -268,6 +270,8 @@ def inpaint(
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
+        animatediff_reserve_scale=animatediff_reserve_scale,
+        animatediff_last_image=animatediff_last_image
     )
 
     return image
@@ -850,7 +854,7 @@ def easyphoto_infer_forward(
 @switch_sd_model_vae()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
@@ -1028,6 +1032,13 @@ def easyphoto_video_infer_forward(
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
+        if last_image is not None:
+            last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
+            animatediff_reserve_scale = 1.00
+            denoising_strength = 0.55
+        else:
+            animatediff_reserve_scale = 0.75
+            denoising_strength = 0.65
 
         # Resize the template image with short edges on 512
         short_side  = min(image.width, image.height)
@@ -1038,11 +1049,13 @@ def easyphoto_video_infer_forward(
         template_images = inpaint(
             image, None, [], 
             input_prompt = init_image_prompt, \
-            diffusion_steps=30, denoising_strength=0.70, hr_scale=1, \
+            diffusion_steps=30, denoising_strength=denoising_strength, hr_scale=1, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras",
-            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps)
+            animatediff_flag = True, animatediff_video_length = int(max_frames), animatediff_fps = int(actual_fps),
+            animatediff_reserve_scale = animatediff_reserve_scale, animatediff_last_image = last_image,
+            
         )
         template_images = [template_images]
 
@@ -1233,7 +1246,7 @@ def easyphoto_video_infer_forward(
                     sum_input_mask.append(np.array(_input_mask))
             sum_input_mask = Image.fromarray(np.uint8(np.max(np.array(sum_input_mask), axis = 0)))
             
-            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, animatediff_flag=True, animatediff_fps=int(actual_fps))
+            first_diffusion_output_image = inpaint(input_image, sum_input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[0], hr_scale=1.0, seed=str(seed), sd_model_checkpoint=sd_model_checkpoint, default_positive_prompt=DEFAULT_POSITIVE_AD, default_negative_prompt=DEFAULT_NEGATIVE_AD, animatediff_flag=True, animatediff_fps=int(actual_fps))
             
             _outputs = []
             frame_idx = 0

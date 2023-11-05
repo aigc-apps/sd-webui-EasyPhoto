@@ -437,6 +437,8 @@ def i2i_inpaint_call(
         animatediff_flag=False,
         animatediff_video_length=0,
         animatediff_fps=0,
+        animatediff_reserve_scale=1,
+        animatediff_last_image=None,
 ):
     """
     Perform image-to-image inpainting.
@@ -543,10 +545,11 @@ def i2i_inpaint_call(
         before_opts             = copy.deepcopy(opts.return_mask)
         opts.return_mask        = False
         
-        i2i_add_random          = False if animatediff_video_length == 0 else True
         animate_diff_process    = AnimateDiffProcess(
             enable=True, video_length=len(images) if animatediff_video_length == 0 else animatediff_video_length, 
-            fps=animatediff_fps, i2i_add_random=i2i_add_random
+            fps=animatediff_fps, i2i_reserve_scale=animatediff_reserve_scale, last_frame = animatediff_last_image,
+            latent_scale=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 3), 
+            latent_scale_last=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 1)
         )
         controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
