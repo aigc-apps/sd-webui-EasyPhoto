@@ -7,8 +7,6 @@ import gradio as gr
 import pandas as pd
 
 
-
-
 def read_json(file_path: str):
     return json.load(open(file_path))
 
@@ -27,12 +25,12 @@ def write_jsonl(data: any, file_path: str):
         json.dump(data, f, ensure_ascii=False)
         f.write('\n')
 
-def save_result(id, submit_cnt, *eval_results):
+def save_result(id, submit_cnt, ids, ids_list, id2data, results, *eval_results):
         
     if not all(eval_results):
         gr.Warning('请完整填写所有问题的答案。\nPlease complete the answers to all questions.')
         return next_item(id) + (submit_cnt,)
-
+    
     if id is None:
         gr.Info('感谢您参与EasyPhoto的评测，本次评测已全部完成~🥰\nThank you for participating in the EasyPhoto review, this review is complete ~🥰')
         return None, [], None, None, draw_results(), submit_cnt
@@ -56,15 +54,15 @@ def save_result(id, submit_cnt, *eval_results):
     results.append(result)
     write_jsonl(result, args.result_path)
 
-    return next_item(None) + (submit_cnt + 1,)
+    return next_item(ids, ids_list, id2data, results) + (submit_cnt + 1,)
 
-def next_item(id):
+def next_item(ids, ids_list, id2data, results):
     
     if len(ids) <= 0:
         gr.Info('感谢您参与EasyPhoto的评测，本次评测已全部完成~🥰\nThank you for participating in the EasyPhoto review, this review is complete ~🥰')
-        return None, [], None, None, draw_results()
-    if id is None:
-        id = random.choice(list(ids))
+        return None, [], None, None, draw_results(results, ids_list), ids, ids_list, id2data, results
+   
+    id = random.choice(list(ids))
     
     if random.random() < 0.5:
         id2data[id]['left'] = 'img1'
@@ -77,12 +75,14 @@ def next_item(id):
         
     item = id2data[id]
 
-    return item['id'], [(x, '') for x in item['reference_imgs']], left_img, right_img, draw_results()
+    return item['id'], [(x, '') for x in item['reference_imgs']], left_img, right_img, draw_results(results, ids_list), ids, ids_list, id2data, results
 
-def draw_results():
-    if len(results) < len(ids_list)+1:
+def draw_results(results, ids_list):
+    
+    if len(results) < len(ids_list):
         return None
     else:
+        
         questions = template['questions']
         num_questions = len(questions)
 
@@ -124,16 +124,15 @@ def draw_results():
             height=300
         )
 
-def init_start():
-    global ids, results, id2data, ids_list
+def init_start(ids, ids_list, id2data, results):
     random_elements = random.sample(data, len(data)//2)
     id2data = {}
     for item in random_elements:
         id2data[item['id']] = item
     ids = set(id2data.keys())
-    ids_list = ids
+    ids_list = set(id2data.keys())
     results = []
-    return next_item(None)
+    return next_item(ids, ids_list, id2data, results)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--template-file', default='default_template.json')
@@ -153,6 +152,10 @@ data = read_json(args.data_path)
 with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
 
     id = gr.State()
+    id2data = gr.State({})
+    ids = gr.State()
+    ids_list = gr.State()
+    results = gr.State([])
 
     with gr.Column(visible=True, elem_id="start"):
         gr.Markdown('### 欢迎您参与EasyPhoto的本次评测。')
@@ -200,7 +203,7 @@ with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
                 with gr.Column(scale=1):
                     pass
 
-    start_btn.click(init_start, inputs=None, outputs=[id, reference_imgs, left_img, right_img, plot]).then(fn=None, _js="\
+    start_btn.click(init_start, inputs=[ids, ids_list, id2data, results], outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results]).then(fn=None, _js="\
         () => {\
             document.querySelector('#start').style.display = 'none';\
             document.querySelector('#main').style.display = 'flex';\
@@ -208,8 +211,8 @@ with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
     ", inputs=None, outputs=[]
     )
 
-    submit.click(save_result, inputs=[id, submit_cnt] + eval_results, outputs=[id, reference_imgs, left_img, right_img, plot, submit_cnt])
-    next_btn.click(next_item, inputs=None, outputs=[id, reference_imgs, left_img, right_img, plot])
+    submit.click(save_result, inputs=[id, submit_cnt,ids, ids_list, id2data, results] + eval_results, outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results, submit_cnt])
+    next_btn.click(next_item, inputs=[ids, ids_list, id2data, results], outputs=[id, reference_imgs, left_img, right_img, plot,ids, ids_list, id2data, results])
 
 
 if __name__=="__main__":
