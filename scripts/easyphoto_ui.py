@@ -409,6 +409,20 @@ def on_ui_tabs():
                             )
 
                         with gr.Row():
+                            infer_note = gr.Markdown(
+                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
+                                visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                            )
+                        
+                            def update_infer_note(sd_model_checkpoint):
+                                # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
+                                if sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
+                                    return gr.Markdown.update(visible=False)
+                                return gr.Markdown.update(visible=True)
+                            
+                            sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
+
+                        with gr.Row():
                             def select_function():
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
