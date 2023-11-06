@@ -11,6 +11,7 @@ from scripts.easyphoto_config import (cache_log_file_path, models_path,
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
+from scripts.sdwebui import get_checkpoint_type
 
 gradio_compat = True
 
@@ -131,6 +132,13 @@ def on_ui_tabs():
                                     inputs=[],
                                     outputs=[sd_model_checkpoint]
                                 )
+                            
+                            with gr.Row():
+                                sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki#4sdxl-training"
+                                sdxl_training_note = gr.Markdown(
+                                    value = "**Please check the [[wiki]]({}) before SDXL training**.".format(sdxl_wiki_url),
+                                    visible=False
+                                )
 
                             with gr.Row():
                                 resolution = gr.Textbox(
@@ -161,7 +169,7 @@ def on_ui_tabs():
                                     interactive=True
                                 )
                                 gradient_accumulation_steps = gr.Textbox(
-                                    label="gradient accumulationsteps",
+                                    label="gradient accumulation steps",
                                     value=4,
                                     interactive=True
                                 )
@@ -222,9 +230,23 @@ def on_ui_tabs():
                             enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_option_row1])
                             enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_notes])
 
+                            # We will update the default training parameters by the checkpoint type. 
+                            def update_train_parameters(sd_model_checkpoint):
+                                checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+                                if checkpoint_type == 3:  # SDXL
+                                    return gr.Markdown.update(visible=True), 1024, 600, 32, 16, gr.Checkbox.update(value=False)
+                                return gr.Markdown.update(visible=False), 512, 800, 128, 64, gr.Checkbox.update(value=True)
+                            
+                            sd_model_checkpoint.change(
+                                fn=update_train_parameters,
+                                inputs=sd_model_checkpoint,
+                                outputs=[sdxl_training_note, resolution, max_train_steps, rank, network_alpha, validation]
+                            )
+
                         gr.Markdown(
                             '''
                             Parameter parsing:
+                            - **The base checkpoint** can be SD1 or SDXL.
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
@@ -305,7 +327,7 @@ def on_ui_tabs():
 
                             upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
 
-                        with gr.TabItem("SDXL-beta") as generate_tab:
+                        with gr.TabItem("text2photo") as generate_tab:
                             
                             sd_xl_resolution  = gr.Dropdown(
                                 value="(1344, 768)", elem_id='dropdown', 
