@@ -356,6 +356,17 @@ def on_ui_tabs():
                                     outputs=[uuids[i]]
                                 )
 
+                        with gr.Row():
+                            match_and_paste = gr.Checkbox(
+                                label="Match and Paste",  
+                                value=True
+                            )
+                            
+                            remove_target = gr.Checkbox(
+                                label="Remove Target",  
+                                value=False
+                            )
+
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
                                 label="Additional Prompt",
@@ -391,6 +402,10 @@ def on_ui_tabs():
                                 angle = gr.Slider(
                                     minimum=-90, maximum=90, value=0.0,
                                     step=1, label='Angle'
+                                )
+                                azimuth  = gr.Slider(
+                                    minimum=-60, maximum=60, value=0.0,
+                                    step=1, label='Azimuth'
                                 )
                                 ratio = gr.Slider(
                                     minimum=0.5, maximum=5.5, value=1.0,
@@ -458,8 +473,8 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-                            lora_weight, iou_threshold, angle, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-                            pure_image, global_inpaint, model_selected_tab, *uuids],
+                            lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
+                            pure_image, global_inpaint, match_and_paste, remove_target, model_selected_tab, *uuids],
                             
                     outputs=[infer_progress, output_images]
                 )

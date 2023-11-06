@@ -9,6 +9,7 @@ easyphoto_txt2img_samples       = os.path.join(data_dir, 'outputs/txt2img-images
 easyphoto_outpath_samples       = os.path.join(data_dir, 'outputs/easyphoto-outputs')
 user_id_outpath_samples         = os.path.join(data_dir, 'outputs/easyphoto-user-id-infos')
 cache_log_file_path             = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_log.txt")
+zero123_model_path              = os.path.join(os.path.abspath(os.path.dirname(__file__)),'thirdparty/zero123/models')
 
 # prompts 
 validation_prompt   = "easyphoto, 1thing"

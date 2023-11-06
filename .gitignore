@@ -162,3 +162,5 @@ cython_debug/
 *.pth
 *.onnx
 *.safetensors
+*.ckpt
+*.bin

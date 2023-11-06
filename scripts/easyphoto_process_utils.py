@@ -122,8 +122,15 @@ def resize_and_stretch(
     if isinstance(img, np.ndarray):
         img = Image.fromarray(img)
 
-    # Crop and resize
-    img.thumbnail(target_size)
+    # Calculate the aspect ratio
+    width, height = img.size
+    aspect_ratio = width / height
+
+    # Calculate the new size while preserving the aspect ratio
+    new_width = int(min(target_size[0], target_size[1] * aspect_ratio))
+    new_height = int(min(target_size[1], target_size[0] / aspect_ratio))
+
+    img = img.resize((new_width, new_height))
 
     if is_mask:
         resized_img = Image.new(
@@ -1061,7 +1068,7 @@ def find_best_angle_ratio(
         iou, in_iou = align_and_compute_iou(
             polygon1, polygon2, x, y, parameters
         )
-        return - iou - 0.1* in_iou + 0.1 * angle_loss(angle_target, parameters)
+        return - iou - 0.01* in_iou + 0.1 * angle_loss(angle_target, parameters)
 
     # Define the constraint function
     def constraint_function(parameters: Tuple[float, float]) -> float:
@@ -1169,3 +1176,12 @@ def expand_box_by_pad(box, max_size, padding_size):
         min(max_size[1], box[3] + padding_size),
     ]
     return expanded_box
+
+
+def resize_to_512(image): 
+    short_side  = min(image.shape[0], image.shape[1])
+    resize      = float(short_side / 512.0)
+    new_size    = (int(image.shape[1] // resize // 32 * 32), int(image.shape[0] // resize // 32 * 32))
+    result_img  = cv2.resize(image, new_size, interpolation=cv2.INTER_LANCZOS4)
+
+    return result_img
