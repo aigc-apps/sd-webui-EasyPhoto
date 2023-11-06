@@ -680,8 +680,8 @@ def easyphoto_infer_forward(
 
                     loop_output_image               = Image.fromarray(np.uint8(origin_loop_template_image))
                 else:
-                    loop_output_image               = second_diffusion_output_image
-                
+                    loop_output_image               = second_diffusion_output_image.resize([loop_template_image.width, loop_template_image.height])
+
                 # Given the current user id, compute the FaceID of the second diffusion generation w.r.t the roop image.
                 # For simplicity, we don't compute the FaceID of the final output image.
                 if display_score:
@@ -705,21 +705,58 @@ def easyphoto_infer_forward(
                     output_image = loop_output_image 
 
             try:
-                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1 or background_restore:
+                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1:
                     ep_logger.info("Start Thirt diffusion for background.")
                     output_image    = Image.fromarray(np.uint8(output_image))
-                    short_side      = min(output_image.width, output_image.height)
-                    if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
-                        target_short_side = 512
-                    else:
-                        target_short_side = 768
-                    resize          = float(short_side / target_short_side)
-                    new_size        = (int(output_image.width//resize), int(output_image.height//resize))
-                    output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
                     denoising_strength  = background_restore_denoising_strength if background_restore else 0.3
-                    controlnet_pairs    = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
-                    output_image    = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
+                    
+                    if not background_restore:
+                        h, w, c = np.shape(output_image)
+                        left, top, right, bottom = [
+                            np.clip(np.min(np.array(template_face_safe_boxes)[:, 0]) - 50, 0, w - 1),
+                            np.clip(np.min(np.array(template_face_safe_boxes)[:, 1]) - 50, 0, h - 1),
+                            np.clip(np.max(np.array(template_face_safe_boxes)[:, 2]) + 50, 0, w - 1),
+                            np.clip(np.max(np.array(template_face_safe_boxes)[:, 3]) + 50, 0, h - 1)
+                        ]
+                        width, height, center_x, center_y = right - left, bottom - top, (left + right) / 2, (top + bottom) / 2
+
+                        left, top           = int(np.clip(center_x - width // 2, 0, w - 1)), int(np.clip(center_y - height // 2, 0, h - 1))
+                        right, bottom       = int(np.clip(left + width, 0, w - 1)), int(np.clip(top + height, 0, h - 1))
+
+                        sub_output_image    = output_image.crop([left, top, right, bottom])
+                        sub_output_mask     = output_mask.crop([left, top, right, bottom])
+
+                        short_side      = min(sub_output_image.width, sub_output_image.height)
+                        if min(sub_output_image.width, sub_output_image.height) > 1024:
+                            target_short_side = 1024
+                            resize          = float(short_side / target_short_side)
+                        else:
+                            resize          = 1
+                        new_size        = (int(sub_output_image.width // resize // 32 * 32), int(sub_output_image.height // resize // 32 * 32))
+                        sub_output_image = sub_output_image.resize(new_size, Image.Resampling.LANCZOS)
+                        import pdb
+                        pdb.set_trace()
+                        controlnet_pairs = [["canny", sub_output_image, 1.00], ["color", sub_output_image, 1.00]]
+                        sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
+
+                        sub_output_image = sub_output_image.resize([width, height])
+                        
+                        output_image = np.array(output_image)
+                        output_image[top:bottom, left:right] = np.array(sub_output_image)
+                        output_image = Image.fromarray(output_image)
+                    else:
+                        short_side      = min(output_image.width, output_image.height)
+                        if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
+                            target_short_side = 512
+                        else:
+                            target_short_side = 768
+                        resize          = float(short_side / target_short_side)
+                        new_size        = (int(output_image.width//resize), int(output_image.height//resize))
+                        output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
+
+                        controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
+                        output_image = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
             except Exception as e:
                 torch.cuda.empty_cache()
                 traceback.print_exc()
