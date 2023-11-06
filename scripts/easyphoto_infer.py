@@ -710,7 +710,7 @@ def easyphoto_infer_forward(
                     output_image = loop_output_image 
 
             try:
-                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1:
+                if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1 and background_restore:
                     ep_logger.info("Start Thirt diffusion for background.")
                     output_image    = Image.fromarray(np.uint8(output_image))
                     # When reconstructing the entire background, use smaller denoise values with larger diffusion_steps to prevent discordant scenes and image collapse.
