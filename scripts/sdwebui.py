@@ -9,12 +9,14 @@ import modules
 import modules.scripts as scripts
 import numpy as np
 from scripts.easyphoto_utils import ep_logger
-from modules import processing, scripts, sd_models, sd_samplers, shared, sd_vae
+from modules import cache, errors, processing, scripts, sd_models, sd_samplers, shared, sd_vae
 from modules.api.models import *
+from modules.paths import models_path
 from modules.processing import StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
 from modules.sd_models import get_closet_checkpoint_match, load_model
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
+from modules.timer import Timer
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
@@ -427,3 +429,53 @@ def i2i_inpaint_call(
     else:
         gen_image = processed.images[0]
     return gen_image
+
+
+def get_checkpoint_type(sd_model_checkpoint: str) -> int:
+    """Get the type of the stable diffusion model given the checkpoint name.
+
+    Args:
+        sd_model_checkpoint (str): the checkpoint name.
+    
+    Returns:
+        An integer representing the model type (1 means SD1; 2 means SD2; 3 means SDXL).
+    """
+    ckpt_path = os.path.join(models_path, "Stable-diffusion", sd_model_checkpoint)
+    timer = Timer()
+    checkpoint_info = sd_models.CheckpointInfo(ckpt_path)
+    state_dict = sd_models.get_checkpoint_state_dict(checkpoint_info, timer)
+    for k in state_dict.keys():
+        # SD web UI uses `hasattr(model, conditioner)` to check the SDXL model.
+        if k.startswith("conditioner"):
+            return 3
+        # SD web UI uses `hasattr(model, model.cond_stage_model)` to check the SD2 model.
+        if k.startswith("cond_stage_model.model"):
+            return 2
+    return 1
+
+
+def get_lora_type(filename: str) -> int:
+    """Get the type of the Lora given the path `filename`. Modified from `extensions-builtin/Lora/network.py`.
+
+    Args:
+        filename (str): the Lora file path.
+    
+    Returns:
+        An integer representing the Lora type (1 means SD1; 2 means SD2; 3 means SDXL).
+    """
+    # Firstly, read the metadata of the Lora from the cache. If the Lora is added to the folder 
+    # after the SD Web UI launches, then read the Lora from the hard disk to get the metadata.
+    try:
+        name = os.path.splitext(os.path.basename(filename))[0]
+        read_metadata = lambda filename: sd_models.read_metadata_from_safetensors(filename)
+        # It will return None if the Lora file has not be cached before.
+        metadata = cache.cached_data_for_file("safetensors-metadata", "lora/" + name, filename, read_metadata)
+    except TypeError as e:
+        metadata = sd_models.read_metadata_from_safetensors(filename)
+    except Exception as e:
+        errors.display(e, f"reading lora {filename}")
+    if str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):
+        return 3
+    elif str(metadata.get('ss_v2', "")) == "True":
+        return 2
+    return 1
