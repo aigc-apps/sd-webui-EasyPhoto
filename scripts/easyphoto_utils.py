@@ -234,7 +234,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
 def convert_to_video(path, frames, fps, mode="gif"):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
-    index = len([path for path in os.listdir(path) if path.endswith(f'.{mode}')]) + 1
+    index = len([path for path in os.listdir(path)]) + 1
     video_path = os.path.join(path, str(index).zfill(5) + f'.{mode}')
 
     if mode == "gif":

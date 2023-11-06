@@ -932,7 +932,7 @@ def on_ui_tabs():
                                     if os.path.exists(video_gif_path):
                                         video_path.append(video_gif_path)
                                         continue
-                                return gr.File.update(value=video_path, visible=True, label='Download Files')
+                                return gr.File.update(value=video_path, visible=True)
 
                             save            = gr.Button('List Recent Conversion Results', elem_id=f'save')
                             download_files  = gr.File(None, label='Download Files', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
