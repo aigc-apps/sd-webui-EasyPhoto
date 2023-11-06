@@ -6,7 +6,7 @@ import gradio as gr
 import requests
 from modules import script_callbacks, shared
 
-from scripts.easyphoto_config import (cache_log_file_path, models_path,
+from scripts.easyphoto_config import (cache_log_file_path, models_path, easyphoto_video_outpath_samples,
                                       user_id_outpath_samples)
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
@@ -916,6 +916,27 @@ def on_ui_tabs():
                             value="No task currently",
                             interactive=False
                         )
+                        with gr.Row():
+                            def save_video():
+                                if not os.path.exists(easyphoto_video_outpath_samples):
+                                    os.makedirs(easyphoto_video_outpath_samples, exist_ok=True)
+                                index = len([path for path in os.listdir(easyphoto_video_outpath_samples)]) + 1
+
+                                video_path = []
+                                for sub_index in range(max(index - 3, 0), index):
+                                    video_mp4_path = os.path.join(easyphoto_video_outpath_samples, str(sub_index).zfill(5) + '.mp4')
+                                    video_gif_path = os.path.join(easyphoto_video_outpath_samples, str(sub_index).zfill(5) + '.gif')
+                                    if os.path.exists(video_mp4_path):
+                                        video_path.append(video_mp4_path)
+                                        continue
+                                    if os.path.exists(video_gif_path):
+                                        video_path.append(video_gif_path)
+                                        continue
+                                return gr.File.update(value=video_path, visible=True, label='Download Files')
+
+                            save            = gr.Button('List Recent Conversion Results', elem_id=f'save')
+                            download_files  = gr.File(None, label='Download Files', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+                            save.click(fn=save_video, inputs=None, outputs=download_files, show_progress=False)
                     
                 display_button.click(
                     fn=easyphoto_video_infer_forward,
