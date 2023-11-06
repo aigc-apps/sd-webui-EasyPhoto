@@ -850,9 +850,9 @@ def easyphoto_infer_forward(
 
                         # Diffusion
                         if not sdxl_pipeline_flag:
-                            sub_output_image = [["canny", sub_output_image, 1.00], ["color", sub_output_image, 1.00]]
+                            controlnet_pairs = [["canny", sub_output_image, 1.00], ["color", sub_output_image, 1.00]]
                         else:
-                            sub_output_image = [["sdxl_canny_mid", sub_output_image, 1.00]]
+                            controlnet_pairs = [["sdxl_canny_mid", sub_output_image, 1.00]]
                         sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
 
                         # Paste the image back to the background 
