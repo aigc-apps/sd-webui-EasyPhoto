@@ -700,7 +700,12 @@ def easyphoto_infer_forward(
                 if min(len(template_face_safe_boxes), len(user_ids) - last_user_id_none_num) > 1:
                     ep_logger.info("Start paste crop image to origin template in multi people.")
                     template_face_safe_box = template_face_safe_boxes[index]
-                    output_image[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = np.array(loop_output_image, np.float32)[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]]
+                    output_image_mask = np.zeros_like(np.array(output_image))
+                    output_image_mask[template_face_safe_box[1]:template_face_safe_box[3], template_face_safe_box[0]:template_face_safe_box[2]] = 255
+                    output_image_mask = cv2.blur(output_image_mask, (32, 32)) / 255
+
+                    output_image = np.array(loop_output_image, np.float32) * output_image_mask + np.array(output_image) * (1 - output_image_mask)
+                    output_image = np.uint8(output_image)
                 else:
                     output_image = loop_output_image 
 
@@ -713,40 +718,58 @@ def easyphoto_infer_forward(
                     
                     if not background_restore:
                         h, w, c = np.shape(output_image)
+
+                        # Set the padding size for edge of faces
+                        background_padding_size = 50
+
+                        # Calculate the left, top, right, bottom of all faces now
                         left, top, right, bottom = [
-                            np.clip(np.min(np.array(template_face_safe_boxes)[:, 0]) - 50, 0, w - 1),
-                            np.clip(np.min(np.array(template_face_safe_boxes)[:, 1]) - 50, 0, h - 1),
-                            np.clip(np.max(np.array(template_face_safe_boxes)[:, 2]) + 50, 0, w - 1),
-                            np.clip(np.max(np.array(template_face_safe_boxes)[:, 3]) + 50, 0, h - 1)
+                            np.min(np.array(template_face_safe_boxes)[:, 0]) - background_padding_size, np.min(np.array(template_face_safe_boxes)[:, 1]) - background_padding_size, 
+                            np.max(np.array(template_face_safe_boxes)[:, 2]) + background_padding_size, np.max(np.array(template_face_safe_boxes)[:, 3]) + background_padding_size
                         ]
-                        width, height, center_x, center_y = right - left, bottom - top, (left + right) / 2, (top + bottom) / 2
+                        # Calculate the width, height, center_x, and center_y of all faces, and get the long side for rec
+                        width, height, center_x, center_y = [
+                            right - left, bottom - top, 
+                            (left + right) / 2, (top + bottom) / 2
+                        ]
+                        long_side = max(width, height)
 
-                        left, top           = int(np.clip(center_x - width // 2, 0, w - 1)), int(np.clip(center_y - height // 2, 0, h - 1))
-                        right, bottom       = int(np.clip(left + width, 0, w - 1)), int(np.clip(top + height, 0, h - 1))
+                        # Calculate the new left, top, right, bottom of all faces for clipping
+                        # Pad the box to square for saving GPU memomry
+                        left, top           = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 2, 0, h - 1))
+                        right, bottom       = int(np.clip(left + long_side, 0, w - 1)), int(np.clip(top + long_side, 0, h - 1))
 
+                        # Crop image and mask for Diffusion
                         sub_output_image    = output_image.crop([left, top, right, bottom])
                         sub_output_mask     = output_mask.crop([left, top, right, bottom])
 
-                        short_side      = min(sub_output_image.width, sub_output_image.height)
-                        if min(sub_output_image.width, sub_output_image.height) > 1024:
-                            target_short_side = 1024
-                            resize          = float(short_side / target_short_side)
+                        # get target_short_side base on the ratio of width and height
+                        if sub_output_image.width / sub_output_image.height > 1.5 or sub_output_image.height / sub_output_image.width > 1.5:
+                            target_short_side = 512
                         else:
-                            resize          = 1
-                        new_size        = (int(sub_output_image.width // resize // 32 * 32), int(sub_output_image.height // resize // 32 * 32))
+                            target_short_side = 768
+
+                        # If the short side is greater than target_short_side, we will resize the image with the short side of target_short_side
+                        short_side = min(sub_output_image.width, sub_output_image.height)
+                        if min(sub_output_image.width, sub_output_image.height) > target_short_side:
+                            resize = float(short_side / target_short_side)
+                        else:
+                            resize = 1
+                        new_size = (int(sub_output_image.width // resize // 32 * 32), int(sub_output_image.height // resize // 32 * 32))
                         sub_output_image = sub_output_image.resize(new_size, Image.Resampling.LANCZOS)
-                        import pdb
-                        pdb.set_trace()
+
+                        # Diffusion
                         controlnet_pairs = [["canny", sub_output_image, 1.00], ["color", sub_output_image, 1.00]]
                         sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
 
-                        sub_output_image = sub_output_image.resize([width, height])
-                        
+                        # Paste the image back to the background 
+                        sub_output_image = sub_output_image.resize([long_side, long_side])
                         output_image = np.array(output_image)
                         output_image[top:bottom, left:right] = np.array(sub_output_image)
                         output_image = Image.fromarray(output_image)
                     else:
                         short_side      = min(output_image.width, output_image.height)
+                        # get target_short_side base on the ratio of width and height
                         if output_image.width / output_image.height > 1.5 or output_image.height / output_image.width > 1.5:
                             target_short_side = 512
                         else:
