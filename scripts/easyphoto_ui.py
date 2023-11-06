@@ -495,7 +495,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 crop_face_preprocess = gr.Checkbox(
                                     label="Crop Face Preprocess",  
-                                    value=False
+                                    value=True
                                 )
                                 apply_face_fusion_before = gr.Checkbox(
                                     label="Apply Face Fusion Before", 
