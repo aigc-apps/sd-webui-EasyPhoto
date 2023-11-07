@@ -401,7 +401,7 @@ def easyphoto_infer_forward(
     # for final paste
     _, box_template = mask_to_box(mask2)
     if remove_target:
-        template_copy = copy.deepcopy(img2_bg)
+        template_copy = copy.deepcopy(img2_bg[:,:,::-1])
     else:
         template_copy = copy.deepcopy(img2)
     mask_copy = copy.deepcopy(mask2)
