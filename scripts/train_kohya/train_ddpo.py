@@ -6,6 +6,7 @@ import heapq
 import logging
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -32,6 +33,7 @@ from PIL import Image
 from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import ddpo_pytorch.prompts
 import ddpo_pytorch.rewards
 from ddpo_pytorch.diffusers_patch.ddim_with_logprob import ddim_step_with_logprob
