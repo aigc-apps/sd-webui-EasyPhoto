@@ -238,10 +238,10 @@ sdxl_txt2img_flag = False
 # @gpu_monitor_decorator() 
 @switch_sd_model_vae()
 def easyphoto_infer_forward(
-    sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, scene_id, additional_prompt, \
+    sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, scene_id, scene_lora_generate_sd_model_checkpoint, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, prompt_generate_sd_model_checkpoint, tabs, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
@@ -297,7 +297,7 @@ def easyphoto_infer_forward(
         elif tabs == 2:
             template_images = [file_d['name'] for file_d in uploaded_template_images]
         elif tabs == 3:
-            reload_sd_model_vae(SDXL_MODEL_NAME, "madebyollin-sdxl-vae-fp16-fix.safetensors")
+            reload_sd_model_vae(prompt_generate_sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
             ep_logger.info(sd_xl_input_prompt)
             sd_xl_resolution = eval(str(sd_xl_resolution))
             template_images = txt2img(
@@ -310,10 +310,10 @@ def easyphoto_infer_forward(
             )
             template_images = [np.uint8(template_images)]
         elif tabs == 4:
-            reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
+            reload_sd_model_vae(scene_lora_generate_sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
             sd_xl_resolution = eval(str(sd_xl_resolution))
             template_images = txt2img(
-                [], input_prompt = f"<lora:{scene_id}:0.8>" + validation_prompt_scene, \
+                [], input_prompt = validation_prompt_scene + f", 1person, <lora:{scene_id}:0.8>, ", \
                 diffusion_steps=30, width=768, height=768, \
                 default_positive_prompt="look at viewer, " + DEFAULT_POSITIVE, \
                 default_negative_prompt=DEFAULT_NEGATIVE, \

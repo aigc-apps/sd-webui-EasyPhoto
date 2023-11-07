@@ -714,10 +714,10 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, selected_scene_lora, additional_prompt, 
+                    inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, selected_scene_lora, scene_lora_generate_sd_model_checkpoint, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, state_tab, *uuids],
+                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, prompt_generate_sd_model_checkpoint, state_tab, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
