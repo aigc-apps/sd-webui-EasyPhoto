@@ -7,12 +7,15 @@ import requests
 import numpy as np
 from PIL import Image
 from modules import script_callbacks, shared
-
+import modules
 from scripts.easyphoto_config import (cache_log_file_path, models_path,
-                                      user_id_outpath_samples)
+                                      user_id_outpath_samples,easyphoto_outpath_samples)
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
+from modules import ui_common
+from modules.ui_components import ToolButton as ToolButton_webui
+import modules.generation_parameters_copypaste as parameters_copypaste
 
 gradio_compat = True
 
@@ -24,6 +27,9 @@ try:
         gradio_compat = False
 except ImportError:
     pass
+
+# def create_output_panel(tabname, outdir):
+#     return ui_common.create_output_panel(tabname, outdir)
 
 def get_external_ckpts():
     external_checkpoints = []
@@ -73,7 +79,9 @@ class ToolButton(gr.Button, gr.components.FormComponent):
 
     def get_block_name(self):
         return "button"
-    
+
+
+
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
         with gr.TabItem('Train'):
@@ -458,18 +466,35 @@ def on_ui_tabs():
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
-
+      
                         output_images = gr.Gallery(
                             label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                        with gr.Row():
+                            tabname = 'easyphoto'
+                            buttons = {
+                                'img2img': ToolButton_webui('🖼️', elem_id=f'{tabname}_send_to_img2img', tooltip="Send image and generation parameters to img2img tab."),
+                                'inpaint': ToolButton_webui('🎨️', elem_id=f'{tabname}_send_to_inpaint', tooltip="Send image and generation parameters to img2img inpaint tab."),
+                                'extras': ToolButton_webui('📐', elem_id=f'{tabname}_send_to_extras', tooltip="Send image and generation parameters to extras tab.")
+                            }
+
+                        for paste_tabname, paste_button in buttons.items():
+                            parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=output_images,
+                                paste_field_names=[]
+                            ))
+
 
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
                             value="No task currently",
                             interactive=False
                         )
-                    
+
+
+            
                 display_button.click(
                     fn=easyphoto_infer_forward,
                     inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
