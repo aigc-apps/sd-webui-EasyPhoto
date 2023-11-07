@@ -474,7 +474,10 @@ def get_lora_type(filename: str) -> int:
         metadata = sd_models.read_metadata_from_safetensors(filename)
     except Exception as e:
         errors.display(e, f"reading lora {filename}")
-    if str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):
+
+    if str(metadata.get('ep_lora_version', "")).startswith("scene"):
+        return 4
+    elif str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):
         return 3
     elif str(metadata.get('ss_v2', "")) == "True":
         return 2

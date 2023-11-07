@@ -49,6 +49,16 @@ def check_id_valid(user_id, user_id_outpath_samples, models_path):
         return False
     return True
 
+def check_scene_valid(lora_path, models_path):
+    from scripts.sdwebui import get_lora_type
+    safetensors_lora_path = os.path.join(models_path, "Lora", lora_path) 
+    if not safetensors_lora_path.endswith("safetensors"):
+        return False
+    lora_type = get_lora_type(safetensors_lora_path)
+    if lora_type == 4:
+        return True
+    return False
+
 def urldownload_progressbar(url, file_path):
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))

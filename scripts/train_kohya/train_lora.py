@@ -785,6 +785,13 @@ def parse_args():
             "The post url to get faceid."
         ),
     )
+    parser.add_argument(
+        "--train_scene_lora_bool",
+        action="store_true",
+        help=(
+            "Whether to train scene lora"
+        ),
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -1203,7 +1210,11 @@ def main():
     def save_model(ckpt_file, unwrapped_nw):
         os.makedirs(args.output_dir, exist_ok=True)
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
-        unwrapped_nw.save_weights(ckpt_file, weight_dtype, None)
+        if args.train_scene_lora_bool:
+            metadata = {"ep_lora_version": "scene"}
+        else:
+            metadata = None
+        unwrapped_nw.save_weights(ckpt_file, weight_dtype, metadata)
 
     user_id = os.path.basename(os.path.dirname(args.output_dir))
     # check log path
