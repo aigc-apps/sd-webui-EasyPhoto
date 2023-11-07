@@ -19,11 +19,12 @@
 #start #component-5 {
     display: block;
 }
-#start button {
+
+/* #start button {
     width: 40%;
     min-width: 280px;
     max-width: 500px;
-}
+} */
 
 #reference-imgs .grid-wrap {
     min-height: 0 !important;
