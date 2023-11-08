@@ -1,0 +1,32 @@
+{
+    "model_cfg": {
+        "embed_dim": 1280,
+        "vision_cfg": {
+            "image_size": 224,
+            "layers": 48,
+            "width": 1664,
+            "head_width": 104,
+            "mlp_ratio": 4.9231,
+            "patch_size": 14
+        },
+        "text_cfg": {
+            "context_length": 77,
+            "vocab_size": 49408,
+            "width": 1280,
+            "heads": 20,
+            "layers": 32
+        }
+    },
+    "preprocess_cfg": {
+        "mean": [
+            0.48145466,
+            0.4578275,
+            0.40821073
+        ],
+        "std": [
+            0.26862954,
+            0.26130258,
+            0.27577711
+        ]
+    }
+}
