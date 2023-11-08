@@ -627,7 +627,7 @@ def on_ui_tabs():
                                 cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="The Cloth on the Person in Video.", visible=True)
                             
                             t2v_input_prompt = gr.Textbox(
-                                label="Text2Video Input Prompt", interactive=False, lines=3,
+                                label="Text2Video Input Prompt", interactive=True, lines=3,
                                 value="upper-body, look at viewer, 1girl, wear white dress, black eyes, black hair, hair ornament, ray tracing and volumatic light, , (cowbody shot, realistic), daytime, , realistic, f32", visible=False
                             )
 
@@ -810,7 +810,7 @@ def on_ui_tabs():
                                     value=8,
                                 )
                                 save_as = gr.Dropdown(
-                                    value="mp4", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
+                                    value="gif", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
                                 )
 
                             with gr.Row():
