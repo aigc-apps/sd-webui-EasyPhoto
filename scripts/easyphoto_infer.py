@@ -549,7 +549,9 @@ def easyphoto_infer_forward(
                     new_size    = (int(input_image.width//resize), int(input_image.height//resize))
                 input_image = input_image.resize(new_size, Image.Resampling.LANCZOS)
 
-                if crop_face_preprocess and not sdxl_pipeline_flag:
+                if crop_face_preprocess:
+                    # In order to ensure that the size of the inpainting output image produced by webui is consistent
+                    # with the input image, the height and width of the input image need to be a multiple of 32.
                     new_width   = int(np.shape(input_image)[1] // 32 * 32)
                     new_height  = int(np.shape(input_image)[0] // 32 * 32)
                     input_image = input_image.resize([new_width, new_height], Image.Resampling.LANCZOS)
