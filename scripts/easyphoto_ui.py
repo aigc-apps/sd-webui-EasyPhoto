@@ -893,6 +893,11 @@ def on_ui_tabs():
                                     label="Video Face Shape Match",
                                     value=False
                                 )
+                            with gr.Row():
+                                video_interpolation = gr.Checkbox(
+                                    label="Video Interpolation",
+                                    value=False
+                                )
 
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
@@ -904,10 +909,18 @@ def on_ui_tabs():
                                     step=0.05, label='Video Makeup Transfer Ratio',
                                     visible=False
                                 )
-                                
                                 super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
 
+                            with gr.Row():
+                                video_interpolation_ext = gr.Slider(
+                                    minimum=1, maximum=2, value=1,
+                                    step=1, label='Video Interpolation Ratio (1 for 2x, 2 for 4x)',
+                                    visible=False
+                                )
+                                video_interpolation.change(lambda x: video_interpolation_ext.update(visible=x), inputs=[video_interpolation], outputs=[video_interpolation_ext])
+
+                                
                             with gr.Box():
                                 gr.Markdown(
                                     '''
@@ -966,7 +979,7 @@ def on_ui_tabs():
                             t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
                             first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                             color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            makeup_transfer, makeup_transfer_ratio, face_shape_match, video_model_selected_tab, *uuids],
+                            makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
                     outputs=[infer_progress, output_video, output_images]
 
                 )

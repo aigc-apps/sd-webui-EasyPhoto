@@ -40,6 +40,7 @@ from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
                              t2i_call)
+from scripts.FIRE_utils import FIRE_forward
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -1014,7 +1015,7 @@ def easyphoto_video_infer_forward(
     t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-    makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, *user_ids,
+    makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, tabs, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
@@ -1545,6 +1546,14 @@ def easyphoto_video_infer_forward(
                 for _output in _outputs:
                     _new_outputs.append(_output.crop(last_retinaface_box))
                 _outputs = _new_outputs
+
+            if video_interpolation:
+                _outputs = [np.array(_output, np.uint8) for _output in _outputs]
+                _outputs, actual_fps = FIRE_forward(
+                    _outputs, actual_fps, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"), 
+                    video_interpolation_ext, 1, fp16 = False
+                )
+                _outputs = [Image.fromarray(np.uint8(_output)) for _output in _outputs]
 
             output_video = convert_to_video(easyphoto_video_outpath_samples, _outputs, actual_fps, save_as)
 
