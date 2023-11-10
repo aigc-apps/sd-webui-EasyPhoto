@@ -4,7 +4,6 @@ from queue import Queue
 
 import cv2
 import numpy as np
-import skvideo.io
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
