@@ -274,6 +274,8 @@ def convert_to_video(path, frames, fps, mode="gif"):
                 ]
             )
         )
+        
+        return None, video_path
     else:
         frames = [np.array(frame) for frame in frames]
         frames = torch.from_numpy(np.array(frames))
@@ -281,7 +283,7 @@ def convert_to_video(path, frames, fps, mode="gif"):
             os.makedirs(os.path.dirname(video_path))
         torchvision.io.write_video(video_path, frames, fps=fps, video_codec="libx264")
     
-    return video_path
+        return video_path, None
 
 def modelscope_models_to_cpu():
     """Load models to cpu to free VRAM.
