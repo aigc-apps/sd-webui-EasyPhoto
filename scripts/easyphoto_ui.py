@@ -874,7 +874,7 @@ def on_ui_tabs():
                                 )
                                 super_resolution = gr.Checkbox(
                                     label="Video Super Resolution at last",  
-                                    value=False
+                                    value=True
                                 )
                                 skin_retouching_bool = gr.Checkbox(
                                     label="Video Skin Retouching",  
@@ -896,13 +896,13 @@ def on_ui_tabs():
                             with gr.Row():
                                 video_interpolation = gr.Checkbox(
                                     label="Video Interpolation",
-                                    value=False
+                                    value=True
                                 )
 
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
                                     value="gpen", \
-                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=False
+                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=True
                                 )
                                 makeup_transfer_ratio = gr.Slider(
                                     minimum=0.00, maximum=1.00, value=0.50,
@@ -916,7 +916,7 @@ def on_ui_tabs():
                                 video_interpolation_ext = gr.Slider(
                                     minimum=1, maximum=2, value=1,
                                     step=1, label='Video Interpolation Ratio (1 for 2x, 2 for 4x)',
-                                    visible=False
+                                    visible=True
                                 )
                                 video_interpolation.change(lambda x: video_interpolation_ext.update(visible=x), inputs=[video_interpolation], outputs=[video_interpolation_ext])
 

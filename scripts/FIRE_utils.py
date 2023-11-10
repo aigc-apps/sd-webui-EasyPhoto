@@ -12,6 +12,7 @@ from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from tqdm import tqdm
+from scripts.easyphoto_utils import switch_ms_model_cpu
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 backwarp_tenGrid = {}
@@ -266,7 +267,8 @@ def pad_image(img, padding, fp16):
         return F.pad(img, padding).half()
     else:
         return F.pad(img, padding)
-
+    
+@switch_ms_model_cpu()
 def FIRE_forward(video, fps, model_path, exp, scale, fp16 = False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
