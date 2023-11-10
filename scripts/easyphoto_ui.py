@@ -631,45 +631,45 @@ def on_ui_tabs():
                                 )
 
                             with gr.Row(visible=True) as row1:
-                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio in Video.", visible=True)
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person in Video.", visible=True)
-                                where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person in Video?", visible=True)
+                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="Gender.", visible=True)
+                                hair_color      = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the hair.", visible=True)
+                                hair_length     = gr.Dropdown(value="long", elem_id='dropdown', choices=["long", "short", "no"], label="Length of the hair.", visible=True)
+                                eyes_color      = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the eye.", visible=True)
+
                             with gr.Row(visible=True) as row2:
-                                season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season in Video?", visible=True)
-                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["none", "daytime", "night"], label="Where is the Time in Video?", visible=True)
-                                light           = gr.Dropdown(value="ray tracing and volumatic light", elem_id='dropdown', choices=["none", "ray tracing, volumatic light and colorful light", "ray tracing", "volumatic light", "best light", "colorful light"], label="Where is the light in Video?", visible=True)
+                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="Wearing of the hair.", visible=True)
+                                cloth_color     = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the Cloth.", visible=True)
+                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "short shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="Cloth on the Person.", visible=True)
+                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does Person do?", visible=True)
 
                             with gr.Row(visible=True) as row3:
-                                hair_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the hair in Video.", visible=True)
-                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="The Wear of the hair in Video.", visible=True)
-                                eyes_color      = gr.Dropdown(value="black", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the eye in Video.", visible=True)
+                                expression      = gr.Dropdown(value="shy", elem_id='dropdown', choices=["shy", "happy"], label="Expression on the face?", visible=True)
+                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="Ratio of Portrait.", visible=True)
+                                where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where.", visible=True)
+                                season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Season?", visible=True)
 
                             with gr.Row(visible=True) as row4:
-                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth in Video.", visible=True)
-                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="The Cloth on the Person in Video.", visible=True)
-                            
+                                time_of_photo   = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "at daytime", "at noot", "at night"], label="Time?", visible=True)
+
                             t2v_input_prompt = gr.Textbox(
-                                label="Text2Video Input Prompt", interactive=True, lines=3,
-                                value="upper-body, look at viewer, 1girl, wear white dress, black eyes, black hair, hair ornament, ray tracing and volumatic light, , (cowbody shot, realistic), daytime, , realistic, f32", visible=False
+                                label="Text2Video Input Prompt.", interactive=True, lines=3,
+                                value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=False
                             )
 
                             def update_t2v_input_prompt(*args):
                                 # preprocess
                                 args = ["" if arg == "none" else arg for arg in args]
-                                portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth = args
+                                gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo = args
 
-                                # first time add gender hack for XL prompt, suggest by Nenly
                                 gender_limit_prompt_girls = {'dress':'shirt'}
                                 if gender in ['boy', 'man']:
                                     if cloth in list(gender_limit_prompt_girls.keys()):
                                         cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
 
-                                input_prompt = f"{portrait_ratio}, look at viewer, 1{gender}, wear {cloth_color} {cloth}, {eyes_color} eyes, {hair_color} hair, {hair_wear}, {light}, {where}, (cowbody shot), {time_of_photo}, {season}, f32"
+                                input_prompt = f"1{gender}, ({hair_color} hair, {hair_length} hair), {eyes_color} eyes, {hair_wear}, {cloth_color} {cloth}, {doing}, looking at viewer, {expression}, {portrait_ratio}, {where}, {time_of_photo}, {season}"
                                 return input_prompt
 
-                            prompt_inputs = [
-                                portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth
-                            ]
+                            prompt_inputs = [gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo]
                             for prompt_input in prompt_inputs:
                                 prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
                                 
@@ -679,16 +679,16 @@ def on_ui_tabs():
                                         gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
                                         gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
                                         gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
-                                        gr.update(visible=False)
+                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
                                     ]
                                 else:
                                     return [
                                         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
                                         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
                                         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
-                                        gr.update(visible=True)
+                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
                                     ]
-                            t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, portrait_ratio, gender, where, season, time_of_photo, light, hair_color, hair_wear, eyes_color, cloth_color, cloth, t2v_input_prompt])
+                            t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo, t2v_input_prompt])
 
                             with gr.Row():
                                 sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
@@ -896,7 +896,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 video_interpolation = gr.Checkbox(
                                     label="Video Interpolation",
-                                    value=True
+                                    value=False
                                 )
 
                             with gr.Row():
@@ -916,11 +916,10 @@ def on_ui_tabs():
                                 video_interpolation_ext = gr.Slider(
                                     minimum=1, maximum=2, value=1,
                                     step=1, label='Video Interpolation Ratio (1 for 2x, 2 for 4x)',
-                                    visible=True
+                                    visible=False
                                 )
                                 video_interpolation.change(lambda x: video_interpolation_ext.update(visible=x), inputs=[video_interpolation], outputs=[video_interpolation_ext])
 
-                                
                             with gr.Box():
                                 gr.Markdown(
                                     '''

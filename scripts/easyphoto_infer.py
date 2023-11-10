@@ -33,14 +33,14 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      modelscope_models_to_gpu,
                                      switch_ms_model_cpu, unload_models)
 from scripts.face_process_utils import (
-    Face_Skin, call_face_crop, color_transfer, crop_and_paste, call_face_crop_templates, 
-    safe_get_box_mask_keypoints_and_padding_image)
+    Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
+    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image)
+from scripts.FIRE_utils import FIRE_forward
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
                              t2i_call)
-from scripts.FIRE_utils import FIRE_forward
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -1508,12 +1508,14 @@ def easyphoto_video_infer_forward(
                 _outputs = _new_outputs
 
             if video_interpolation:
+                modelscope_models_to_cpu()
                 _outputs = [np.array(_output, np.uint8) for _output in _outputs]
                 _outputs, actual_fps = FIRE_forward(
                     _outputs, actual_fps, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"), 
                     video_interpolation_ext, 1, fp16 = False
                 )
                 _outputs = [Image.fromarray(np.uint8(_output)) for _output in _outputs]
+                modelscope_models_to_gpu()
 
             output_video, output_gif = convert_to_video(easyphoto_video_outpath_samples, _outputs, actual_fps, save_as)
 
