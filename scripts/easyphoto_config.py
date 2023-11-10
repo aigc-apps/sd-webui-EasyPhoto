@@ -13,7 +13,7 @@ cache_log_file_path             = os.path.join(data_dir, "outputs/easyphoto-tmp/
 
 # prompts 
 validation_prompt   = "easyphoto_face, easyphoto, 1person"
-DEFAULT_POSITIVE    = '(cloth:1.5), (best quality), (realistic, photo-realistic:1.3), (detailed skin:1.3), (rough skin:1.3), (beautiful eyes:1.3)'
+DEFAULT_POSITIVE    = '(cloth:1.5), (best quality), (realistic, photo-realistic:1.3), (detailed skin:1.3), (rough skin:1.3), (beautiful eyes:1.3), (sparkling eyes:1.3), (beautiful mouth:1.3), finely detail, light smile, extremely detailed CG unity 8k wallpaper, huge filesize, best quality, realistic, photo-realistic, ultra high res, raw photo, put on makeup'
 DEFAULT_NEGATIVE    = '(bags under the eyes:1.5), (bags under eyes:1.5), (earrings:1.3), (glasses:1.2), (naked:1.5), (nsfw:1.5), nude, breasts, penis, cum, (over red lips: 1.3), (bad lips: 1.3), (bad ears:1.3), (bad hair: 1.3), (bad teeth: 1.3), (worst quality:2), (low quality:2), (normal quality:2), lowres, watermark, badhand, lowres, bad anatomy, bad hands, normal quality, mural,'
 DEFAULT_POSITIVE_AD = 'cloth, (masterpiece, best quality, high quality), (realistic:1.1), (delicate eyes and face)'
 DEFAULT_NEGATIVE_AD = '(naked:1.2), (nsfw:1.2), nipple slip, nude, breasts, penis, cum, (bags under the eyes:1.0), (bags under eyes:1.0), (earrings:1.0), (glasses:1.0), (over red lips:1.0), (bad lips:1.0), (bad ears:1.0), (bad hair:1.0), (worst quality:2.0), (low quality:2.0), (normal quality:2.0)'
