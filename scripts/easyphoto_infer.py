@@ -1522,6 +1522,8 @@ def easyphoto_video_infer_forward(
                 loop_message += "\n"
             loop_message += f"Template {str(template_idx + 1)} Success."
         except Exception as e:
+            output_video, output_gif = None, None
+            
             torch.cuda.empty_cache()
             traceback.print_exc()
             ep_logger.error(f"Template {str(template_idx + 1)} error: Error info is {e}, skip it.")
