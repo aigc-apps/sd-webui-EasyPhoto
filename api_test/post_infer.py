@@ -20,13 +20,12 @@ def decode_image_from_base64jpeg(base64_image):
     image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     return image
 
-def post(encoded_image, user_id=None, url='http://0.0.0.0:8005'):
+def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
     if user_id is None:
         user_id = 'test'
     datas = json.dumps({
         "user_ids"              : [user_id], 
-        #"sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-        "sd_model_checkpoint"   : "SDXL_1.0_ArienMixXL_v2.0.safetensors",
+        "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "init_image"            : encoded_image, 
 
         "first_diffusion_steps"     : 50,

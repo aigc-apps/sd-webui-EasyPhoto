@@ -938,10 +938,17 @@ def on_ui_tabs():
                     with gr.Column():
                         gr.Markdown('Generated Results')
 
-                        output_video = gr.Video(
-                            label='Output Video', 
-                        )
+                        output_video    = gr.Video(label='Output of Video', visible=False)
+                        output_gif      = gr.Image(label='Output of GIF')
 
+                        def update_save_as_mode(save_as_mode):
+                            if save_as_mode == "mp4":
+                                return [gr.update(visible=True), gr.update(visible=False)]
+                            else:
+                                return [gr.update(visible=False), gr.update(visible=True)]
+                            
+                        save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
+                                
                         output_images = gr.Gallery(
                             label='Output Frames',
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
@@ -980,8 +987,7 @@ def on_ui_tabs():
                             first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                             color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                             makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
-                    outputs=[infer_progress, output_video, output_images]
-
+                    outputs=[infer_progress, output_video, output_gif, output_images]
                 )
 
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]

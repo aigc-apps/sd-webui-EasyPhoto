@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+import copy
 from PIL import Image
 from skimage import transform
 
@@ -171,7 +172,6 @@ def crop_and_paste(source_image, source_image_mask, target_image, source_five_po
     output      = mask * np.float32(target_image) + (1 - mask) * np.float32(warped)
     return output
 
-
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface detect 
     retinaface_result                                           = retinaface_detection(image) 
@@ -179,6 +179,46 @@ def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
+def call_face_crop_templates(loop_template_image, retinaface_detection, crop_face_preprocess):
+    """
+    Args:
+        loop_template_image (list): A list of template images.
+        retinaface_detection: The retinaface detection model.
+        crop_face_preprocess (bool): Whether to crop face in preprocessing.
+
+    Returns:
+        input_image: A tuple containing the cropped template images and 
+        loop_template_crop_safe_box: The corresponding safe crop boxes.
+    """
+    input_image = []
+    loop_template_crop_safe_box = []
+
+    if crop_face_preprocess:
+        loop_template_retinaface_box = []
+        for _loop_template_image in loop_template_image:
+            _loop_template_retinaface_boxes, _, _ = call_face_crop(retinaface_detection, _loop_template_image, 3, "loop_template_image")
+            if len(_loop_template_retinaface_boxes) == 0:
+                continue
+            _loop_template_retinaface_box = _loop_template_retinaface_boxes[0]
+            loop_template_retinaface_box.append(_loop_template_retinaface_box)
+        if len(loop_template_retinaface_box) == 0:
+            raise ValueError("There is no face in video.")
+        # Get the enclose box of all boxes
+        loop_template_retinaface_box = np.array(loop_template_retinaface_box)
+        loop_template_retinaface_box = [np.min(loop_template_retinaface_box[:, 0]), np.min(loop_template_retinaface_box[:, 1]), np.max(loop_template_retinaface_box[:, 2]), np.max(loop_template_retinaface_box[:, 3])]
+
+    for _loop_template_image in loop_template_image:
+        # Crop the template image to retain only the portion of the portrait
+        if crop_face_preprocess:
+            _loop_template_crop_safe_box    = loop_template_retinaface_box
+            _loop_template_image            = copy.deepcopy(_loop_template_image).crop(_loop_template_crop_safe_box)
+        else:
+            _loop_template_crop_safe_box    = None
+
+        input_image.append(_loop_template_image)
+        loop_template_crop_safe_box.append(_loop_template_crop_safe_box)
+    return input_image, loop_template_crop_safe_box
 
 def color_transfer(sc, dc):
     """
