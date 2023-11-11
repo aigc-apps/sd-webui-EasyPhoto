@@ -330,9 +330,9 @@ def on_ui_tabs():
                         with gr.TabItem("text2photo") as generate_tab:
                             
                             sd_xl_resolution  = gr.Dropdown(
-                                value="(1344, 768)", elem_id='dropdown', 
+                                value="(768, 1344)", elem_id='dropdown', 
                                 choices=[(704, 1408), (768, 1344), (832, 1216), (896, 1152), (960, 1088), (1024, 1024), (1088, 960), (1152, 896), (1216, 832), (1344, 768), (1408, 704), (1536, 640), (1664, 576)], 
-                                label="The Resolution of Photo.", visible=True
+                                label="The Resolution of Photo (width x height).", visible=True
                             )
                             
                             with gr.Row():
@@ -625,9 +625,9 @@ def on_ui_tabs():
                                 t2v_mode_choose = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=shared.opts.data.get("enable_easyphoto_t2v_write_prompt_yourself", False))
 
                                 t2v_resolution = gr.Dropdown(
-                                    value="(768, 512)", elem_id='dropdown', 
+                                    value="(512, 768)", elem_id='dropdown', 
                                     choices=[(768, 512), (512, 512), (512, 768)], 
-                                    label="The Resolution of Video.", visible=True
+                                    label="The Resolution of Video (width x height).", visible=True
                                 )
 
                             with gr.Row(visible=True) as row1:

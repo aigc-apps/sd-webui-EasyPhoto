@@ -382,7 +382,7 @@ def easyphoto_infer_forward(
             sd_xl_resolution = eval(str(sd_xl_resolution))
             template_images = txt2img(
                 [], input_prompt = sd_xl_input_prompt, \
-                diffusion_steps=30, width=sd_xl_resolution[1], height=sd_xl_resolution[0], \
+                diffusion_steps=30, width=sd_xl_resolution[0], height=sd_xl_resolution[1], \
                 default_positive_prompt=DEFAULT_POSITIVE_XL, \
                 default_negative_prompt=DEFAULT_NEGATIVE_XL, \
                 seed = seed,
@@ -1178,7 +1178,7 @@ def easyphoto_video_infer_forward(
 
         template_images = txt2img(
             [], input_prompt = t2v_input_prompt, \
-            diffusion_steps=30, width=t2v_resolution[1], height=t2v_resolution[0], \
+            diffusion_steps=30, width=t2v_resolution[0], height=t2v_resolution[1], \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras", 
