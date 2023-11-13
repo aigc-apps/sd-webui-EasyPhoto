@@ -968,15 +968,15 @@ def on_ui_tabs():
                                 video_path = []
                                 video_crop_path = []
                                 for sub_index in range(max(index - 3, 0), index):
-                                    video_mp4_path = os.path.join(origin_path, str(sub_index).zfill(5) + '.mp4')
-                                    video_gif_path = os.path.join(origin_path, str(sub_index).zfill(5) + '.gif')
+                                    video_mp4_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.mp4')
+                                    video_gif_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.gif')
                                     for _video_path in [video_mp4_path, video_gif_path]:
                                         if os.path.exists(_video_path):
                                             video_path.append(_video_path)
                                             continue
 
-                                    video_mp4_crop_path = os.path.join(crop_path, str(sub_index).zfill(5) + "_crop" + '.mp4')
-                                    video_gif_crop_path = os.path.join(crop_path, str(sub_index).zfill(5) + "_crop" + '.gif')
+                                    video_mp4_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.mp4')
+                                    video_gif_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.gif')
                                     for _video_path in [video_mp4_crop_path, video_gif_crop_path]:
                                         if os.path.exists(_video_path):
                                             video_crop_path.append(_video_path)
