@@ -19,6 +19,7 @@ import math
 import os
 import random
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Dict
@@ -42,6 +43,7 @@ from packaging import version
 from torchvision import transforms
 from tqdm.auto import tqdm
 
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from utils.lora_diffusers import merge_lora_weights
 import utils.lora_utils as network_module
 
