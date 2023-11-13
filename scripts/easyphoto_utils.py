@@ -242,7 +242,7 @@ def convert_to_video(path, frames, fps, prefix = None, mode="gif"):
         os.makedirs(path, exist_ok=True)
     index = len([path for path in os.listdir(path)]) + 1
     if prefix is None:
-        prefix = str(index).zfill(5)
+        prefix = str(index).zfill(8)
     video_path = os.path.join(path, prefix + f'.{mode}')
 
     if mode == "gif":
