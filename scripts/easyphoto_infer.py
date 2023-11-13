@@ -1485,6 +1485,18 @@ def easyphoto_video_infer_forward(
                 frame_idx += 1
                 _outputs.append(_input_image)
 
+            if video_interpolation:
+                modelscope_models_to_cpu()
+                _outputs = [np.array(_output, np.uint8) for _output in _outputs]
+                _outputs, actual_fps = FIRE_forward(
+                    _outputs, actual_fps, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"), 
+                    video_interpolation_ext, 1, fp16 = False
+                )
+                _outputs = [Image.fromarray(np.uint8(_output)) for _output in _outputs]
+                modelscope_models_to_gpu()
+
+            output_video, output_gif, prefix = convert_to_video(os.path.join(easyphoto_video_outpath_samples, "origin"), _outputs, actual_fps, mode = save_as)
+
             if crop_at_last:
                 # get max box of face 
                 last_retinaface_box = []
@@ -1505,19 +1517,7 @@ def easyphoto_video_infer_forward(
                 _new_outputs = []
                 for _output in _outputs:
                     _new_outputs.append(_output.crop(last_retinaface_box))
-                _outputs = _new_outputs
-
-            if video_interpolation:
-                modelscope_models_to_cpu()
-                _outputs = [np.array(_output, np.uint8) for _output in _outputs]
-                _outputs, actual_fps = FIRE_forward(
-                    _outputs, actual_fps, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"), 
-                    video_interpolation_ext, 1, fp16 = False
-                )
-                _outputs = [Image.fromarray(np.uint8(_output)) for _output in _outputs]
-                modelscope_models_to_gpu()
-
-            output_video, output_gif = convert_to_video(easyphoto_video_outpath_samples, _outputs, actual_fps, save_as)
+                output_video, output_gif, _ = convert_to_video(os.path.join(easyphoto_video_outpath_samples, "crop"), _new_outputs, actual_fps, prefix = prefix + "_crop", mode = save_as)
 
             outputs += _outputs
             if loop_message != "":

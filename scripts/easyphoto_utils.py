@@ -237,11 +237,13 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
     image_list = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in image_list]
     return image_list, required_fps
 
-def convert_to_video(path, frames, fps, mode="gif"):
+def convert_to_video(path, frames, fps, prefix = None, mode="gif"):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
     index = len([path for path in os.listdir(path)]) + 1
-    video_path = os.path.join(path, str(index).zfill(5) + f'.{mode}')
+    if prefix is None:
+        prefix = str(index).zfill(5)
+    video_path = os.path.join(path, prefix + f'.{mode}')
 
     if mode == "gif":
         import imageio.v3 as imageio
@@ -275,7 +277,7 @@ def convert_to_video(path, frames, fps, mode="gif"):
             )
         )
         
-        return None, video_path
+        return None, video_path, prefix
     else:
         frames = [np.array(frame) for frame in frames]
         frames = torch.from_numpy(np.array(frames))
@@ -283,7 +285,7 @@ def convert_to_video(path, frames, fps, mode="gif"):
             os.makedirs(os.path.dirname(video_path))
         torchvision.io.write_video(video_path, frames, fps=fps, video_codec="libx264")
     
-        return video_path, None
+        return video_path, None, prefix
 
 def modelscope_models_to_cpu():
     """Load models to cpu to free VRAM.
