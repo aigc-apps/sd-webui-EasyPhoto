@@ -3,12 +3,16 @@ import os
 import time
 
 import gradio as gr
+import modules.generation_parameters_copypaste as parameters_copypaste
 import requests
 from modules import script_callbacks, shared
-
-from scripts.easyphoto_config import (cache_log_file_path, models_path, easyphoto_video_outpath_samples,
-                                      user_id_outpath_samples)
-from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
+from modules.ui_components import ToolButton as ToolButton_webui
+from scripts.easyphoto_config import (cache_log_file_path,
+                                      easyphoto_outpath_samples,
+                                      easyphoto_video_outpath_samples,
+                                      models_path, user_id_outpath_samples)
+from scripts.easyphoto_infer import (easyphoto_infer_forward,
+                                     easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
 from scripts.sdwebui import get_checkpoint_type
@@ -409,6 +413,20 @@ def on_ui_tabs():
                             )
 
                         with gr.Row():
+                            infer_note = gr.Markdown(
+                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
+                                visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                            )
+                        
+                            def update_infer_note(sd_model_checkpoint):
+                                # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
+                                if sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
+                                    return gr.Markdown.update(visible=False)
+                                return gr.Markdown.update(visible=True)
+                            
+                            sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
+
+                        with gr.Row():
                             def select_function():
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
@@ -585,6 +603,21 @@ def on_ui_tabs():
                             label='Output',
                             show_label=False
                         ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                        with gr.Row():
+                            tabname = 'easyphoto'
+                            buttons = {
+                                'img2img': ToolButton_webui('🖼️', elem_id=f'{tabname}_send_to_img2img', tooltip="Send image and generation parameters to img2img tab."),
+                                'inpaint': ToolButton_webui('🎨️', elem_id=f'{tabname}_send_to_inpaint', tooltip="Send image and generation parameters to img2img inpaint tab."),
+                                'extras': ToolButton_webui('📐', elem_id=f'{tabname}_send_to_extras', tooltip="Send image and generation parameters to extras tab.")
+                            }
+
+                        for paste_tabname, paste_button in buttons.items():
+                            parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=output_images,
+                                paste_field_names=[]
+                            ))
+
 
                         face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
                         face_id_outputs = gr.Gallery(
