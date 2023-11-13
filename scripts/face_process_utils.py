@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+import copy
 from PIL import Image
 from skimage import transform
 
@@ -28,7 +29,7 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_keypoints = []
         retinaface_mask_pils = []
         for index in range(len(retinaface_result['boxes'])):
-            # 获得retinaface的box并做扩充
+            # Obtain the box of reinface and expand it
             retinaface_box      = np.array(retinaface_result['boxes'][index])
             face_width          = retinaface_box[2] - retinaface_box[0]
             face_height         = retinaface_box[3] - retinaface_box[1]
@@ -39,12 +40,12 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
             retinaface_box      = np.array(retinaface_box, np.int32)
             retinaface_boxs.append(retinaface_box)
 
-            # 检测关键点
+            # Detect key points
             retinaface_keypoint = np.reshape(retinaface_result['keypoints'][index], [5, 2])
             retinaface_keypoint = np.array(retinaface_keypoint, np.float32)
             retinaface_keypoints.append(retinaface_keypoint)
 
-            # mask部分
+            # mask part
             retinaface_crop     = image.crop(np.int32(retinaface_box))
             retinaface_mask     = np.zeros_like(np.array(image, np.uint8))
             if mask_type == "skin":
@@ -69,6 +70,68 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_mask_pil     = Image.fromarray(np.uint8(retinaface_mask))
             
         return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
+def safe_get_box_mask_keypoints_and_padding_image(image, retinaface_detection, crop_ratio):
+    """
+    Get the face bounding box and padding image safely.
+
+    Args:
+        image (PIL.Image.Image): Input image.
+        retinaface_detection: RetinaFace detection model.
+        crop_ratio (float): expand ratio of face for padding.
+
+    Returns:
+        image (PIL.Image.Image): Padded image.
+        retinaface_box (numpy.ndarray): Bounding box coordinates.
+        retinaface_keypoint (numpy.ndarray): Key points coordinates.
+        retinaface_mask_pil (PIL.Image.Image): Mask image.
+        padding_size (int): Padding size.
+
+    """
+    h, w, c             = np.shape(image)
+    retinaface_result   = retinaface_detection(image) 
+
+    # Check if face is detected
+    if len(retinaface_result['boxes']) == 0:
+        return None, None, None, None, None
+    retinaface_box      = np.array(retinaface_result['boxes'][0])
+
+    middle_x = (retinaface_box[0] + retinaface_box[2]) / 2
+    middle_y = (retinaface_box[1] + retinaface_box[3]) / 2
+    width    = retinaface_box[2] - retinaface_box[0]
+    height   = retinaface_box[3] - retinaface_box[1]
+    border_length = max(width, height) 
+
+    left    = middle_x - border_length * (crop_ratio - 1) / 2
+    top     = middle_y - border_length * (crop_ratio - 1) / 2
+    right   = left + border_length * (crop_ratio - 1)
+    bottom  = top + border_length * (crop_ratio - 1)
+
+    # Padding border for crop
+    padding_left    = -left
+    padding_top     = -top
+    padding_right   = -(w - right)
+    padding_bottom  = -(h - bottom)
+    padding_size    = int(max([padding_left, padding_top, padding_right, padding_bottom]) + 20)
+
+    # Pad the image with white pixels
+    if padding_size >= 0:
+        image = np.pad(np.array(image, np.uint8), [[int(padding_size), int(padding_size)], [int(padding_size), int(padding_size)], [0, 0]], constant_values=255, mode='constant')
+    image = Image.fromarray(np.uint8(image))
+    
+    # Detect key points
+    retinaface_keypoint = np.reshape(retinaface_result['keypoints'][0], [5, 2])
+    retinaface_keypoint = np.array(retinaface_keypoint, np.float32)
+    retinaface_keypoint = retinaface_keypoint + padding_size
+
+    retinaface_box = np.array([left, top, right, bottom], np.int32) + padding_size
+    
+    # Create mask image
+    retinaface_mask = np.zeros_like(np.array(image, np.uint8))
+    retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+    retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
+
+    return image, retinaface_box, retinaface_keypoint, retinaface_mask_pil, padding_size
 
 def crop_and_paste(source_image, source_image_mask, target_image, source_five_point, target_five_point, source_box):
     """
@@ -98,7 +161,7 @@ def crop_and_paste(source_image, source_image_mask, target_image, source_five_po
     source_five_point, target_five_point    = np.array(source_five_point), np.array(target_five_point)
 
     tform = transform.SimilarityTransform()
-    # 程序直接估算出转换矩阵M
+    # The program directly estimates the transformation matrix M
     tform.estimate(source_five_point, target_five_point)
     M = tform.params[0:2, :]
 
@@ -109,7 +172,6 @@ def crop_and_paste(source_image, source_image_mask, target_image, source_five_po
     output      = mask * np.float32(target_image) + (1 - mask) * np.float32(warped)
     return output
 
-
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface detect 
     retinaface_result                                           = retinaface_detection(image) 
@@ -117,6 +179,46 @@ def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
+def call_face_crop_templates(loop_template_image, retinaface_detection, crop_face_preprocess):
+    """
+    Args:
+        loop_template_image (list): A list of template images.
+        retinaface_detection: The retinaface detection model.
+        crop_face_preprocess (bool): Whether to crop face in preprocessing.
+
+    Returns:
+        input_image: A tuple containing the cropped template images and 
+        loop_template_crop_safe_box: The corresponding safe crop boxes.
+    """
+    input_image = []
+    loop_template_crop_safe_box = []
+
+    if crop_face_preprocess:
+        loop_template_retinaface_box = []
+        for _loop_template_image in loop_template_image:
+            _loop_template_retinaface_boxes, _, _ = call_face_crop(retinaface_detection, _loop_template_image, 3, "loop_template_image")
+            if len(_loop_template_retinaface_boxes) == 0:
+                continue
+            _loop_template_retinaface_box = _loop_template_retinaface_boxes[0]
+            loop_template_retinaface_box.append(_loop_template_retinaface_box)
+        if len(loop_template_retinaface_box) == 0:
+            raise ValueError("There is no face in video.")
+        # Get the enclose box of all boxes
+        loop_template_retinaface_box = np.array(loop_template_retinaface_box)
+        loop_template_retinaface_box = [np.min(loop_template_retinaface_box[:, 0]), np.min(loop_template_retinaface_box[:, 1]), np.max(loop_template_retinaface_box[:, 2]), np.max(loop_template_retinaface_box[:, 3])]
+
+    for _loop_template_image in loop_template_image:
+        # Crop the template image to retain only the portion of the portrait
+        if crop_face_preprocess:
+            _loop_template_crop_safe_box    = loop_template_retinaface_box
+            _loop_template_image            = copy.deepcopy(_loop_template_image).crop(_loop_template_crop_safe_box)
+        else:
+            _loop_template_crop_safe_box    = None
+
+        input_image.append(_loop_template_image)
+        loop_template_crop_safe_box.append(_loop_template_crop_safe_box)
+    return input_image, loop_template_crop_safe_box
 
 def color_transfer(sc, dc):
     """
