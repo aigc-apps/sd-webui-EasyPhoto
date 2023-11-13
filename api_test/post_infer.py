@@ -94,7 +94,7 @@ if __name__ == '__main__':
         outputs = post(encoded_image)
         outputs = json.loads(outputs)
         image = decode_image_from_base64jpeg(outputs["outputs"][0])
-        toutput_path = os.path.join(os.path.join(output_path), img_path.split('/')[-1])
+        toutput_path = os.path.join(os.path.join(output_path), "tmp.jpg")
         cv2.imwrite(toutput_path, image)
 
     # When selecting a local file as a parameter input.

@@ -1,5 +1,6 @@
-import os
+import copy
 import logging
+import os
 from contextlib import ContextDecorator
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -8,15 +9,19 @@ import gradio as gr
 import modules
 import modules.scripts as scripts
 import numpy as np
-from scripts.easyphoto_utils import ep_logger
-from modules import cache, errors, processing, scripts, sd_models, sd_samplers, shared, sd_vae
+from modules import (cache, errors, processing, scripts, sd_models,
+                     sd_samplers, sd_vae, shared)
 from modules.api.models import *
 from modules.paths import models_path
-from modules.processing import StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
+from modules.processing import (Processed, StableDiffusionProcessing,
+                                StableDiffusionProcessingImg2Img,
+                                StableDiffusionProcessingTxt2Img)
 from modules.sd_models import get_closet_checkpoint_match, load_model
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
 from modules.timer import Timer
+from scripts.animatediff_utils import AnimateDiffProcess, motion_module
+from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
@@ -87,7 +92,7 @@ class ControlNetUnit:
         model: Optional[str]=None,
         weight: float=1.0,
         image: Optional[InputImage]=None,
-        resize_mode: Union[ResizeMode, int, str] = ResizeMode.INNER_FIT,
+        resize_mode: Union[int, str] = 1,
         low_vram: bool=False,
         processor_res: int=-1,
         threshold_a: float=-1,
@@ -95,7 +100,8 @@ class ControlNetUnit:
         guidance_start: float=0.0,
         guidance_end: float=1.0,
         pixel_perfect: bool=False,
-        control_mode: Union[ControlMode, int, str] = ControlMode.BALANCED,
+        control_mode: Union[int, str] = 0,
+        batch_images = [],
         **_kwargs,
     ):
         self.enabled = enabled
@@ -112,6 +118,7 @@ class ControlNetUnit:
         self.guidance_end = guidance_end
         self.pixel_perfect = pixel_perfect
         self.control_mode = control_mode
+        self.batch_images = batch_images
 
     def __eq__(self, other):
         if not isinstance(other, ControlNetUnit):
@@ -252,7 +259,58 @@ def t2i_call(
         controlnet_units: List[ControlNetUnit] = [],
         use_deprecated_controlnet=False,
         outpath_samples = "",
+        sd_vae = None, 
+        sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        animatediff_flag=False,
+        animatediff_video_length=0,
+        animatediff_fps=0,
 ):
+    """
+    Perform text-to-image generation.
+
+    Args:
+        resize_mode (int): Resize mode.
+        prompt (str): Prompt text.
+        styles (list): List of styles.
+        seed (int): Seed value.
+        subseed (int): Subseed value.
+        subseed_strength (int): Subseed strength.
+        seed_resize_from_h (int): Seed resize height.
+        seed_resize_from_w (int): Seed resize width.
+        batch_size (int): Batch size.
+        n_iter (int): Number of iterations.
+        steps (list): List of steps.
+        cfg_scale (float): Configuration scale.
+        width (int): Output image width.
+        height (int): Output image height.
+        restore_faces (bool): Restore faces flag.
+        tiling (bool): Tiling flag.
+        do_not_save_samples (bool): Do not save samples flag.
+        do_not_save_grid (bool): Do not save grid flag.
+        negative_prompt (str): Negative prompt text.
+        eta (float): Eta value.
+        s_churn (int): Churn value.
+        s_tmax (int): Tmax value.
+        s_tmin (int): Tmin value.
+        s_noise (int): Noise value.
+        override_settings (dict): Dictionary of override settings.
+        override_settings_restore_afterwards (bool): Flag to restore override settings afterwards.
+        sampler (object): Sampler object.
+        include_init_images (bool): Include initial images flag.
+        controlnet_units (List[ControlNetUnit]): List of control net units.
+        use_deprecated_controlnet (bool): Use deprecated control net flag.
+        outpath_samples (str): Output path for samples.
+        sd_vae (str): VAE model checkpoint.
+        sd_model_checkpoint (str): Model checkpoint.
+        animatediff_flag (bool): Animatediff flag.
+        animatediff_video_length (int): Animatediff video length.
+        animatediff_fps (int): Animatediff video FPS.
+
+    Returns:
+        gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
+            When animatediff_flag is True, outputs is list.
+            When animatediff_flag is False, outputs is PIL.Image.Image.
+    """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
@@ -286,30 +344,50 @@ def t2i_call(
     p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
-    for alwayson_scripts in modules.scripts.scripts_txt2img.alwayson_scripts:
+    if animatediff_flag:
+        before_opts             = copy.deepcopy(opts.return_mask)
+        opts.return_mask        = False
+        
+        animate_diff_process    = AnimateDiffProcess(
+            enable=True, video_length=animatediff_video_length, fps=animatediff_fps
+        )
+        controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
+    else:
+        animate_diff_process    = None
+
+    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
                 continue
-            if alwayson_scripts.name=='controlnet':
+            if alwayson_scripts.name == 'controlnet':
                 p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
-            if alwayson_scripts.title().lower()=='controlnet':
+            if alwayson_scripts.title().lower() == 'controlnet':
                 p_txt2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.title().lower() == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
 
     processed = processing.process_images(p_txt2img)
+    if animatediff_flag:
+        opts.return_mask = before_opts
 
-    if len(processed.images) > 1:
-        # get the generate image!
-        h_0, w_0, c_0 = np.shape(processed.images[0])
-        h_1, w_1, c_1 = np.shape(processed.images[1])
-        if w_1 != w_0:
-            gen_image = processed.images[1]
+    if animatediff_flag:
+        gen_image = processed.images
+    else:
+        if len(processed.images) > 1:
+            # get the generate image!
+            h_0, w_0, c_0 = np.shape(processed.images[0])
+            h_1, w_1, c_1 = np.shape(processed.images[1])
+            if w_1 != w_0:
+                gen_image = processed.images[1]
+            else:
+                gen_image = processed.images[0]
         else:
             gen_image = processed.images[0]
-    else:
-        gen_image = processed.images[0]
     return gen_image
 
 def i2i_inpaint_call(
@@ -353,12 +431,73 @@ def i2i_inpaint_call(
         sampler=None, 
         include_init_images=False,
 
-        controlnet_units: List[ControlNetUnit] = [],
+        controlnet_units: List[ControlNetUnit]=[],
         use_deprecated_controlnet=False,
-        outpath_samples = "",
-        sd_vae = "vae-ft-mse-840000-ema-pruned.ckpt", 
-        sd_model_checkpoint = "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        outpath_samples="",
+        sd_vae="vae-ft-mse-840000-ema-pruned.ckpt", 
+        sd_model_checkpoint="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        animatediff_flag=False,
+        animatediff_video_length=0,
+        animatediff_fps=0,
+        animatediff_reserve_scale=1,
+        animatediff_last_image=None,
 ):
+    """
+    Perform image-to-image inpainting.
+
+    Args:
+        images (list): List of input images.
+        resize_mode (int): Resize mode.
+        denoising_strength (float): Denoising strength.
+        image_cfg_scale (float): Image configuration scale.
+        mask_image (PIL.Image.Image): Mask image.
+        mask_blur (int): Mask blur strength.
+        inpainting_fill (int): Inpainting fill value.
+        inpaint_full_res (bool): Flag to inpaint at full resolution.
+        inpaint_full_res_padding (int): Padding size for full resolution inpainting.
+        inpainting_mask_invert (int): Invert the mask flag.
+        initial_noise_multiplier (int): Initial noise multiplier.
+        prompt (str): Prompt text.
+        styles (list): List of styles.
+        seed (int): Seed value.
+        subseed (int): Subseed value.
+        subseed_strength (int): Subseed strength.
+        seed_resize_from_h (int): Seed resize height.
+        seed_resize_from_w (int): Seed resize width.
+        batch_size (int): Batch size.
+        n_iter (int): Number of iterations.
+        steps (list): List of steps.
+        cfg_scale (float): Configuration scale.
+        width (int): Output image width.
+        height (int): Output image height.
+        restore_faces (bool): Restore faces flag.
+        tiling (bool): Tiling flag.
+        do_not_save_samples (bool): Do not save samples flag.
+        do_not_save_grid (bool): Do not save grid flag.
+        negative_prompt (str): Negative prompt text.
+        eta (float): Eta value.
+        s_churn (int): Churn value.
+        s_tmax (int): Tmax value.
+        s_tmin (int): Tmin value.
+        s_noise (int): Noise value.
+        override_settings (dict): Dictionary of override settings.
+        override_settings_restore_afterwards (bool): Flag to restore override settings afterwards.
+        sampler: Sampler.
+        include_init_images (bool): Include initial images flag.
+        controlnet_units (List[ControlNetUnit]): List of control net units.
+        use_deprecated_controlnet (bool): Use deprecated control net flag.
+        outpath_samples (str): Output path for samples.
+        sd_vae (str): VAE model checkpoint.
+        sd_model_checkpoint (str): Model checkpoint.
+        animatediff_flag (bool): Animatediff flag.
+        animatediff_video_length (int): Animatediff video length.
+        animatediff_fps (int): Animatediff video FPS.
+
+    Returns:
+        gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
+            When animatediff_flag is True, outputs is list.
+            When animatediff_flag is False, outputs is PIL.Image.Image.
+    """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
@@ -404,32 +543,54 @@ def i2i_inpaint_call(
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
+    if animatediff_flag:
+        before_opts             = copy.deepcopy(opts.return_mask)
+        opts.return_mask        = False
+        
+        animate_diff_process    = AnimateDiffProcess(
+            enable=True, video_length=len(images) if animatediff_video_length == 0 else animatediff_video_length, 
+            fps=animatediff_fps, i2i_reserve_scale=animatediff_reserve_scale, last_frame = animatediff_last_image,
+            latent_scale=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 3), 
+            latent_scale_last=len(images) if animatediff_video_length == 0 else int(animatediff_video_length / 4 * 1)
+        )
+        controlnet_units        = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
+    else:
+        animate_diff_process    = None
+
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
                 continue
-            if alwayson_scripts.name=='controlnet':
+            if alwayson_scripts.name == 'controlnet':
                 p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.name == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
-            if alwayson_scripts.title().lower()=='controlnet':
+            if alwayson_scripts.title().lower() == 'controlnet':
                 p_img2img.script_args[alwayson_scripts.args_from:alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
+            if alwayson_scripts.title().lower() == 'animatediff_easyphoto' and animate_diff_process is not None:
+                p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
 
     processed = processing.process_images(p_img2img)
+    if animatediff_flag:
+        opts.return_mask = before_opts
 
-    if len(processed.images) > 1:
-        # get the generate image!
-        h_0, w_0, c_0 = np.shape(processed.images[0])
-        h_1, w_1, c_1 = np.shape(processed.images[1])
-        if w_1 != w_0:
-            gen_image = processed.images[1]
+    if animatediff_flag:
+        gen_image = processed.images
+    else:
+        if len(processed.images) > 1:
+            # get the generate image!
+            h_0, w_0, c_0 = np.shape(processed.images[0])
+            h_1, w_1, c_1 = np.shape(processed.images[1])
+            if w_1 != w_0:
+                gen_image = processed.images[1]
+            else:
+                gen_image = processed.images[0]
         else:
             gen_image = processed.images[0]
-    else:
-        gen_image = processed.images[0]
     return gen_image
-
 
 def get_checkpoint_type(sd_model_checkpoint: str) -> int:
     """Get the type of the stable diffusion model given the checkpoint name.

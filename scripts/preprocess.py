@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
                 h, w, c     = np.shape(image)
 
-                retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 3, prefix="tmp")
+                retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 4, prefix="tmp")
                 retinaface_box      = retinaface_boxes[0]
                 retinaface_keypoint = retinaface_keypoints[0]
 
@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
                 # Calculate the new left, top, right, bottom of all faces for clipping
                 # Pad the box to square for saving GPU memomry
-                left, top           = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 2, 0, h - 1))
+                left, top           = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 4, 0, h - 1))
                 right, bottom       = int(np.clip(left + long_side, 0, w - 1)), int(np.clip(top + long_side, 0, h - 1))
                 
                 retinaface_box      = [left, top, right, bottom]
