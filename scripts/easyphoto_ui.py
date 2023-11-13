@@ -981,7 +981,6 @@ def on_ui_tabs():
                                         if os.path.exists(_video_path):
                                             video_crop_path.append(_video_path)
                                             continue
-                                print(video_path, video_crop_path)
                                 return gr.File.update(value=video_path, visible=True), gr.File.update(value=video_crop_path, visible=True)
 
                             save = gr.Button('List Recent Conversion Results', elem_id=f'save')
