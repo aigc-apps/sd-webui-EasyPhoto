@@ -1520,6 +1520,7 @@ def easyphoto_video_infer_forward(
                 for _output in _outputs:
                     _new_outputs.append(_output.crop(last_retinaface_box))
                 output_video, output_gif, _ = convert_to_video(os.path.join(easyphoto_video_outpath_samples, "crop"), _new_outputs, actual_fps, prefix = prefix + "_crop", mode = save_as)
+                _outputs = _new_outputs
 
             outputs += _outputs
             if loop_message != "":
