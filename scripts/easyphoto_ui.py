@@ -415,7 +415,7 @@ def on_ui_tabs():
                         with gr.Row():
                             infer_note = gr.Markdown(
                                 value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                                visible=(sd_model_checkpoint.value != shared.opts.sd_model_checkpoint.split(" ")[0])
                             )
                         
                             def update_infer_note(sd_model_checkpoint):
@@ -558,6 +558,15 @@ def on_ui_tabs():
                                     label="Face Shape Match",
                                     value=False
                                 )
+                                ip_adapter_control = gr.Checkbox(
+                                    label="IP-Adapter Control",
+                                    value=False
+                                )
+                            with gr.Row():
+                                upload_ref_image = gr.Checkbox(
+                                    label="Upload Reference Image",
+                                    value=False
+                                )
 
                             with gr.Row():
                                 super_resolution_method = gr.Dropdown(
@@ -574,10 +583,21 @@ def on_ui_tabs():
                                     step=0.05, label='Makeup Transfer Ratio',
                                     visible=False
                                 )
+                                ip_adapter_weight = gr.Slider(
+                                    minimum=0.10, maximum=1.00, value=0.70,
+                                    step=0.05, label="IP-Adapter Control Weight",
+                                    visible=False
+                                )
                                 
                                 super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
+                                ip_adapter_control.change(lambda x: ip_adapter_weight.update(visible=x), inputs=[ip_adapter_control], outputs=[ip_adapter_weight])
+                            
+                            uploaded_ref_image_path = None
+                            with gr.Row():
+                                uploaded_ref_image_path = gr.Image(label="Reference Image", show_label=True, source="upload", type="filepath", visible=False)
+                            upload_ref_image.change(lambda x: uploaded_ref_image_path.update(visible=x), inputs=[upload_ref_image], outputs=[uploaded_ref_image_path])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -640,7 +660,8 @@ def on_ui_tabs():
                     inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
+                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, \
+                            ip_adapter_control, ip_adapter_weight, uploaded_ref_image_path, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )

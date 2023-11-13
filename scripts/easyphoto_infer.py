@@ -10,11 +10,11 @@ import torch
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from modules import shared, sd_models, sd_vae
+from modules import shared
 from modules.images import save_image
 from modules.paths import models_path
 from modules.shared import opts
-from PIL import Image
+from PIL import Image, ImageChops, ImageOps
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_XL,
                                       DEFAULT_POSITIVE, DEFAULT_POSITIVE_XL,
                                       SDXL_MODEL_NAME,
@@ -34,6 +34,7 @@ from scripts.sdwebui import (i2i_inpaint_call, reload_sd_model_vae,
                              switch_sd_model_vae, t2i_call,
                              get_checkpoint_type, get_lora_type)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
+from scripts.sdwebui import ControlNetUnit
 
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -135,6 +136,26 @@ def get_controlnet_unit(unit, input_image, weight):
             threshold_a=1,
             threshold_b=200,
             model='control_v11f1e_sd15_tile'
+        )
+    elif unit == "ipa_plus_face":
+        control_unit = ControlNetUnit(
+            image=np.asarray(input_image),
+            module="ip-adapter_clip_sd15",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="ip-adapter-plus-face_sd15",
+        )
+    elif unit == "ipa_sdxl_plus_face":
+        control_unit = dict(
+            input_image={"image": np.asarray(input_image), "mask": None},
+            module="ip-adapter_clip_sdxl_plus_vith",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="ip-adapter-plus-face_sdxl_vit-h",
         )
     return control_unit
 
@@ -241,7 +262,8 @@ def easyphoto_infer_forward(
     sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
     before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids,
+    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, \
+    ip_adapter_control, ip_adapter_weight, uploaded_ref_image_path, *user_ids,
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
@@ -283,6 +305,11 @@ def easyphoto_infer_forward(
 
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
+    
+    max_control_net_unit_count = 3 if not ip_adapter_control else 4
+    if shared.opts.data.get("control_net_unit_count") < max_control_net_unit_count:
+        return "Please go to Settings/ControlNet and at least set {} for "
+        "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count), [], []
 
     # get random seed 
     if int(seed) == -1:
@@ -416,10 +443,14 @@ def easyphoto_infer_forward(
                 face_id_image_path  = best_outputs_paths[0]
             else:
                 face_id_image_path  = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
-            roop_image_path         = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
 
-            face_id_image           = Image.open(face_id_image_path).convert("RGB")
-            roop_image              = Image.open(roop_image_path).convert("RGB")
+            face_id_image = Image.open(face_id_image_path).convert("RGB")
+            if uploaded_ref_image_path is not None:
+                roop_image = Image.open(uploaded_ref_image_path)
+                roop_image = ImageOps.exif_transpose(roop_image).convert("RGB")
+            else:
+                roop_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+                roop_image = Image.open(roop_image_path).convert("RGB")
 
             # Crop user images to obtain portrait boxes, facial keypoints, and masks
             _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(retinaface_detection, face_id_image, multi_user_facecrop_ratio, "face_id")
@@ -534,6 +565,27 @@ def easyphoto_infer_forward(
                     input_image = copy.deepcopy(loop_template_image).crop(loop_template_crop_safe_box)
                 else:
                     input_image = copy.deepcopy(loop_template_image)
+                
+                # The cropped face area (square) in the reference image will be used in IP-Adapter.
+                if ip_adapter_control:
+                    roop_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, roop_images[index], 1, "crop")
+                    roop_face_safe_box = roop_face_safe_boxes[0]
+                    roop_face_width = roop_face_safe_box[2] - roop_face_safe_box[0]
+                    roop_mask = face_skin(roop_images[index], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+                    roop_kernel_size = np.ones((int(roop_face_width//10), int(roop_face_width//10)), np.uint8)
+                    # Fill small holes with a close operation
+                    roop_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(roop_mask), cv2.MORPH_CLOSE, roop_kernel_size)))
+                    # Use dilate to reconstruct the surrounding area of the face
+                    # roop_mask = Image.fromarray(np.uint8(cv2.dilate(np.array(roop_mask), roop_kernel_size, iterations=1)))
+
+                    roop_image_face = ImageChops.multiply(roop_images[index], roop_mask)
+                    roop_image_face = roop_image_face.crop(roop_face_safe_boxes[0])
+                    roop_face_width, roop_face_height = roop_image_face.size
+                    if roop_face_width > roop_face_height:
+                        padded_size = (roop_face_width, roop_face_width)
+                    else:
+                        padded_size = (roop_face_height, roop_face_height)
+                    roop_image_face = ImageOps.pad(roop_image_face, padded_size, color=(0, 0, 0))
 
                 if sdxl_pipeline_flag:
                     # Fix total pixels in the generated image in SDXL.
@@ -616,13 +668,22 @@ def easyphoto_infer_forward(
                 ep_logger.info("Start First diffusion.")
                 if not face_shape_match:
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                    if ip_adapter_control:
+                        controlnet_pairs.append(["ipa_plus_face", roop_image_face, ip_adapter_weight])
+
                     if sdxl_pipeline_flag:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
+                        if ip_adapter_control:
+                            controlnet_pairs.append(["ipa_sdxl_plus_face", roop_image_face, ip_adapter_weight])
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
                 else:
                     controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
+                    if ip_adapter_control:
+                        controlnet_pairs.append(["ipa_plus_face", roop_image_face, ip_adapter_weight])
                     if sdxl_pipeline_flag:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
+                        if ip_adapter_control:
+                            controlnet_pairs.append(["ipa_sdxl_plus_face", roop_image_face, ip_adapter_weight])
                     first_diffusion_output_image = inpaint(input_image, None, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
 
                     # detect face area
