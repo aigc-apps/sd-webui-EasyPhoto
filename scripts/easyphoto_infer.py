@@ -73,16 +73,8 @@ def get_controlnet_unit(
     is_batch: bool = False # Default to False, assuming single image input by default
 ):
     if unit == "canny":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
-
         control_unit = dict(
-            input_image=input_image,
-            batch_images=batch_images,
+            input_image=None,
             module='canny',
             weight=weight,
             guidance_end=1,
@@ -92,6 +84,12 @@ def get_controlnet_unit(
             threshold_b=200,
             model='control_v11p_sd15_canny'
         )
+
+        if is_batch:
+            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        else:
+            control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+
     elif unit == "sdxl_canny_mid":
         control_unit = dict(
             input_image={'image': np.asarray(input_image), 'mask': None},
@@ -105,17 +103,10 @@ def get_controlnet_unit(
             threshold_b=200,
             model='diffusers_xl_canny_mid'
         )
-    elif unit == "openpose":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
 
+    elif unit == "openpose":
         control_unit = dict(
-            input_image=input_image,
-            batch_images=batch_images,
+            input_image=None,
             module='openpose_full',
             weight=weight,
             guidance_end=1,
@@ -123,6 +114,12 @@ def get_controlnet_unit(
             resize_mode='Just Resize',
             model='control_v11p_sd15_openpose'
         )
+
+        if is_batch:
+            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        else:
+            control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+
     elif unit == "sdxl_openpose":
         control_unit = dict(
             input_image={'image': np.asarray(input_image), 'mask': None},
@@ -134,7 +131,18 @@ def get_controlnet_unit(
             resize_mode='Just Resize',
             model='thibaud_xl_openpose'
         )
+
     elif unit == "color":
+        control_unit = dict(
+            input_image=None,
+            module='none',
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode='Just Resize',
+            model='control_sd15_random_color'
+        )
+
         blur_ratio = 24
         if is_batch:
             new_input_image = []
@@ -151,8 +159,7 @@ def get_controlnet_unit(
                 color_image = Image.fromarray(np.uint8(color_image))
                 new_input_image.append(color_image)
 
-            batch_images = [np.array(_input_image, np.uint8) for _input_image in new_input_image]
-            input_image  = None
+            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in new_input_image]
         else:
             h, w, c         = np.shape(input_image)
             color_image     = np.array(input_image, np.uint8)
@@ -165,30 +172,11 @@ def get_controlnet_unit(
             color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
             color_image = Image.fromarray(np.uint8(color_image))
 
-            batch_images = None
-            input_image  = {'image': np.asarray(color_image), 'mask': None}
+            control_unit['input_image'] = {'image': np.asarray(color_image), 'mask': None}
 
-        control_unit = dict(
-            input_image=input_image, 
-            batch_images=batch_images,
-            module='none',
-            weight=weight,
-            guidance_end=1,
-            control_mode=1,
-            resize_mode='Just Resize',
-            model='control_sd15_random_color'
-        )
     elif unit == "tile":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
-
         control_unit = dict(
-            input_image=input_image,
-            batch_images=batch_images,
+            input_image=None,
             module='tile_resample',
             weight=weight,
             guidance_end=1,
@@ -198,6 +186,11 @@ def get_controlnet_unit(
             threshold_b=200,
             model='control_v11f1e_sd15_tile'
         )
+
+        if is_batch:
+            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        else:
+            control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
 
     return control_unit
 
