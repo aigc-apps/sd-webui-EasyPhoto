@@ -1211,7 +1211,10 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
         if args.train_scene_lora_bool:
-            metadata = {"ep_lora_version": "scene"}
+            metadata = {
+                "ep_lora_version": "scene",
+                "ep_prompt": args.validation_prompt,
+            }
         else:
             metadata = None
         unwrapped_nw.save_weights(ckpt_file, weight_dtype, metadata)

@@ -41,7 +41,7 @@ from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
-                             t2i_call)
+                             t2i_call, get_scene_prompt)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -378,8 +378,16 @@ def easyphoto_infer_forward(
         elif tabs == 2:
             template_images = [file_d['name'] for file_d in uploaded_template_images]
         elif tabs == 3:
-            reload_sd_model_vae(prompt_generate_sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
-            ep_logger.info(sd_xl_input_prompt)
+            # load sd and vae
+            prompt_generate_sd_model_checkpoint_type = get_checkpoint_type(prompt_generate_sd_model_checkpoint)
+            if prompt_generate_sd_model_checkpoint_type == 3:
+                prompt_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
+            else:
+                prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+            reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
+
+            # text to image for template 
+            ep_logger.info(f"Text to Image with prompt: {sd_xl_input_prompt}")
             sd_xl_resolution = eval(str(sd_xl_resolution))
             template_images = txt2img(
                 [], input_prompt = sd_xl_input_prompt, \
@@ -391,15 +399,44 @@ def easyphoto_infer_forward(
             )
             template_images = [np.uint8(template_images)]
         elif tabs == 4:
-            reload_sd_model_vae(scene_lora_generate_sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
-            sd_xl_resolution = eval(str(sd_xl_resolution))
+            # load sd and vae
+            scene_lora_generate_sd_model_checkpoint_type = get_checkpoint_type(scene_lora_generate_sd_model_checkpoint)
+            if scene_lora_generate_sd_model_checkpoint_type == 3:
+                scene_lora_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
+            else:
+                scene_lora_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+            reload_sd_model_vae(scene_lora_generate_sd_model_checkpoint, scene_lora_generate_vae)
+
+            # scene lora path
+            lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+            if not os.path.exists(lora_model_path):
+                return "Please check scene lora is exist or not.", [], []
+            is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+            if not is_scene_lora:
+                return "Please use the lora trained by ep.", [], []
+            
+            # get prompt
+            input_prompt = f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            # Add the ddpo LoRA into the input prompt if available.
+            lora_model_path = os.path.join(models_path, "Lora")
+            if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id[0]))):
+                input_prompt += "<lora:ddpo_{}>".format(user_ids[0])
+            
+            # get lora scene prompt
+            last_scene_lora_prompt = scene_lora_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + input_prompt
+
+            # text to image with scene lora 
+            ep_logger.info(f"Text to Image with prompt: {scene_lora_prompt} and lora: {lora_model_path}")
             template_images = txt2img(
-                [], input_prompt = validation_prompt_scene + f", 1person, <lora:{scene_id}:0.8>, ", \
-                diffusion_steps=30, width=768, height=768, \
+                [], input_prompt=last_scene_lora_prompt, \
+                diffusion_steps=30, width=624, height=832, \
                 default_positive_prompt="look at viewer, " + DEFAULT_POSITIVE, \
                 default_negative_prompt=DEFAULT_NEGATIVE, \
-                seed = seed,
-                sampler = "DPM++ 2M SDE Karras"
+                seed = seed, sampler = "DPM++ 2M SDE Karras"
+            )
+            template_images = inpaint(
+                template_images, None, [], diffusion_steps=30, denoising_strength=0.15, 
+                input_prompt=last_scene_lora_prompt, hr_scale=1.5, seed=str(seed)
             )
             template_images = [np.uint8(template_images)]
     except Exception as e:

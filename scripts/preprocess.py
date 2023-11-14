@@ -258,16 +258,18 @@ if __name__ == "__main__":
 
                 h, w, c     = np.shape(image)
 
-                retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 4, prefix="tmp")
+                retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 1, prefix="tmp")
                 retinaface_box      = retinaface_boxes[0]
                 retinaface_keypoint = retinaface_keypoints[0]
+    
+                face_width          = retinaface_box[2] - retinaface_box[0]
+                face_height         = retinaface_box[3] - retinaface_box[1]
 
-                # face size judge
-                face_width  = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
-                face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
-                if min(face_width, face_height) < 128:
-                    print("Face size in {} is small than 128. Ignore it.".format(jpg))
-                    continue
+                crop_ratio          = 3
+                retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
+                retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 4, 0, h - 1)
+                retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
+                retinaface_box[3]   = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 4 * 3, 0, h - 1)
 
                 # Calculate the left, top, right, bottom of all faces now
                 left, top, right, bottom = retinaface_box
@@ -280,9 +282,8 @@ if __name__ == "__main__":
 
                 # Calculate the new left, top, right, bottom of all faces for clipping
                 # Pad the box to square for saving GPU memomry
-                left, top           = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 4, 0, h - 1))
+                left, top           = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 2, 0, h - 1))
                 right, bottom       = int(np.clip(left + long_side, 0, w - 1)), int(np.clip(top + long_side, 0, h - 1))
-                
                 retinaface_box      = [left, top, right, bottom]
                 
                 # face crop 

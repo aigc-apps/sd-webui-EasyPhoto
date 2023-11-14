@@ -40,6 +40,7 @@ def easyphoto_train_forward(
     max_rl_time: float,
     timestep_fraction: float,
     skin_retouching_bool: bool,
+    training_prefix_prompt: str,
     *args
 ):  
     global check_hash
@@ -128,7 +129,7 @@ def easyphoto_train_forward(
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
     
-    local_validation_prompt = validation_prompt if not train_scene_lora_bool else validation_prompt_scene
+    local_validation_prompt = validation_prompt if not train_scene_lora_bool else training_prefix_prompt + "," + validation_prompt_scene
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
     command = [

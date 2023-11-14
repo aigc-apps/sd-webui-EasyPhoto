@@ -148,6 +148,13 @@ def on_ui_tabs():
                                     value = "**Please check the [[wiki]]({}) before SDXL training**.".format(sdxl_wiki_url),
                                     visible=False
                                 )
+                                
+                            with gr.Row():
+                                training_prefix_prompt = gr.Textbox(
+                                    label="Corresponding Prompts to the Template. (Such as: 1girl, beautiful and delicate girl, red dress, yellow leaves, in autumn)", 
+                                    placeholder="Please write the corresponding prompts to the template.", 
+                                    lines=1, value='', visible=False, interactive=True
+                                )
 
                             with gr.Row():
                                 resolution = gr.Textbox(
@@ -260,11 +267,11 @@ def on_ui_tabs():
 
                         def update_train_mode(train_mode_choose):
                             if train_mode_choose == "Train Human Lora":
-                                return [gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)]
+                                return [gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)]
                             else:
-                                return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+                                return [gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
 
-                        train_mode_choose.change(update_train_mode, inputs=train_mode_choose, outputs=[val_and_checkpointing_steps, validation, enable_rl, rl_option_row1, rl_notes, skin_retouching_bool, human_train_notes, scene_train_notes])
+                        train_mode_choose.change(update_train_mode, inputs=train_mode_choose, outputs=[training_prefix_prompt, val_and_checkpointing_steps, validation, enable_rl, rl_option_row1, rl_notes, skin_retouching_bool, human_train_notes, scene_train_notes])
 
                 with gr.Row():
                     with gr.Column(width=3):
@@ -297,7 +304,8 @@ def on_ui_tabs():
                                     sd_model_checkpoint, dummy_component,
                                     uuid, train_mode_choose, 
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
-                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool
+                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool, 
+                                    training_prefix_prompt
                                 ],
                                 outputs=[output_message])
                                 
