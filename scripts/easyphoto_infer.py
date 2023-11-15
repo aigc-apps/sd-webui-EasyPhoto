@@ -72,13 +72,6 @@ def get_controlnet_unit(
     is_batch: bool = False # Default to False, assuming single image input by default
 ):
     if unit == "canny":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
-
         control_unit = dict(
             input_image=None,
             module='canny',
@@ -111,13 +104,6 @@ def get_controlnet_unit(
         )
 
     elif unit == "openpose":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
-
         control_unit = dict(
             input_image=None,
             module='openpose_full',
@@ -188,13 +174,6 @@ def get_controlnet_unit(
             control_unit['input_image'] = {'image': np.asarray(color_image), 'mask': None}
 
     elif unit == "tile":
-        if is_batch:
-            batch_images    = [np.array(_input_image, np.uint8) for _input_image in input_image]
-            input_image     = None
-        else:
-            batch_images    = None
-            input_image     = {'image': np.asarray(input_image), 'mask': None}
-
         control_unit = dict(
             input_image=None,
             module='tile_resample',
