@@ -81,6 +81,7 @@ if not launch.is_installed("invisible-watermark"):
     print('Installing requirements for easyphoto-webui')
     launch.run_pip("install invisible-watermark", "requirements for invisible-watermark")
 
+
 if platform.system() != 'Windows':
     if not is_installed("nvitop"):
         print('Installing requirements for easyphoto-webui')

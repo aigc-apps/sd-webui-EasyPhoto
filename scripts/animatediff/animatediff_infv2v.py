@@ -13,48 +13,7 @@ from modules.sd_samplers_cfg_denoiser import CFGDenoiser, catenate_conds, subscr
 from .animatediff_logger import logger_animatediff as logger
 from .animatediff_ui import AnimateDiffProcess
 from .animatediff_prompt import AnimateDiffPromptSchedule
-
-def split_pad_and_smooth_tensor(tensor, b, window_size=1):
-    """
-    This function takes a tensor with shape [k, c, h, w] and a split size b.
-    It splits the tensor along the k dimension, pads it if k is not divisible by b,
-    and applies smoothing at the boundaries of each split.
-
-    :param tensor: A PyTorch tensor with shape [k, c, h, w]
-    :param b: The size of each split along the k dimension
-    :param window_size: The size of the smoothing window
-    :return: A tensor with the same shape [k, c, h, w], with smoothing applied
-    """
-    k, c, h, w = tensor.shape
-
-    # Pad the tensor if k is not divisible by b
-    padding_needed = k % b
-    if padding_needed != 0:
-        padding_amount = b - padding_needed
-        padding_values = tensor[:padding_amount]
-        tensor = torch.cat((tensor, padding_values), dim=0)
-
-    # Split the tensor
-    split_tensors = torch.split(tensor, split_size_or_sections=b, dim=0)
-
-    # Apply smoothing at the boundaries of each split
-    for i in range(len(split_tensors)):
-        if i > 0:
-            start_smoothing = (split_tensors[i][0:window_size] + split_tensors[i-1][-window_size:]) / 2
-            split_tensors[i][0:window_size] = start_smoothing
-
-        if i < len(split_tensors) - 1:
-            end_smoothing = (split_tensors[i][-window_size:] + split_tensors[i+1][0:window_size]) / 2
-            split_tensors[i][-window_size:] = end_smoothing
-
-    # Concatenate the split tensors back together
-    smoothed_tensor = torch.cat(split_tensors, dim=0)
-
-    # Trim off the padding if it was added
-    if padding_needed != 0:
-        smoothed_tensor = smoothed_tensor[:-(padding_amount)]
-
-    return smoothed_tensor
+from .animatediff_noise import split_pad_and_smooth_tensor_gaussian, split_pad_and_smooth_tensor
 
 class AnimateDiffInfV2V:
 
@@ -277,9 +236,21 @@ class AnimateDiffInfV2V:
                 sigma_in = torch.cat([torch.stack([sigma[i] for _ in range(n)]) for i, n in enumerate(repeats)] + [sigma] + [sigma])
                 image_cond_in = torch.cat([torch.stack([image_cond[i] for _ in range(n)]) for i, n in enumerate(repeats)] + [image_uncond] + [torch.zeros_like(self.init_latent)])
 
-            if self.init_latent is None and  self.step==0:
-                print("Do smooth when t2v! ", self.step)
-                x_in = split_pad_and_smooth_tensor(x_in, 16)
+            if self.init_latent is None and self.step==0:
+                if shared.opts.batch_cond_uncond:
+                    split_tensors = torch.split(x_in, x_in.shape[0] // 2, dim=0)
+                    # tmp0 = split_pad_and_smooth_tensor(split_tensors[0], batch_size)
+                    # tmp1 = split_pad_and_smooth_tensor(split_tensors[1], batch_size)
+                    tmp0 = split_pad_and_smooth_tensor_gaussian(split_tensors[0], batch_size, batch_size//2, batch_size//4)
+                    tmp1 = split_pad_and_smooth_tensor_gaussian(split_tensors[1], batch_size, batch_size//2, batch_size//4)
+                    x_in = torch.cat([tmp0, tmp1], dim=0)
+                    print(f"Do smooth when t2v at {self.step} for positive/negative separately, original x_in shape {x_in.shape}")
+
+                else:
+                    # x_in = split_pad_and_smooth_tensor(x_in, batch_size)
+                    x_in = split_pad_and_smooth_tensor_gaussian(split_tensors[1], batch_size, batch_size//2, batch_size//4)
+                    print(f"Do smooth when t2v at {self.step} for positive x_in, , original x_in shape {x_in.shape}")
+
 
             denoiser_params = CFGDenoiserParams(x_in, image_cond_in, sigma_in, state.sampling_step, state.sampling_steps, tensor, uncond)
             cfg_denoiser_callback(denoiser_params)
