@@ -750,7 +750,7 @@ def seg_by_box(
     return mask_image
 
 
-def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=5) -> np.ndarray:
+def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=1) -> np.ndarray:
     """
     Apply a mask to an image to keep pixels where the mask is 255 and set other areas to white.
 
@@ -1007,8 +1007,9 @@ def get_background_color(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     sorted_colors = unique_values[sorted_indices]
     # sorted_counts = counts[sorted_indices]
 
-    TopK = min(len(sorted_colors), 10)
+    TopK = min(len(sorted_colors), 20)
     sorted_colors = sorted_colors[:TopK]
+    # print(sorted_colors)
     most_frequent_value = get_no_white(sorted_colors)
 
     return most_frequent_value

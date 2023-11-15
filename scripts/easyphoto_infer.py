@@ -407,6 +407,7 @@ def easyphoto_infer_forward(
     mask_copy = copy.deepcopy(mask2)
 
     cv2.imwrite("mask2_input.jpg", mask2)
+
     # draw_box_on_image(img2, box_template, "box2.jpg")
 
     # crop to get local img
@@ -517,25 +518,28 @@ def easyphoto_infer_forward(
                     models_zero123['carvekit'] = create_carvekit_interface()
 
                     x,y,z = 0,azimuth,0
-                    result = zero123_infer(models_zero123, x, y, z, Image.fromarray(np.uint8(img1))) # TODO [PIL.Image] May choose the best merge one by lightglue 
+                    result, has_nsfw_concept = zero123_infer(models_zero123, x, y, z, Image.fromarray(np.uint8(img1))) # TODO [PIL.Image] May choose the best merge one by lightglue 
+                    if not has_nsfw_concept:
+                        # crop and get mask
+                        img1_3d = np.array(result[0])
+                        mask1 = salient_detect(img1_3d)[OutputKeys.MASKS]
+                        mask1, box_gen = mask_to_box(mask1)
+
+                        mask1 = cv2.erode(np.array(mask1),
+                                            np.ones((10, 10), np.uint8), iterations=1)
+
+                        # crop image again
+                        img1 = crop_image(img1_3d, box_gen,expand_ratio=expand_ratio)
+                        mask1 = crop_image(mask1, box_gen,expand_ratio=expand_ratio)
+
+                        cv2.imwrite('img1_3d_crop.jpg', img1)
+                        cv2.imwrite('mask1_3d_crop.jpg', mask1)
+                    else:
+                        print('To 3d failed. NSFW Image occured!')
+
                     # result[0].save('res_zero123.jpg')
                 except:
                     raise ImportError('Please install Zero123 following the instruction of https://github.com/cvlab-columbia/zero123')    
-
-            # crop and get mask
-            img1_3d = np.array(result[0])
-            mask1 = salient_detect(img1_3d)[OutputKeys.MASKS]
-            mask1, box_gen = mask_to_box(mask1)
-
-            mask1 = cv2.erode(np.array(mask1),
-                                np.ones((10, 10), np.uint8), iterations=1)
-
-            # crop image again
-            img1 = crop_image(img1_3d, box_gen,expand_ratio=expand_ratio)
-            mask1 = crop_image(mask1, box_gen,expand_ratio=expand_ratio)
-
-            cv2.imwrite('img1_3d_crop.jpg', img1)
-            cv2.imwrite('mask1_3d_crop.jpg', mask1)
 
         # first paste: paste img1 to img2 to get the control image
         if optimize_angle_and_ratio:
@@ -1156,7 +1160,7 @@ def easyphoto_infer_forward(
         # show paste result for debug
         return_res.append(first_paste)
     
-    if azimuth !=0:
+    if azimuth !=0 and not has_nsfw_concept:
         return_res.append(Image.fromarray(np.uint8(img1_3d)))
     
     torch.cuda.empty_cache()

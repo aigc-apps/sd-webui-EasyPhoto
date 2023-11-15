@@ -401,11 +401,12 @@ if __name__ == "__main__":
     print(f"Selected images for the common subject are: {sorted(list(selected_image_indices))}")
     print(f"After remove few point image, now image: {len(list(selected_image_indices))}")
 
-    # import pdb
-    # pdb.set_trace()
-
     # get final list
-    image_list = [image_list[i] for i in sorted(selected_image_indices)]
+    if len(list(selected_image_indices)):
+        image_list = [image_list[i] for i in sorted(selected_image_indices)]
+    else:
+        print('Warning! All images are filtered using the input image list.')
+
     N = len(image_list)  # Number of images
     keypoint_counter = defaultdict(lambda: {'count': 0, 'score': 0.0, 'matches': {}})
     matched_pairs_per_image = defaultdict(list)
@@ -476,7 +477,8 @@ if __name__ == "__main__":
         # cv2.imwrite(f'sub_mask_bf_{i}.jpg',sub_mask)
         
         # refine_mask = False
-        if refine_mask:
+        if i!=0 and refine_mask:
+            # ref image not refined to get correct background color
             # refine sam mask
             result = salient_detect(sub_image)
             sub_mask = result[OutputKeys.MASKS]

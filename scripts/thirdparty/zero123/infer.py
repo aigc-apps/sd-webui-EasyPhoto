@@ -126,6 +126,7 @@ def zero123_infer(models,
     (image, has_nsfw_concept) = models['nsfw'](
         images=np.ones((1, 3)), clip_input=safety_checker_input.pixel_values)
     print('has_nsfw_concept:', has_nsfw_concept)
+
     if np.any(has_nsfw_concept):
         print('NSFW content detected.')
         to_return = [None] * 10
@@ -133,14 +134,14 @@ def zero123_infer(models,
                        'potential NSFW content was detected, '
                        'which is not supported by our model. '
                        'Please try again with a different image. </span>')
-        if 'angles' in return_what:
-            to_return[0] = 0.0
-            to_return[1] = 0.0
-            to_return[2] = 0.0
-            to_return[3] = description
-        else:
-            to_return[0] = description
-        return to_return
+        # if 'angles' in return_what:
+        #     to_return[0] = 0.0
+        #     to_return[1] = 0.0
+        #     to_return[2] = 0.0
+        #     to_return[3] = description
+        # else:
+        to_return[0] = description
+        return to_return, has_nsfw_concept
 
     else:
         print('Safety check passed.')
@@ -174,7 +175,7 @@ def zero123_infer(models,
         output_ims.append(Image.fromarray(x_sample.astype(np.uint8)))
 
     description = None
-    return output_ims
+    return output_ims, has_nsfw_concept
 
 
 if 0:
