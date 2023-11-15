@@ -100,8 +100,14 @@ class ControlNetUnit:
         guidance_start: float=0.0,
         guidance_end: float=1.0,
         pixel_perfect: bool=False,
+<<<<<<< HEAD
         control_mode: Union[int, str] = 0,
         batch_images = [],
+=======
+        control_mode: Union[int, str]=0,
+        save_detected_map: bool=True,
+        batch_images=[],
+>>>>>>> main
         **_kwargs,
     ):
         self.enabled = enabled
@@ -118,6 +124,10 @@ class ControlNetUnit:
         self.guidance_end = guidance_end
         self.pixel_perfect = pixel_perfect
         self.control_mode = control_mode
+<<<<<<< HEAD
+=======
+        self.save_detected_map = save_detected_map
+>>>>>>> main
         self.batch_images = batch_images
 
     def __eq__(self, other):

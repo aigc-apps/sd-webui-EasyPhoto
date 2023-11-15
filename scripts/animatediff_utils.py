@@ -1012,8 +1012,11 @@ class AnimateDiffScript_Remake(scripts.Script):
         if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
             AnimateDiffI2VLatent().randomize(p, params)
 
+<<<<<<< HEAD
         # if params.enable and isinstance(p, StableDiffusionProcessingText2Img):
         #     AnimateDiffI2VLatent().randomize(p, params)
+=======
+>>>>>>> main
 
     def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
         if isinstance(params, dict): params = AnimateDiffProcess(**params)
