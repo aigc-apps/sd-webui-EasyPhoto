@@ -503,7 +503,7 @@ def on_ui_tabs():
                             
                     outputs=[infer_progress, output_images]
                 )
-            
+
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 # 注册设置页的配置项

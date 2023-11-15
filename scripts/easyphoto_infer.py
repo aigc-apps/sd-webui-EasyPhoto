@@ -544,6 +544,7 @@ def easyphoto_infer_forward(
         # first paste: paste img1 to img2 to get the control image
         if optimize_angle_and_ratio:
             print('Start Optimize!')
+
             # find optimzal angle and ratio
             # resize mask1 to same size as mask2 (init ratio as 1)
             resized_mask1 = resize_and_stretch(
@@ -571,10 +572,11 @@ def easyphoto_infer_forward(
                 rotation_angle2 = 0
             if rotation_angle1 > 20:
                 rotation_angle1 = 0
-            angle_target = rotation_angle1 - rotation_angle2
+            # polygon angle is reverse to img angle
+            angle_target =  rotation_angle2 - rotation_angle1
 
             print(
-                f"target rotation: 1 to 0: {rotation_angle1}, 2 to 0: {rotation_angle2}")
+                f"target rotation: 1 to 0: {rotation_angle1}, 2 to 0: {rotation_angle2}, final_rotate: {angle_target}")
 
             # center
             x, y = mask2.shape[1] // 2, mask2.shape[0] // 2
@@ -592,8 +594,7 @@ def easyphoto_infer_forward(
                 max_iters,
                 iou_threshold,
             )
-
-   
+        
         # paste first
         print("before first paste:", img1.shape)
         print("before first paste:", img2.shape)
@@ -602,11 +603,11 @@ def easyphoto_infer_forward(
 
         print(f'Set angle:{angle}, ratio: {ratio}, azimuth: {azimuth}')
 
-        cv2.imwrite('first_img1.jpg',img1)
-        cv2.imwrite('first_img2.jpg',img2)
-        cv2.imwrite('first_mask1.jpg',mask1)
-        cv2.imwrite('first_mask2.jpg',mask2)
-        cv2.imwrite('first_background.jpg',background_img)
+        # cv2.imwrite('first_img1.jpg',img1)
+        # cv2.imwrite('first_img2.jpg',img2)
+        # cv2.imwrite('first_mask1.jpg',mask1)
+        # cv2.imwrite('first_mask2.jpg',mask2)
+        # cv2.imwrite('first_background.jpg',background_img)
 
         print('before align!')
         print(img2.shape)
@@ -617,7 +618,7 @@ def easyphoto_infer_forward(
             np.array(background_img),
             np.array(mask1),
             np.array(mask2),
-            angle=angle,
+            angle=-angle,
             ratio=ratio,
         )
 

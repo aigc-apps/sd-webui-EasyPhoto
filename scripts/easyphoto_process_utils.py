@@ -224,6 +224,53 @@ def merge_images(
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
 
 
+# def rotate_resize_image(
+#     array: np.ndarray,
+#     angle: float = 0.0,
+#     scale_ratio: float = 1.0,
+#     use_white_bg: Optional[bool] = False
+# ) -> np.ndarray:
+#     """
+#     Rotate and resize an image while optionally setting excess border to white.
+
+#     Args:
+#         array (np.ndarray): The input image.
+#         angle (float, optional): The rotation angle in degrees (default is 0.0).
+#         scale_ratio (float, optional): The scaling ratio (default is 1.0).
+#         use_white_bg (bool, optional): Whether to set the excess border to white (default is False).
+
+#     Returns:
+#         np.ndarray: The rotated and resized image.
+#     """
+#     height, width = array.shape[:2]
+#     image_center = (width / 2, height / 2)
+
+#     # Create a rotation matrix
+#     rotation_matrix = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+
+#     # Apply rotation to the image
+#     rotated_mat = cv2.warpAffine(array, rotation_matrix, (width, height))
+
+#     # Scale the rotated image
+#     scaled_mat = cv2.resize(
+#         rotated_mat,
+#         None,
+#         fx=scale_ratio,
+#         fy=scale_ratio,
+#         interpolation=cv2.INTER_LINEAR,
+#     )
+
+#     if use_white_bg:
+#         # Create a white background with the same size
+#         white_bg = np.zeros_like(scaled_mat)
+#         white_bg.fill(255)  # Set the background to white
+
+#         # Combine the rotated and scaled image with the white background using a mask
+#         mask = scaled_mat == 0
+#         scaled_mat = np.where(mask, white_bg, scaled_mat)
+
+#     return scaled_mat
+
 def rotate_resize_image(
     array: np.ndarray,
     angle: float = 0.0,
@@ -270,15 +317,15 @@ def rotate_resize_image(
         rotated_mat = np.where(mask, white_bg, rotated_mat)
 
     # Scale
-    scaled_mat = cv2.resize(
-        rotated_mat,
-        None,
-        fx=scale_ratio,
-        fy=scale_ratio,
-        interpolation=cv2.INTER_LINEAR,
-    )
+    # scaled_mat = cv2.resize(
+    #     rotated_mat,
+    #     None,
+    #     fx=scale_ratio,
+    #     fy=scale_ratio,
+    #     interpolation=cv2.INTER_LINEAR,
+    # )
 
-    return scaled_mat
+    return rotated_mat
 
 
 @timing_decorator
@@ -1069,7 +1116,7 @@ def find_best_angle_ratio(
         iou, in_iou = align_and_compute_iou(
             polygon1, polygon2, x, y, parameters
         )
-        return - iou - 0.01* in_iou + 0.1 * angle_loss(angle_target, parameters)
+        return - iou - 0.1* in_iou + 0.1 * angle_loss(angle_target, parameters)
 
     # Define the constraint function
     def constraint_function(parameters: Tuple[float, float]) -> float:
