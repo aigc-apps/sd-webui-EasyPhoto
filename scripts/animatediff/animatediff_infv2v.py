@@ -236,7 +236,7 @@ class AnimateDiffInfV2V:
                 sigma_in = torch.cat([torch.stack([sigma[i] for _ in range(n)]) for i, n in enumerate(repeats)] + [sigma] + [sigma])
                 image_cond_in = torch.cat([torch.stack([image_cond[i] for _ in range(n)]) for i, n in enumerate(repeats)] + [image_uncond] + [torch.zeros_like(self.init_latent)])
 
-            if self.init_latent is None and self.step==0:
+            if self.init_latent is None and self.step < 15 and self.step % 3 == 0 :
                 if shared.opts.batch_cond_uncond:
                     split_tensors = torch.split(x_in, x_in.shape[0] // 2, dim=0)
                     # tmp0 = split_pad_and_smooth_tensor(split_tensors[0], batch_size)
