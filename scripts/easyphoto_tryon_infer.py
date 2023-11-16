@@ -98,8 +98,8 @@ def easyphoto_tryon_infer_forward(
     
     return_msg = ''
 
-    # webui_save_path = os.path.join(models_path, f"Lora/{cloth_uuid}.safetensors")
-    webui_save_path = os.path.join(models_path, f"Lora/redt.safetensors")
+    webui_save_path = os.path.join(models_path, f"Lora/{cloth_uuid}.safetensors")
+
     if os.path.exists(webui_save_path):
         return_msg += f'Use exists LoRA of {cloth_uuid}.\n'
         print(f'LoRA of user id: {cloth_uuid} exists. Start Infer.')
@@ -148,7 +148,7 @@ def easyphoto_tryon_infer_forward(
         train_batch_size = 1
         gradient_accumulation_steps = 4
         val_and_checkpointing_steps = 100
-        learning_rate = 0.00001
+        learning_rate = 0.0001
         rank = 128
         network_alpha = 64
         dataloader_num_workers = 16
@@ -196,7 +196,6 @@ def easyphoto_tryon_infer_forward(
                 f'--train_data_dir={user_path}',
                 '--caption_column=text', 
                 f'--resolution={resolution}',
-                # '--random_flip',
                 f'--train_batch_size={train_batch_size}',
                 f'--gradient_accumulation_steps={gradient_accumulation_steps}',
                 f'--dataloader_num_workers={dataloader_num_workers}', 
@@ -247,8 +246,7 @@ def easyphoto_tryon_infer_forward(
     )
 
     # prompt init
-    # input_prompt = f"{validation_tryon_prompt}, <lora:{cloth_uuid}:{lora_weight}>"
-    input_prompt = f"{validation_tryon_prompt}, <lora:redt:{lora_weight}>"
+    input_prompt = f"{validation_tryon_prompt}, <lora:{cloth_uuid}:{lora_weight}>"
     print("input_prompt:", input_prompt)
 
      # model init
@@ -418,7 +416,7 @@ def easyphoto_tryon_infer_forward(
         ratio=ratio,
     )
 
-    return_msg += f'Paste with angle {angle}, ratio: {ratio}, Match IoU: {iou}, optimize: {optimize_angle_and_ratio}. See paste result above, if you are not satisfatory with the optimized result, close the optimize_angle_and_ratio and manually set a angle and ratio.\n'
+    return_msg += f'Paste with angle {angle}, ratio: {ratio}, Match IoU: {iou}, optimize: {optimize_angle_and_ratio}. \n See paste result above, if you are not satisfatory with the optimized result, close the optimize_angle_and_ratio and manually set a angle and ratio.\n'
 
     # Step4: prepare for control image
     # get the img2 box
@@ -566,7 +564,7 @@ def easyphoto_tryon_infer_forward(
             # print("input_control:", input_control_img.shape)
 
             # generate
-            controlnet_pairs = [["canny", input_control_img, 1.0, True]]
+            controlnet_pairs = [["canny", input_control_img, 1.0]]
             # input_mask = Image.fromarray(
             #     np.uint8(np.clip((np.float32(input_mask) * 255), 0, 255))
             # )

@@ -1111,10 +1111,10 @@ def on_ui_tabs():
                             )
 
                         with gr.Row():
-                            infer_note = gr.Markdown(
-                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
-                            )
+                            # infer_note = gr.Markdown(
+                            #     value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
+                            #     visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                            # )
                         
                             def update_infer_note(sd_model_checkpoint):
                                 # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
@@ -1123,7 +1123,6 @@ def on_ui_tabs():
                                 return gr.Markdown.update(visible=True)
                             
                             sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
-
 
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
@@ -1198,7 +1197,25 @@ def on_ui_tabs():
                                     label="Pure Image",  
                                     value=True
                                 )
-                            
+                        
+                        gr.Markdown(
+                            '''
+                            Note:
+                            This is a simplified version of the anyid branch to conduct virtual try on.
+                            Step1: Upload a template image, and mask the region to be inpainted.
+                            Step2: Choose a cloth from the cloth gallery or upload a reference image with only the cloth.
+                            Step3: Refresh the cloth gallery when a new cloth is uploaded.
+
+                            If the result is not identical to the reference image, try a longer training step or larger lora weight.
+
+                            You are highly recommend to use the anyid branch for a better result (but a little bit complex). 
+                            In that branch, we additional support:
+                            - Multiple training images.
+                            - 3d inpaint.
+                            - Lora inpaint for anything (not only clothes).
+                            '''
+                        )
+
                         tryon_button = gr.Button('Start Try On') 
 
                     with gr.Column():
@@ -1223,16 +1240,7 @@ def on_ui_tabs():
                                 paste_field_names=[]
                             ))
 
-
-                        face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
-                        face_id_outputs = gr.Gallery(
-                            label ="Face Similarity Scores",
-                            show_label=False,
-                            visible=False,
-                        ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                        # Display Face Similarity Scores if the user intend to do it.
-                        display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
-                        display_score.change(lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs])
+                        
 
                         infer_progress = gr.Textbox(
                             label="Generation Progress",

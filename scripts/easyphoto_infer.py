@@ -232,6 +232,11 @@ def get_controlnet_unit(
         else:
             control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
 
+    # print('-----------------------------')
+    # print(unit)
+    # print(control_unit['input_image'])
+    # print('-----------------------------')
+    
     return control_unit
 
 @switch_ms_model_cpu()

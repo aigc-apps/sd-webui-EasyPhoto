@@ -196,7 +196,7 @@ def prepare_tryon_train_data(ref_image_path, images_save_path, json_save_path, v
     cv2.imwrite(ref_image_path,result_img)
     cv2.imwrite(ref_image_path.replace('ref_image.jpg','ref_image_mask.jpg'), mask)
 
-    cv2.imwrite(f'{images_save_path}/{0}.jpg',result_img)
+    cv2.imwrite(f'{images_save_path}/0.jpg',result_img)
     with open(os.path.join(images_save_path, str(0) + ".txt"), "w") as f:
         f.write(validation_prompt)
 
