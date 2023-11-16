@@ -1183,10 +1183,49 @@ def easyphoto_video_infer_forward(
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
+        drag_points = None
         if last_image is not None:
             last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
             animatediff_reserve_scale = 1.00
             denoising_strength = 0.55
+        elif drag_points is not None:
+            init_drag = True
+            if init_drag:
+                inversion_strength = 0.75
+                lam = 0.1
+                latent_lr = 0.01
+                n_pix_step = 40
+                start_step = 0
+                start_layer = 10
+                padding_size = 50
+                tmodel_path = sd_model_checkpoint_for_animatediff_text2video
+                sd_base15_checkpoint = os.path.join(
+                    os.path.abspath(os.path.dirname(__file__)
+                                    ).replace("scripts", "models"),
+                    "stable-diffusion-v1-5",
+                )
+                source_image = image
+                mask = np.ones(image.shape)
+                prompt = init_image_prompt
+                final_points = [[100, 100], [200, 200]]
+                out_image = run_drag(
+                    source_image,
+                    mask,
+                    prompt,
+                    final_points,
+                    inversion_strength,
+                    lam,
+                    latent_lr,
+                    n_pix_step,
+                    tmodel_path,
+                    sd_base15_checkpoint,
+                    None,
+                    start_step,
+                    start_layer,
+                )
+                print("drag out:", out_image.shape)
+            animatediff_reserve_scale = 1.00
+            denoising_strength = 0.55            
         else:
             animatediff_reserve_scale = 0.75
             denoising_strength = 0.65
