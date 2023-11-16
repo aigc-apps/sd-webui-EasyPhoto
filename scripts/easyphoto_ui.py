@@ -541,30 +541,54 @@ def on_ui_tabs():
                                     label="Skin Retouching",  
                                     value=True
                                 )
-                                display_score = gr.Checkbox(
-                                    label="Display Face Similarity Scores",  
-                                    value=False
-                                )
                                 background_restore = gr.Checkbox(
                                     label="Background Restore",  
                                     value=False
                                 )
-                            with gr.Row():
                                 makeup_transfer = gr.Checkbox(
                                     label="MakeUp Transfer",
                                     value=False
                                 )
-                                face_shape_match = gr.Checkbox(
-                                    label="Face Shape Match",
+                            with gr.Row():
+                                display_score = gr.Checkbox(
+                                    label="Display Face Similarity Scores",  
                                     value=False
                                 )
                                 ip_adapter_control = gr.Checkbox(
                                     label="IP-Adapter Control",
                                     value=False
                                 )
-                            with gr.Row():
                                 upload_ref_image = gr.Checkbox(
                                     label="Upload Reference Image",
+                                    value=False
+                                )
+
+                                def ipa_update_score(ip_adapter_control, display_score):
+                                    if not display_score and ip_adapter_control:
+                                        return gr.Checkbox.update(value=True)
+                                    return gr.Checkbox.update(value=display_score)
+                                
+                                def update_score(ip_adapter_control, display_score):
+                                    if ip_adapter_control:
+                                        return gr.Checkbox.update(value=True)
+                                    return gr.Checkbox.update(value=display_score)
+                                
+                                # We need to make sure that Display Similarity Score is mandatory when the user
+                                # selects IP-Adapter Control. Otherwise, it is not.
+                                ip_adapter_control.change(
+                                    ipa_update_score,
+                                    inputs=[ip_adapter_control, display_score],
+                                    outputs=[display_score]
+                                )
+                                display_score.change(
+                                    update_score,
+                                    inputs=[ip_adapter_control, display_score],
+                                    outputs=[display_score]
+                                )
+
+                            with gr.Row():
+                                face_shape_match = gr.Checkbox(
+                                    label="Face Shape Match",
                                     value=False
                                 )
 
