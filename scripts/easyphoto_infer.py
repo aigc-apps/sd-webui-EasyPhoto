@@ -42,6 +42,7 @@ from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              reload_sd_model_vae, switch_sd_model_vae,
                              t2i_call)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
+from scripts.dragdiffusion_utils import run_drag
 
 
 def resize_image(input_image, resolution, nearest = False, crop264 = True):
@@ -1167,6 +1168,9 @@ def easyphoto_video_infer_forward(
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
 
+    import pdb
+    pdb.set_trace()
+
     if tabs == 0:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         t2v_resolution = eval(str(t2v_resolution))
@@ -1183,13 +1187,14 @@ def easyphoto_video_infer_forward(
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
-        drag_points = None
+        drag_points = True
         if last_image is not None:
             last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
             animatediff_reserve_scale = 1.00
             denoising_strength = 0.55
         elif drag_points is not None:
             init_drag = True
+            debug_path = '/mnt/zhoulou.wzh/AIGC/sd-webui-EasyPhoto/official/sd-webui-EasyPhoto/'
             if init_drag:
                 inversion_strength = 0.75
                 lam = 0.1
@@ -1198,14 +1203,17 @@ def easyphoto_video_infer_forward(
                 start_step = 0
                 start_layer = 10
                 padding_size = 50
-                tmodel_path = sd_model_checkpoint_for_animatediff_text2video
+                tmodel_path = os.path.join(
+                models_path, f"Stable-diffusion", sd_model_checkpoint_for_animatediff_text2video)
                 sd_base15_checkpoint = os.path.join(
                     os.path.abspath(os.path.dirname(__file__)
                                     ).replace("scripts", "models"),
                     "stable-diffusion-v1-5",
                 )
-                source_image = image
-                mask = np.ones(image.shape)
+                source_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                cv2.imwrite(os.path.join(debug_path, 'input_first.jpg'), source_image)
+                mask = np.ones(source_image.shape[:2])
+
                 prompt = init_image_prompt
                 final_points = [[100, 100], [200, 200]]
                 out_image = run_drag(
@@ -1224,6 +1232,8 @@ def easyphoto_video_infer_forward(
                     start_layer,
                 )
                 print("drag out:", out_image.shape)
+                cv2.imwrite(os.path.join(debug_path, 'input_last.jpg'), out_image)
+                last_image = Image.fromarray(np.uint8(out_image)).convert("RGB")
             animatediff_reserve_scale = 1.00
             denoising_strength = 0.55            
         else:

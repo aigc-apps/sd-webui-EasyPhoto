@@ -1032,6 +1032,7 @@ def run_drag(
     
     # preprocess 
     source_image = preprocess_image(source_image, device)
+
     mask = preprocess_mask(mask, device)
     mask = F.interpolate(mask, (sup_res_h, sup_res_w), mode="nearest")
 
