@@ -84,10 +84,10 @@ def get_controlnet_unit(
             model='control_v11p_sd15_canny'
         )
 
-        if is_batch:
-            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
-        else:
-            control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+        # if is_batch:
+        #     control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        # else:
+        #     control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
 
     elif unit == "sdxl_canny_mid":
         control_unit = dict(
@@ -114,10 +114,10 @@ def get_controlnet_unit(
             model='control_v11p_sd15_openpose'
         )
 
-        if is_batch:
-            control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
-        else:
-            control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+        # if is_batch:
+        #     control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        # else:
+        #     control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
 
     elif unit == "sdxl_openpose":
         control_unit = dict(
@@ -186,6 +186,47 @@ def get_controlnet_unit(
             model='control_v11f1e_sd15_tile'
         )
 
+        # if is_batch:
+        #     control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        # else:
+        #     control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+
+    elif unit == "depth":
+        control_unit = dict(
+            input_image=input_image,
+            module="depth_midas",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="control_v11f1p_sd15_depth",
+        )
+
+    elif unit == "ipa":
+        control_unit = dict(
+            input_image=input_image,
+            module="ip-adapter_clip_sd15",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="ip-adapter_sd15",
+        )
+
+    elif unit == "canny_no_pre":
+        control_unit = dict(
+            input_image=input_image,
+            module=None,
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Crop and Resize",
+            threshold_a=100,
+            threshold_b=200,
+            model="control_v11p_sd15_canny",
+        )
+
+    if unit!='color' and not unit.startswith('sdxl'):
         if is_batch:
             control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         else:

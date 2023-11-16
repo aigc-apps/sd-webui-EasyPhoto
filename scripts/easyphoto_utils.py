@@ -154,7 +154,58 @@ def check_files_exists_and_download(check_hash):
         ep_logger.info(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename[0]), exist_ok=True)
         urldownload_progressbar(url, filename[0])
+
+
+def check_tryon_files_exists_and_download(check_hash):
+    controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
+    controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
+    models_annotator_path               = os.path.join(data_path, "models")
+    
+    if os.path.exists(controlnet_extensions_path):
+        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    elif os.path.exists(controlnet_extensions_builtin_path):
+        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    else:
+        controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+
+    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
+    urls        = [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/Chilloutmix-Ni-pruned-fp16-fix.safetensors", 
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11p_sd15_canny.pth",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/dpt_hybrid-midas-501f0c75.pt",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11f1p_sd15_depth.pth",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/sam_vit_l_0b3195.pth",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/clip_h.pth",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/ip-adapter_sd15.pth"
+    ]
+
+    filenames = [
+        os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
+        os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
+        os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "sam_vit_l_0b3195.pth"),
+        os.path.join(controlnet_annotator_cache_path_ipa, f"clip_h.pth"),
+        os.path.join(models_path, f"ControlNet/ip-adapter_sd15.pth"),
+    ]
+
+    # This print will introduce some misundertand
+    # print("Start Downloading weights")
+    for url, filename in zip(urls, filenames):
+        if not check_hash:
+            if os.path.exists(filename):
+                continue
+        else:
+            if os.path.exists(filename) and compare_hasd_link_file(url, filename):
+                continue
+        print(f"Start Downloading: {url}")
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        urldownload_progressbar(url, filename)
        
+
 # Calculate the hash value of the download link and downloaded_file by sha256
 def compare_hasd_link_file(url, file_path):
     r           = requests.head(url)

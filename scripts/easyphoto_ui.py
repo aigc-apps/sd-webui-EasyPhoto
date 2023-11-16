@@ -10,10 +10,13 @@ from modules.ui_components import ToolButton as ToolButton_webui
 from scripts.easyphoto_config import (cache_log_file_path,
                                       easyphoto_outpath_samples,
                                       easyphoto_video_outpath_samples,
-                                      models_path, user_id_outpath_samples)
+                                      models_path,
+                                      user_id_outpath_samples,
+                                      cloth_id_outpath_samples)
 from scripts.easyphoto_infer import (easyphoto_infer_forward,
                                      easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
+from scripts.easyphoto_tryon_infer import easyphoto_tryon_infer_forward
 from scripts.easyphoto_utils import check_id_valid
 from scripts.sdwebui import get_checkpoint_type
 
@@ -594,7 +597,7 @@ def on_ui_tabs():
                                     '''
                                 )
                             
-                        display_button = gr.Button('Start Generation')
+                        display_button = gr.Button('Start Generation')                        
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
@@ -1031,6 +1034,220 @@ def on_ui_tabs():
                     outputs=[infer_progress, output_video, output_gif, output_images]
                 )
 
+
+        with gr.TabItem("Virtual Try On"):
+            dummy_component = gr.Label(visible=False)           
+
+            with gr.Blocks() as demo:
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown('Template Image')
+                        template_image = gr.Image(label="Image for skybox", elem_id="{id_part}_tem_image", show_label=False, source="upload", tool='sketch')
+                    
+                        gr.Markdown('Reference Image')
+                        ref_image_selected_tab = gr.State(0)
+                        with gr.TabItem("cloth gallery") as cloth_gallery_tab:
+                            cloth_gallery_dir = os.path.join(cloth_id_outpath_samples,'gallery')
+                            os.makedirs(cloth_gallery_dir, exist_ok=True)
+                            cloth_ids = glob.glob(os.path.join(cloth_gallery_dir,'*.jpg')) + glob.glob(os.path.join(cloth_gallery_dir,'*.png'))
+                            cloth_gallery_list = [(i, i) for i in cloth_ids]
+                            cloth_gallery = gr.Gallery(cloth_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                            
+                            def select_function(evt: gr.SelectData):
+                                cloth_ids = glob.glob(os.path.join(cloth_gallery_dir,'*.jpg')) + glob.glob(os.path.join(cloth_gallery_dir,'*.png'))
+                                return [cloth_ids[evt.index]]
+
+                            selected_cloth_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
+                            cloth_gallery.select(select_function, None, selected_cloth_template_images)
+                            
+                            def cloth_gallery_refresh_function():
+                                cloth_ids = glob.glob(os.path.join(cloth_gallery_dir,'*.jpg')) + glob.glob(os.path.join(cloth_gallery_dir,'*.png'))
+                                return gr.update(value=cloth_ids)
+
+                            cloth_id_refresh = ToolButton(value="\U0001f504")
+                            cloth_id_refresh.click(
+                                fn=cloth_gallery_refresh_function,
+                                inputs=[],
+                                outputs=[cloth_gallery]
+                            )
+                            
+                        with gr.TabItem("upload") as upload_ref_image_tab:
+                            main_image = gr.Image(label="Main Image", elem_id="{id_part}_ref_image", show_label=False, source="upload", type="filepath")
+                            cloth_uuid = gr.Textbox(
+                                label="Cloth User ID",
+                                lines=1,
+                                value='',
+                                interactive=True
+                            )
+
+                        model_selected_tabs = [cloth_gallery_tab, upload_ref_image_tab]
+                        for i, tab in enumerate(model_selected_tabs):
+                            tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[ref_image_selected_tab])
+
+                        with gr.Row():
+                            def checkpoint_refresh_function():
+                                checkpoints = []
+                                models_dir = os.path.join(models_path, "Stable-diffusion")
+                                
+                                for root, dirs, files in os.walk(models_dir):
+                                    for _checkpoint in files:
+                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                            rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
+                                            checkpoints.append(rel_path)
+                                
+                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
+                            
+                            checkpoints = []
+                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                    checkpoints.append(_checkpoint)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
+
+                            checkpoint_refresh = ToolButton(value="\U0001f504")
+                            checkpoint_refresh.click(
+                                fn=checkpoint_refresh_function,
+                                inputs=[],
+                                outputs=[sd_model_checkpoint]
+                            )
+
+                        with gr.Row():
+                            infer_note = gr.Markdown(
+                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
+                                visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                            )
+                        
+                            def update_infer_note(sd_model_checkpoint):
+                                # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
+                                if sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
+                                    return gr.Markdown.update(visible=False)
+                                return gr.Markdown.update(visible=True)
+                            
+                            sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
+
+
+                        with gr.Accordion("Advanced Options", open=False):
+                            additional_prompt = gr.Textbox(
+                                label="Additional Prompt",
+                                lines=3,
+                                value='masterpiece, beauty',
+                                interactive=True
+                            )
+                            seed = gr.Textbox(
+                                label="Seed", 
+                                value=-1,
+                            )
+                            with gr.Row():
+                                max_train_steps = gr.Slider(
+                                    minimum=100, maximum=1000, value=200,
+                                    step=1, label='Train Steps'
+                                )
+                                first_diffusion_steps = gr.Slider(
+                                    minimum=15, maximum=50, value=50,
+                                    step=1, label='Diffusion Steps'
+                                )
+                                first_denoising_strength = gr.Slider(
+                                    minimum=0.40, maximum=1.00, value=0.70,
+                                    step=0.05, label='Diffusion Denoising Strength'
+                                )
+
+                            with gr.Row():
+                                lora_weight = gr.Slider(
+                                    minimum=0, maximum=1, value=0.8,
+                                    step=0.1, label='LoRA weight'
+                                )
+                                iou_threshold = gr.Slider(
+                                    minimum=0, maximum=1, value=0.7,
+                                    step=0.05, label='IoU Threshold '
+                                )
+
+                            with gr.Row():
+                                angle = gr.Slider(
+                                    minimum=-90, maximum=90, value=0.0,
+                                    step=1, label='Angle'
+                                )
+                                azimuth  = gr.Slider(
+                                    minimum=-60, maximum=60, value=0.0,
+                                    step=1, label='Azimuth'
+                                )
+                                ratio = gr.Slider(
+                                    minimum=0.5, maximum=5.5, value=1.0,
+                                    step=0.1, label='Ratio'
+                                )
+
+                            with gr.Row():
+                                batch_size = gr.Slider(
+                                    minimum=1, maximum=10, value=1,
+                                    step=1, label='Batch Size'
+                                )
+                            
+
+                            with gr.Row():
+                                refine_input_mask = gr.Checkbox(
+                                    label="Refine Input Mask",  
+                                    value=True
+                                )
+                                optimize_angle_and_ratio = gr.Checkbox(
+                                    label="Optimize Angle and Ratio", 
+                                    value=True
+                                )
+                                refine_bound = gr.Checkbox(
+                                    label="Refine Boundary",  
+                                    value=True
+                                )
+                                pure_image = gr.Checkbox(
+                                    label="Pure Image",  
+                                    value=True
+                                )
+                            
+                        tryon_button = gr.Button('Start Try On') 
+
+                    with gr.Column():
+                        gr.Markdown('Generated Results')
+
+                        output_images = gr.Gallery(
+                            label='Output',
+                            show_label=False
+                        ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                        with gr.Row():
+                            tabname = 'easyphoto'
+                            buttons = {
+                                'img2img': ToolButton_webui('🖼️', elem_id=f'{tabname}_send_to_img2img', tooltip="Send image and generation parameters to img2img tab."),
+                                'inpaint': ToolButton_webui('🎨️', elem_id=f'{tabname}_send_to_inpaint', tooltip="Send image and generation parameters to img2img inpaint tab."),
+                                'extras': ToolButton_webui('📐', elem_id=f'{tabname}_send_to_extras', tooltip="Send image and generation parameters to extras tab.")
+                            }
+
+                        for paste_tabname, paste_button in buttons.items():
+                            parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=output_images,
+                                paste_field_names=[]
+                            ))
+
+
+                        face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
+                        face_id_outputs = gr.Gallery(
+                            label ="Face Similarity Scores",
+                            show_label=False,
+                            visible=False,
+                        ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
+                        # Display Face Similarity Scores if the user intend to do it.
+                        display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
+                        display_score.change(lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs])
+
+                        infer_progress = gr.Textbox(
+                            label="Generation Progress",
+                            value="No task currently",
+                            interactive=False
+                        )
+
+                tryon_button.click(fn=easyphoto_tryon_infer_forward,
+                                inputs=[
+                                    sd_model_checkpoint, template_image, selected_cloth_template_images, main_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
+                                    lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
+                                    pure_image, ref_image_selected_tab, cloth_uuid,max_train_steps
+                                ],
+                                outputs=[infer_progress, output_images])   
+            
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 # Configuration items for registration settings page
