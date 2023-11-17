@@ -7,11 +7,15 @@ import traceback
 from contextlib import ContextDecorator
 from glob import glob
 
+import cv2
+import numpy as np
 import requests
 import scripts.easyphoto_infer
 import torch
+import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
 from modules.paths import models_path
+from PIL import Image
 from scripts.easyphoto_config import data_path
 from tqdm import tqdm
 
@@ -82,6 +86,7 @@ def check_files_exists_and_download(check_hash):
     urls        = [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
@@ -98,9 +103,11 @@ def check_files_exists_and_download(check_hash):
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/makeup_transfer.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
@@ -109,6 +116,7 @@ def check_files_exists_and_download(check_hash):
     filenames = [
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
+        os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
@@ -125,9 +133,11 @@ def check_files_exists_and_download(check_hash):
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
         os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
@@ -187,6 +197,107 @@ def compare_hasd_link_file(url, file_path):
         ep_logger.info(f" {file_path} : Hash mismatch")
         return False
       
+def get_mov_all_images(file: str, required_fps: int) -> tuple:
+    """
+    Extracts a specific number of frames uniformly from a video file and converts them to a list of RGB images.
+
+    required_fps < video fps , uniform sampling frames
+    required_fps >= video fps, get all frames
+
+    Parameters:
+    - file (str): The path to the video file.
+    - required_fps (int): The required frame per second to extract.
+
+    Returns:
+    - image_list (tuple): A tuple containing a list of RGB images and the actual number of frames extracted.
+             Returns None if the file cannot be opened or if 'file' is None.
+    - required_fps (int): The actual fps after extracting a specific number of frames uniformly from a video file.
+    """
+    if file is None:
+        return None
+    cap = cv2.VideoCapture(file)
+
+    if not cap.isOpened():
+        return None
+    
+    # Frames cannot be greater than the actual fps for sampling
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    if required_fps > fps:
+        print('Waring: The set number of frames is greater than the number of video frames')
+        required_fps = fps
+
+    # Get all frames
+    movies = []
+    while (True):
+        flag, frame = cap.read()
+        if not flag:
+            break
+        else:
+            movies.append(frame)
+    # Obtain the required frame
+    # Extracts a specific number of frames uniformly from a video
+    num_pics        = int(required_fps / fps * len(movies))
+    target_indexs   = list(np.rint(np.linspace(0, len(movies)-1, num=num_pics)))
+    image_list = []
+    for index in target_indexs:
+        frame = movies[int(index)]
+        image_list.append(frame)
+
+    cap.release()
+
+    image_list = [cv2.cvtColor(image, cv2.COLOR_BGR2RGB) for image in image_list]
+    return image_list, required_fps
+
+def convert_to_video(path, frames, fps, prefix = None, mode="gif"):
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    index = len([path for path in os.listdir(path)]) + 1
+    if prefix is None:
+        prefix = str(index).zfill(8)
+    video_path = os.path.join(path, prefix + f'.{mode}')
+
+    if mode == "gif":
+        import imageio.v3 as imageio
+        try:
+            import av
+        except ImportError:
+            from launch import run_pip
+            run_pip(
+                "install imageio[pyav]",
+                "sd-webui-animatediff GIF palette optimization requirement: imageio[pyav]",
+            )
+        video_array = [np.array(v) for v in frames]
+        imageio.imwrite(
+            video_path, video_array, plugin='pyav', fps=fps, 
+            codec='gif', out_pixel_format='pal8',
+            filter_graph=(
+                {
+                    "split": ("split", ""),
+                    "palgen": ("palettegen", ""),
+                    "paluse": ("paletteuse", ""),
+                    "scale": ("scale", f"{frames[0].width}:{frames[0].height}")
+                },
+                [
+                    ("video_in", "scale", 0, 0),
+                    ("scale", "split", 0, 0),
+                    ("split", "palgen", 1, 0),
+                    ("split", "paluse", 0, 0),
+                    ("palgen", "paluse", 0, 1),
+                    ("paluse", "video_out", 0, 0),
+                ]
+            )
+        )
+        
+        return None, video_path, prefix
+    else:
+        frames = [np.array(frame) for frame in frames]
+        frames = torch.from_numpy(np.array(frames))
+        if not os.path.exists(os.path.dirname(video_path)):
+            os.makedirs(os.path.dirname(video_path))
+        torchvision.io.write_video(video_path, frames, fps=fps, video_codec="libx264")
+    
+        return video_path, None, prefix
+
 def modelscope_models_to_cpu():
     """Load models to cpu to free VRAM.
     """
