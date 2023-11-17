@@ -320,7 +320,7 @@ def easyphoto_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
+    check_files_exists_and_download(check_hash, "add_text2image" if tabs==3 else "none")
     check_hash = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
@@ -1016,7 +1016,7 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
+    check_files_exists_and_download(check_hash, "video")
     check_hash = False
 
     for user_id in user_ids:
