@@ -9,7 +9,7 @@ from packaging.version import parse
 
 def is_installed(package: str):
     min_version = "0.0.0"
-    max_version = "99999999.99999999.99999999"
+    max_version = "99999999.99999999.99999999" 
     pkg_name = package
     version_check = True
     if "==" in package:

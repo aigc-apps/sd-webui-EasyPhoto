@@ -642,3 +642,4 @@ def get_lora_type(filename: str) -> int:
     elif str(metadata.get('ss_v2', "")) == "True":
         return 2
     return 1
+

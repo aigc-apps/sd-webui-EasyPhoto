@@ -2,7 +2,7 @@ from scripts.easyphoto_utils import (check_tryon_files_exists_and_download,
                                      
                                      )
 from scripts.sdwebui import get_checkpoint_type
-from scripts.easyphoto_config import cloth_id_outpath_samples, validation_tryon_prompt,cache_log_file_path,easyphoto_outpath_samples
+from scripts.easyphoto_config import cloth_id_outpath_samples, validation_tryon_prompt,cache_log_file_path,easyphoto_outpath_samples,CLOTH_LORA_PREFIX
 from scripts.easyphoto_tryon_process_utils import (prepare_tryon_train_data,mask_to_box,
                                                    seg_by_box,
                                                    crop_image,expand_roi,
@@ -68,22 +68,17 @@ def easyphoto_tryon_infer_forward(
     try:
         # choose tabs select
         if ref_image_selected_tab == 0:
+            # choose from gallery
             input_ref_img_path = eval(selected_cloth_template_images)[0]
             cloth_uuid = input_ref_img_path.split('/')[-1].split('.')[0]
         elif ref_image_selected_tab == 1:
-            # check user id
-            if cloth_uuid in user_ids:
-                info = "The user id is repeat with the cloth gallery. Please name a new user id"
-                print(info)
-                return info, [], []
-    
             if cloth_uuid == '' or cloth_uuid is None:
                 info = "The user id cannot be empty."
                 print(info)
                 return info, [], []
     
-            # save to gallery
-            Image.open(input_ref_img_path).save(os.path.join(cloth_gallery_dir,f'{cloth_uuid}.jpg'))
+            cloth_uuid = CLOTH_LORA_PREFIX+cloth_uuid+'_'+str(max_train_steps)
+
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
@@ -104,7 +99,16 @@ def easyphoto_tryon_infer_forward(
         return_msg += f'Use exists LoRA of {cloth_uuid}.\n'
         print(f'LoRA of user id: {cloth_uuid} exists. Start Infer.')
     else:
-        return_msg += f'Train a new LoRA of {cloth_uuid} of {max_train_steps} steps.\n'
+        def has_duplicate_uid(input_user_id, existing_user_ids):
+            input_uid = input_user_id.split('_')[1]
+            existing_uids = [uid.split('_')[1] for uid in existing_user_ids]
+            return input_uid in existing_uids
+
+        if has_duplicate_uid(cloth_uuid, user_ids):
+            uuid = cloth_uuid.split('_')[1]
+            return_msg += f'Update LoRA of {uuid} with {max_train_steps} steps.\n'
+        else:
+            return_msg += f'Train a new LoRA of {cloth_uuid} of {max_train_steps} steps.\n'
         print('Start Training')
 
         # ref image copy
@@ -147,7 +151,7 @@ def easyphoto_tryon_infer_forward(
         resolution = 512
         train_batch_size = 1
         gradient_accumulation_steps = 4
-        val_and_checkpointing_steps = 100
+        val_and_checkpointing_steps = 200
         learning_rate = 0.0001
         rank = 128
         network_alpha = 64
@@ -221,8 +225,11 @@ def easyphoto_tryon_infer_forward(
 
         best_weight_path = os.path.join(weights_save_path, f"pytorch_lora_weights.safetensors")
         if not os.path.exists(best_weight_path):
-            return "Failed to obtain Lora after training, please check the training process."
+            return "Failed to obtain Lora after training, please check the training process.",[]
 
+        # save to gallery
+        Image.open(input_ref_img_path).save(os.path.join(cloth_gallery_dir,f'{cloth_uuid}.jpg'))
+        # save to models/LoRA
         copyfile(best_weight_path, webui_save_path)
 
     
@@ -253,9 +260,6 @@ def easyphoto_tryon_infer_forward(
     sam = sam_model_registry["vit_l"]()
     sam.load_state_dict(torch.load(sam_checkpoint))
     predictor = SamPredictor(sam.cuda())
-    salient_detect = pipeline(
-        Tasks.semantic_segmentation, model="damo/cv_u2net_salient-detection"
-    )
 
     # Step1: open image and prepare for mask
     # main
@@ -325,8 +329,6 @@ def easyphoto_tryon_infer_forward(
                 ["depth", img2, 1.0],
             ]
 
-        cv2.imwrite('img2.jpg',np.uint8(img2))
-        cv2.imwrite('mask2.jpg', np.uint8(mask2))
 
         background_diffusion_steps = 20
         background_denoising_strength = 0.8
@@ -345,7 +347,7 @@ def easyphoto_tryon_infer_forward(
         background_img = background_img.resize((img2.shape[1],img2.shape[0]), Image.Resampling.LANCZOS)
         background_img = np.array(background_img)
 
-    cv2.imwrite('background.jpg',background_img)
+    # cv2.imwrite('background.jpg',background_img)
 
     # Step3: optimize match and paste
     if azimuth !=0:
@@ -467,11 +469,6 @@ def easyphoto_tryon_infer_forward(
     return_res = []
     for i in range(batch_size):
         print("Start First diffusion.")
-
-        cv2.imwrite('debug_res_canny.jpg',res_canny)
-        cv2.imwrite('debug_res_depth.jpg',resize_img2[:,:,::-1])
-        resize_image_input.save('debug_resize_image_input.jpg')
-        mask2_input.save('debug_mask2_input.jpg')
 
         controlnet_pairs = [
                     ["canny_no_pre", res_canny, 1.0],
@@ -621,9 +618,6 @@ def easyphoto_tryon_infer_forward(
         torch.cuda.empty_cache()
 
     return 'Success\n'+return_msg, return_res
-
-
-    
     
 
 

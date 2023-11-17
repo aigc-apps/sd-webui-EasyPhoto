@@ -26,3 +26,6 @@ DEFAULT_NEGATIVE_XL             = '(bokeh:2), cgi, illustration, cartoon, deform
 
 # ModelName
 SDXL_MODEL_NAME                 = 'SDXL_1.0_ArienMixXL_v2.0.safetensors'
+
+# lora prefix
+CLOTH_LORA_PREFIX               = 'cloth_'
