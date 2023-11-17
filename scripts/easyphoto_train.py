@@ -41,6 +41,7 @@ def easyphoto_train_forward(
     timestep_fraction: float,
     skin_retouching_bool: bool,
     training_prefix_prompt: str,
+    crop_ratio: float,
     *args
 ):  
     global check_hash
@@ -138,7 +139,8 @@ def easyphoto_train_forward(
             f'--json_save_path={json_save_path}', 
             f'--validation_prompt={local_validation_prompt}',
             f'--inputs_dir={original_backup_path}',
-            f'--ref_image_path={ref_image_path}'
+            f'--ref_image_path={ref_image_path}',
+            f'--crop_ratio={crop_ratio}'
         ]
     if skin_retouching_bool:
         command += ["--skin_retouching_bool"]

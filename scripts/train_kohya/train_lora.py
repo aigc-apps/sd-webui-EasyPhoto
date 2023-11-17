@@ -319,8 +319,11 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         - Calculate the average feature of real human images.
         - Select top_merge weights for merging based on generated validation images.
     """
-    # embedding
-    face_recognition = modelscope_pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
+    try:
+        # embedding
+        face_recognition = modelscope_pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
+    except:
+        return [], [], []
 
     # get ID list
     face_image_list     = glob(os.path.join(pivot_dir, '*.jpg')) + glob(os.path.join(pivot_dir, '*.JPG')) + \
@@ -742,14 +745,6 @@ def parse_args():
         default=None,
         help=(
             "The dir of template masks used, to make certificate photos."
-        ),
-    )
-    parser.add_argument(
-        "--mask_post_url",
-        type=str,
-        default=None,
-        help=(
-            "The post url to mask certificate photos."
         ),
     )
 
@@ -1178,7 +1173,8 @@ def main():
         input_images_shape  = []
         control_images      = []
         input_masks         = []
-        retinaface_detection = modelscope_pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
+        if args.template_mask_dir is None:
+            retinaface_detection = modelscope_pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
         jpgs                = os.listdir(args.template_dir)[:4]
         for jpg in jpgs:
             if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -1192,7 +1188,11 @@ def main():
             new_size    = (int(read_jpg.width//resize) // 64 * 64, int(read_jpg.height//resize) // 64 * 64)
             read_jpg    = read_jpg.resize(new_size)
 
-            _, _, input_mask = call_face_crop(retinaface_detection, read_jpg, crop_ratio=1.3)
+            if args.template_mask:
+                if args.template_mask_dir is not None:
+                    input_mask      = Image.open(os.path.join(args.template_mask_dir, jpg))
+                else:
+                    _, _, input_mask = call_face_crop(retinaface_detection, read_jpg, crop_ratio=1.3)
 
             # append into list
             input_images.append(read_jpg)

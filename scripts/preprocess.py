@@ -61,6 +61,14 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--crop_ratio",
+        type=float,
+        default=3,
+        help=(
+            "The crop ratio of the data for scene lora preprocessing."
+        ),
+    )
+    parser.add_argument(
         "--skin_retouching_bool",
         action="store_true",
         help=(
@@ -167,6 +175,12 @@ if __name__ == "__main__":
 
                 # face crop
                 sub_image = image.crop(retinaface_box)
+                if skin_retouching_bool:
+                    try:
+                        sub_image = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
+                    except Exception as e:
+                        torch.cuda.empty_cache()
+                        logging.error(f"Photo skin_retouching error, error info: {e}")
 
                 # get embedding
                 embedding = face_recognition(dict(user=image))[OutputKeys.IMG_EMBEDDING]
@@ -247,8 +261,6 @@ if __name__ == "__main__":
         # jpg list
         jpgs = os.listdir(inputs_dir)
         images = []
-        enhancement_num = 0
-        max_enhancement_num = len(jpgs) // 2
         for index, jpg in enumerate(tqdm(jpgs)):
             try:
                 if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -265,7 +277,7 @@ if __name__ == "__main__":
                 face_width          = retinaface_box[2] - retinaface_box[0]
                 face_height         = retinaface_box[3] - retinaface_box[1]
 
-                crop_ratio          = 3
+                crop_ratio          = float(args.crop_ratio)
                 retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
                 retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 4, 0, h - 1)
                 retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
@@ -296,9 +308,8 @@ if __name__ == "__main__":
                         logging.error(f"Photo skin_retouching error, error info: {e}")
 
                 try:
-                    if (np.shape(sub_image)[0] < 512 or np.shape(sub_image)[1] < 512) and enhancement_num < max_enhancement_num:
+                    if (np.shape(sub_image)[0] < 768 or np.shape(sub_image)[1] < 768):
                         sub_image = Image.fromarray(cv2.cvtColor(portrait_enhancement(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
-                        enhancement_num += 1
                 except Exception as e:
                     torch.cuda.empty_cache()
                     logging.error(f"Photo enhance error, error info: {e}")
