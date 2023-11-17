@@ -1016,7 +1016,7 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash, "video")
+    check_files_exists_and_download(check_hash, "add_video")
     check_hash = False
 
     for user_id in user_ids:
