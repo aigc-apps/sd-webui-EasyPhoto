@@ -81,7 +81,6 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/makeup_transfer.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
         # templates
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
@@ -94,9 +93,9 @@ download_urls = {
     ],
     "add_video": [
         # new backbone for video
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
     ]
 }
 save_filenames = {
@@ -124,7 +123,6 @@ save_filenames = {
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
         # templates
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
@@ -137,9 +135,9 @@ save_filenames = {
     ],
     "add_video": [
         # new backbone for video
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
     ]
 }
 
