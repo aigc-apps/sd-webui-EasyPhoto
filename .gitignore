@@ -164,6 +164,7 @@ cython_debug/
 *.safetensors
 *.ckpt
 *.bin
+*.pkl
 
 models/stable-diffusion-xl/version.txt
 scripts/thirdparty
