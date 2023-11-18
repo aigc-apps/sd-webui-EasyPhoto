@@ -66,7 +66,6 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
         # loras
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
         # controlnet annotator
@@ -75,8 +74,6 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
         # vaes
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
         # other models
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
@@ -86,6 +83,12 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/4.jpg",
+    ],
+    "sdxl": [
+        # sdxl
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
     ],
     "add_text2image": [
         # sdxl for text2image
@@ -108,7 +111,6 @@ save_filenames = {
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
         [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
-        [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         # controlnet annotator
@@ -117,8 +119,6 @@ save_filenames = {
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
         # vaes
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
-        os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
         # other models
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
@@ -128,6 +128,11 @@ save_filenames = {
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
+    ],
+    "sdxl": [
+        [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
+        os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
     ],
     "add_text2image": [
         # sdxl for text2image
@@ -164,11 +169,8 @@ def urldownload_progressbar(url, file_path):
 
     progress_bar.close()
 
-def check_files_exists_and_download(check_hash, addition_download="none"):
-    urls, filenames = download_urls["base"], save_filenames["base"]
-    if addition_download is not "none":
-        urls += download_urls[addition_download]
-        filenames += save_filenames[addition_download]
+def check_files_exists_and_download(check_hash, download_mode="base"):
+    urls, filenames = download_urls[download_mode], save_filenames[download_mode]
 
     # This print will introduce some misundertand
     # print("Start Downloading weights")
