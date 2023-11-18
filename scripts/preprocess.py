@@ -290,7 +290,7 @@ if __name__ == "__main__":
                     right - left, bottom - top, 
                     (left + right) / 2, (top + bottom) / 2
                 ]
-                long_side = max(width, height)
+                long_side = min(width, height)
 
                 # Calculate the new left, top, right, bottom of all faces for clipping
                 # Pad the box to square for saving GPU memomry

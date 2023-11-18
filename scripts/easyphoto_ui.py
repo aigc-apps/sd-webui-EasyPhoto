@@ -11,8 +11,8 @@ from scripts.easyphoto_config import (cache_log_file_path, models_path,
                                       user_id_outpath_samples)
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from modules.ui_components import ToolButton as ToolButton_webui
-from scripts.easyphoto_config import (cache_log_file_path,
-                                      easyphoto_outpath_samples,
+from scripts.easyphoto_config import (cache_log_file_path, DEFAULT_SCENE_LORA, 
+                                      easyphoto_outpath_samples, 
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples)
 from scripts.easyphoto_infer import (easyphoto_infer_forward,
@@ -373,41 +373,62 @@ def on_ui_tabs():
                                     label="Input Prompt", interactive=True, lines=2,
                                     value="upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32", visible=True
                                 )
-
-                                with gr.Row():
-                                    def scene_change_function(scene_id):
-                                        # scene lora path
-                                        lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
-                                        if not os.path.exists(lora_model_path):
-                                            return gr.update(value="Please check scene lora is exist or not.")
-                                        is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
-                                        return gr.update(value=scene_lora_prompt)
+                                with gr.Accordion("Scene Lora (Click here to Select Scene Lora)", open=False):
+                                    with gr.Column():
+                                        def scene_change_function(scene_id_gallery, evt: gr.SelectData):
+                                            scene_id = scene_id_gallery[evt.index][1]
+                                            # scene lora path
+                                            lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+                                            if scene_id == "none":
+                                                return gr.update(visible=True), gr.update(value="none")
+                                            if not os.path.exists(lora_model_path):
+                                                return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
+                                            is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+                                            
+                                            return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
+                                        
+                                        def scene_refresh_function():
+                                            scene = [[os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "scene_lora", f'{_scene}.jpg'), _scene] for _scene in DEFAULT_SCENE_LORA]
+                                            _scenes = os.listdir(os.path.join(models_path, "Lora"))
+                                            for _scene in _scenes:
+                                                if check_scene_valid(_scene, models_path):
+                                                    if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+                                                        continue
+                                                    ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+                                                    if not os.path.exists(ref_image):
+                                                        ref_image = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg')
+                                                    scene.append([ref_image, os.path.splitext(_scene)[0]])
+                                            scene = sorted(scene)
+                                            scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
+                                            return gr.update(value=scene)
                                     
-                                    def scene_select_function():
-                                        scene = []
+                                        scene = [[os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "scene_lora", f'{_scene}.jpg'), _scene] for _scene in DEFAULT_SCENE_LORA]
                                         _scenes = os.listdir(os.path.join(models_path, "Lora"))
                                         for _scene in _scenes:
                                             if check_scene_valid(_scene, models_path):
-                                                scene.append(os.path.splitext(_scene)[0])
+                                                if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+                                                    continue
+                                                ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+                                                if not os.path.exists(ref_image):
+                                                    ref_image = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg')
+                                                scene.append([ref_image, os.path.splitext(_scene)[0]])
                                         scene = sorted(scene)
-                                        return gr.update(choices=["none"] + scene)
-                                
-                                    scene = []
-                                    _scenes = os.listdir(os.path.join(models_path, "Lora"))
-                                    for _scene in _scenes:
-                                        if check_scene_valid(_scene, models_path):
-                                            scene.append(os.path.splitext(_scene)[0])
-                                    scene = sorted(scene)
+                                        scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
 
-                                    scene_id = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + scene, min_width=40, label=f"Scene Lora", visible=True)
-                                    scene_id.change(fn=scene_change_function, inputs=[scene_id], outputs=[text_to_image_input_prompt])
+                                        scene_id = gr.Text(show_label=False, visible=True, placeholder="Selected")
+                                        with gr.Row():
+                                            scene_id_gallery = gr.Gallery(
+                                                value=scene, label="Scene Lora Gallery", allow_preview=False,
+                                                show_share_button=False, visible=True, height=300,
+                                            ).style(columns=[5], rows=[2])
+                                            scene_id_gallery.select(scene_change_function, [scene_id_gallery], [text_to_image_input_prompt, scene_id])
 
-                                    scene_id_refresh = ToolButton(value="\U0001f504")
-                                    scene_id_refresh.click(fn=scene_select_function, inputs=[], outputs=[scene_id])
+                                            scene_id_refresh = ToolButton(value="\U0001f504")
+                                            scene_id_refresh.click(fn=scene_refresh_function, inputs=[], outputs=[scene_id_gallery])
 
                                 with gr.Row():
-                                    text_to_image_width = gr.Slider(minimum=64, maximum=2048, step=8, label="Width", value=512, elem_id=f"width")
-                                    text_to_image_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Height", value=768,elem_id=f"height")
+                                    text_to_image_width = gr.Slider(minimum=64, maximum=2048, step=8, label="Width", value=624, elem_id=f"width")
+                                    text_to_image_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Height", value=832,elem_id=f"height")
 
                                 with gr.Row():
                                     prompt_generate_sd_model_checkpoint = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The checkpoint you use for text to image prompt generate.", interactive=True, visible=True)

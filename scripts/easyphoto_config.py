@@ -22,5 +22,7 @@ DEFAULT_NEGATIVE_AD = '(naked:1.2), (nsfw:1.2), nipple slip, nude, breasts, (hug
 DEFAULT_POSITIVE_T2I = '(cloth:1.0), (best quality), (realistic, photo-realistic:1.3), film photography, minor acne, (high resolution detail of human skin texture:1.4), (rough skin:1.2), (portrait:1.2), (indirect lighting), extremely detailed CG unity 8k wallpaper, huge filesize, best quality, realistic, photo-realistic, ultra high res, raw photo, put on makeup'
 DEFAULT_NEGATIVE_T2I = '(nsfw:1.5), (huge breast:1.5), nude, breasts, penis, cum, bokeh, cgi, illustration, cartoon, deformed, distorted, disfigured, poorly drawn, bad anatomy, wrong anatomy, ugly, deformed, blurry, Noisy, log, text (worst quality:2), (low quality:2), (normal quality:2), lowres, watermark, badhand, lowres'
 
+# scene lora
+DEFAULT_SCENE_LORA = ['Christmas_1', 'FairMaidenStyle_1', 'Gentleman_1', 'GuoFeng_1', 'GuoFeng_2', 'GuoFeng_3', 'GuoFeng_4', 'Minimalism_1', 'NaturalWind_1', 'Princess_1', 'Princess_2', 'Princess_3', 'SchoolUniform_1', 'SchoolUniform_2']
 # ModelName
-SDXL_MODEL_NAME     = 'SDXL_1.0_ArienMixXL_v2.0.safetensors'
+SDXL_MODEL_NAME = 'SDXL_1.0_ArienMixXL_v2.0.safetensors'
