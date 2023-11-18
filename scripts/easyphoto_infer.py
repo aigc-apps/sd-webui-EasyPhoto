@@ -40,7 +40,7 @@ from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
-                             t2i_call)
+                             refresh_model_vae, t2i_call)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -321,6 +321,8 @@ def easyphoto_infer_forward(
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash[0], download_mode = "base")
+    if check_hash[0]:
+        refresh_model_vae()
     check_hash[0] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
@@ -330,9 +332,13 @@ def easyphoto_infer_forward(
 
     if sdxl_pipeline_flag or tabs == 3:
         check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
+        if check_hash[1]:
+            refresh_model_vae()
         check_hash[1] = False
     if tabs == 3:
         check_files_exists_and_download(check_hash[2], download_mode = "add_text2image")
+        if check_hash[2]:
+            refresh_model_vae()
         check_hash[2] = False
 
     for user_id in user_ids:
@@ -1024,6 +1030,8 @@ def easyphoto_video_infer_forward(
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash[3], "add_video")
+    if check_hash[3]:
+        refresh_model_vae()
     check_hash[3] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
