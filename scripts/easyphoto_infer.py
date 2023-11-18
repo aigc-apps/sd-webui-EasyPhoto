@@ -323,15 +323,12 @@ def easyphoto_infer_forward(
     check_files_exists_and_download(check_hash[0], download_mode = "base")
     check_hash[0] = False
 
-    if sd_model_checkpoint != SDXL_MODEL_NAME:
-        checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
-        if checkpoint_type == 2:
-            return "EasyPhoto does not support the SD2 checkpoint.", [], []
-        sdxl_pipeline_flag = True if checkpoint_type == 3 else False
-    else:
-        sdxl_pipeline_flag = True
+    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+    if checkpoint_type == 2:
+        return "EasyPhoto does not support the SD2 checkpoint.", [], []
+    sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
-    if sdxl_pipeline_flag:
+    if sdxl_pipeline_flag or tabs == 3:
         check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
         check_hash[1] = False
     if tabs == 3:
