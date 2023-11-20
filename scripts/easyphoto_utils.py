@@ -42,16 +42,109 @@ for handler in handlers:
 
 ep_logger.setLevel("INFO")
 
-def check_id_valid(user_id, user_id_outpath_samples, models_path):
-    face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
-    if not os.path.exists(face_id_image_path):
-        return False
-    
-    safetensors_lora_path   = os.path.join(models_path, "Lora", f"{user_id}.safetensors") 
-    ckpt_lora_path          = os.path.join(models_path, "Lora", f"{user_id}.ckpt") 
-    if not (os.path.exists(safetensors_lora_path) or os.path.exists(ckpt_lora_path)):
-        return False
-    return True
+# download path
+controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
+controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
+models_annotator_path               = os.path.join(data_path, "models")
+if os.path.exists(controlnet_extensions_path):
+    controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
+    controlnet_cache_path = controlnet_extensions_path
+elif os.path.exists(controlnet_extensions_builtin_path):
+    controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
+    controlnet_cache_path = controlnet_extensions_builtin_path
+else:
+    controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
+    controlnet_cache_path = controlnet_extensions_path
+
+download_urls = {
+    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
+    "base": [
+        # base model
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
+        # controlnets
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
+        # loras
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
+        # controlnet annotator
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
+        # vaes
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
+        # other models
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/makeup_transfer.pth",
+        # templates
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/4.jpg",
+    ],
+    "sdxl": [
+        # sdxl
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
+    ],
+    "add_text2image": [
+        # sdxl for text2image
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
+    ],
+    "add_video": [
+        # new backbone for video
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
+    ]
+}
+save_filenames = {
+    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
+    "base": [
+        # base model
+        os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
+        # controlnets
+        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
+        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
+        [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
+        [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
+        # loras
+        os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
+        # controlnet annotator
+        os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
+        os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
+        # vaes
+        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
+        # other models
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
+        # templates
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
+    ],
+    "sdxl": [
+        [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
+        os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
+    ],
+    "add_text2image": [
+        # sdxl for text2image
+        os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
+    ],
+    "add_video": [
+        # new backbone for video
+        os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
+    ]
+}
 
 def check_scene_valid(lora_path, models_path):
     from scripts.sdwebui import get_lora_type
@@ -62,6 +155,17 @@ def check_scene_valid(lora_path, models_path):
     if lora_type == 4:
         return True
     return False
+
+def check_id_valid(user_id, user_id_outpath_samples, models_path):
+    face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
+    if not os.path.exists(face_id_image_path):
+        return False
+    
+    safetensors_lora_path   = os.path.join(models_path, "Lora", f"{user_id}.safetensors") 
+    ckpt_lora_path          = os.path.join(models_path, "Lora", f"{user_id}.ckpt") 
+    if not (os.path.exists(safetensors_lora_path) or os.path.exists(ckpt_lora_path)):
+        return False
+    return True
 
 def urldownload_progressbar(url, file_path):
     response = requests.get(url, stream=True)
@@ -75,73 +179,9 @@ def urldownload_progressbar(url, file_path):
 
     progress_bar.close()
 
-def check_files_exists_and_download(check_hash):
-    controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
-    controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
-    models_annotator_path               = os.path.join(data_path, "models")
-    if os.path.exists(controlnet_extensions_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
-        controlnet_cache_path = controlnet_extensions_path
-    elif os.path.exists(controlnet_extensions_builtin_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
-        controlnet_cache_path = controlnet_extensions_builtin_path
-    else:
-        controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
-        controlnet_cache_path = controlnet_extensions_path
+def check_files_exists_and_download(check_hash, download_mode="base"):
+    urls, filenames = download_urls[download_mode], save_filenames[download_mode]
 
-    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
-    urls        = [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/makeup_transfer.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1.jpg",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2.jpg",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/3.jpg",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/4.jpg",
-    ]
-    filenames = [
-        os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
-        os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
-        os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
-        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
-        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
-        [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
-        [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
-        [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
-        os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
-        os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
-        os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
-        os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
-        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
-        os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
-    ]
     # This print will introduce some misundertand
     # print("Start Downloading weights")
     for url, filename in zip(urls, filenames):

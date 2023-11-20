@@ -23,7 +23,7 @@ from scripts.sdwebui import get_checkpoint_type, unload_sd
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 python_executable_path = sys.executable
-check_hash             = True
+check_hash             = [True, True]
 
 # Attention! Output of js is str or list, not float or int
 @unload_sd()
@@ -70,15 +70,22 @@ def easyphoto_train_forward(
         return "The network alpha {} must not exceed rank {}. " \
             "It will result in an unintended LoRA.".format(network_alpha, rank)
     
+    check_files_exists_and_download(check_hash[0], "base")
+    check_hash[0] = False
+
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint: {}.".format(sd_model_checkpoint)
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
+    if sdxl_pipeline_flag:
+        check_files_exists_and_download(check_hash[1], "sdxl")
+        check_hash[1] = False
+
     # check if user want to train Scene Lora
     train_scene_lora_bool = True if train_mode_choose == "Train Scene Lora" else False
     cache_outpath_samples = scene_id_outpath_samples if train_scene_lora_bool else user_id_outpath_samples 
-
+        
     # Check conflicted arguments in SDXL training.
     if sdxl_pipeline_flag:
         if enable_rl:
@@ -90,9 +97,6 @@ def easyphoto_train_forward(
         if validation:
             # We do not ensemble models by validation in SDXL training.
             return "To save training time and VRAM, please turn off validation in SDXL training."
-
-    check_files_exists_and_download(check_hash)
-    check_hash = False
 
     # Template address
     training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
