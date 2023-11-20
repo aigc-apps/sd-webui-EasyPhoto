@@ -558,8 +558,8 @@ def on_ui_tabs():
                                     label="IP-Adapter Control",
                                     value=False
                                 )
-                                upload_ref_image = gr.Checkbox(
-                                    label="Upload Reference Image",
+                                face_shape_match = gr.Checkbox(
+                                    label="Face Shape Match",
                                     value=False
                                 )
 
@@ -584,12 +584,6 @@ def on_ui_tabs():
                                     update_score,
                                     inputs=[ip_adapter_control, display_score],
                                     outputs=[display_score]
-                                )
-
-                            with gr.Row():
-                                face_shape_match = gr.Checkbox(
-                                    label="Face Shape Match",
-                                    value=False
                                 )
 
                             with gr.Row():
@@ -618,10 +612,18 @@ def on_ui_tabs():
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
                                 ip_adapter_control.change(lambda x: ip_adapter_weight.update(visible=x), inputs=[ip_adapter_control], outputs=[ip_adapter_weight])
                             
-                            uploaded_ref_image_path = None
+                            ipa_note = gr.Markdown(
+                                value = '''
+                                    IP-Adapter Control notes:
+                                    1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
+                                    2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
+                                ''',
+                                visible=False
+                            )
                             with gr.Row():
-                                uploaded_ref_image_path = gr.Image(label="Reference Image", show_label=True, source="upload", type="filepath", visible=False)
-                            upload_ref_image.change(lambda x: uploaded_ref_image_path.update(visible=x), inputs=[upload_ref_image], outputs=[uploaded_ref_image_path])
+                                ipa_image_path = gr.Image(label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath", visible=False)
+                            ip_adapter_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_image_path])
+                            ip_adapter_control.change(lambda x: ipa_note.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_note])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -685,7 +687,7 @@ def on_ui_tabs():
                             before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                             seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                             background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, \
-                            ip_adapter_control, ip_adapter_weight, uploaded_ref_image_path, *uuids],
+                            ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids],
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )

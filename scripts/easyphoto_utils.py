@@ -122,7 +122,7 @@ def check_files_exists_and_download(check_hash):
         [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
         [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
         [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
-        [os.path.join(models_path, f"ControlNet/ip-adapter-plus-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
+        [os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
         [os.path.join(models_path, f"ControlNet/ip-adapter-plus-face_sdxl_vit-h.safetensors"), os.path.join(controlnet_cache_path, f"models/ip-adapter-plus-face_sdxl_vit-h.safetensors")],
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
