@@ -36,6 +36,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 新特性：
+- 感谢[揽睿星舟](https://www.lanrui-ai.com/) 提供了内置EasyPhoto的SDWebUI官方镜像，并承诺每两周更新一次。亲自测试，可以在2分钟内拉起资源，并在5分钟内完成启动。[🔥 🔥 🔥 🔥 2023.11.20]
 - ComfyUI 支持 [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), 感谢[THtianhao](https://github.com/THtianhao)的精彩工作![🔥 🔥 🔥 2023.10.17]
 - EasyPhoto 论文地址 [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]
 - 支持使用SDXL模型和一定的选项直接生成高清大图，不再需要上传模板，需要16GB显存。具体细节可以前往[这里](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
@@ -62,7 +63,7 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 - 支持高分辨率。
 
 # 快速启动
-### 1. 云使用: AliyunDSW/AutoDL/Docker
+### 1. 云使用: AliyunDSW/AutoDL/揽睿星舟/Docker
 #### a. 通过阿里云 DSW
 DSW 有免费 GPU 时间，用户可申请一次，申请后3个月内有效。
 
@@ -70,7 +71,11 @@ DSW 有免费 GPU 时间，用户可申请一次，申请后3个月内有效。
 
 [![DSW Notebook](images/dsw.png)](https://gallery.pai-ml.com/#/preview/deepLearning/cv/stable_diffusion_easyphoto)
 
-#### b. 通过AutoDL
+#### b. 通过揽睿星舟/AutoDL
+##### 揽睿星舟
+揽睿星舟官方全插件版本内置EasyPhoto，并承诺每两周测试与更新，亲测可用，5分钟内拉起，感谢他们的支持和对社区做出的贡献。
+
+##### AutoDL
 如果您正在使用 AutoDL，您可以使用我们提供的镜像快速启动 Stable DIffusion webui。
 
 您可以在社区镜像中填写以下信息来选择所需的镜像。
