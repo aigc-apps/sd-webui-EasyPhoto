@@ -16,8 +16,8 @@ from modules.paths import models_path
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
-from modules.sd_models import get_closet_checkpoint_match, load_model
-from modules.sd_vae import find_vae_near_checkpoint
+from modules.sd_models import get_closet_checkpoint_match, load_model, list_models
+from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
 from scripts.animatediff_utils import AnimateDiffProcess, motion_module
@@ -226,6 +226,12 @@ def reload_sd_model_vae(sd_model, vae):
     sd_models.reload_model_weights()
     shared.opts.sd_vae = vae
     sd_vae.reload_vae_weights()
+
+def refresh_model_vae():
+    """Refresh sd model and vae
+    """
+    list_models()
+    refresh_vae_list()
 
 def t2i_call(
         resize_mode=0,

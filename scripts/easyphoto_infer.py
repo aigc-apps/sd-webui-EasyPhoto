@@ -40,7 +40,7 @@ from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, i2i_inpaint_call,
                              reload_sd_model_vae, switch_sd_model_vae,
-                             t2i_call)
+                             refresh_model_vae, t2i_call)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -324,7 +324,7 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = True
+check_hash = [True, True, True, True]
 sdxl_txt2img_flag = False
 
 # this decorate is default to be closed, not every needs this, more for developers
@@ -341,13 +341,26 @@ def easyphoto_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
-    check_hash = False
+    check_files_exists_and_download(check_hash[0], download_mode = "base")
+    if check_hash[0]:
+        refresh_model_vae()
+    check_hash[0] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
+
+    if sdxl_pipeline_flag or tabs == 3:
+        check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
+        if check_hash[1]:
+            refresh_model_vae()
+        check_hash[1] = False
+    if tabs == 3:
+        check_files_exists_and_download(check_hash[2], download_mode = "add_text2image")
+        if check_hash[2]:
+            refresh_model_vae()
+        check_hash[2] = False
 
     for user_id in user_ids:
         if user_id != "none":
@@ -1159,13 +1172,21 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash)
-    check_hash = False
+    check_files_exists_and_download(check_hash[3], "add_video")
+    if check_hash[3]:
+        refresh_model_vae()
+    check_hash[3] = False
 
+    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+    checkpoint_type_text2video = get_checkpoint_type(sd_model_checkpoint_for_animatediff_text2video)
+    checkpoint_type_image2video = get_checkpoint_type(sd_model_checkpoint_for_animatediff_image2video)
+    if checkpoint_type == 2 or checkpoint_type == 3 or checkpoint_type_text2video == 2 or checkpoint_type_text2video == 3 or checkpoint_type_image2video == 2 or checkpoint_type_image2video == 3:
+        return "EasyPhoto video infer does not support the SD2 checkpoint and sdxl.", None, None, []
+    
     for user_id in user_ids:
         if user_id != "none":
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
-                return "User id is not exist", [], []  
+                return "User id is not exist", None, None, []
     
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -1174,7 +1195,7 @@ def easyphoto_video_infer_forward(
             passed_userid_list.append(idx)
 
     if len(user_ids) == len(passed_userid_list):
-        return "Please choose a user id.", [], []
+        return "Please choose a user id.", None, None, []
 
     # get random seed 
     if int(seed) == -1:
@@ -1205,7 +1226,7 @@ def easyphoto_video_infer_forward(
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
-        return "Please choose or upload a template.", [], []
+        return "Please input the correct params or upload a template.", None, None, []
     
     # create modelscope model
     if retinaface_detection is None:
