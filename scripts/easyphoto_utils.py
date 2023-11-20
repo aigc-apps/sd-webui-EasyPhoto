@@ -115,6 +115,9 @@ download_urls = {
     "Christmas_1": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors",
     ],
+    "Cyberpunk_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Cyberpunk_1.safetensors",
+    ],
     "FairMaidenStyle_1": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/FairMaidenStyle_1.safetensors",
     ],
@@ -212,6 +215,9 @@ save_filenames = {
     # Scene Lora Collection
     "Christmas_1": [
        os.path.join(models_path, f"Lora/Christmas_1.safetensors"),
+    ],
+    "Cyberpunk_1": [
+       os.path.join(models_path, f"Lora/Cyberpunk_1.safetensors"),
     ],
     "FairMaidenStyle_1": [
        os.path.join(models_path, f"Lora/FairMaidenStyle_1.safetensors"),
