@@ -420,7 +420,7 @@ def on_ui_tabs():
                             with gr.Row():
                                 infer_note = gr.Markdown(
                                     value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                    visible=(sd_model_checkpoint != shared.opts.sd_model_checkpoint.split(" ")[0])
+                                    visible=(sd_model_checkpoint.value != shared.opts.sd_model_checkpoint.split(" ")[0])
                                 )
                             
                                 def update_infer_note(sd_model_checkpoint):
@@ -546,22 +546,52 @@ def on_ui_tabs():
                                         label="Skin Retouching",  
                                         value=True
                                     )
-                                    display_score = gr.Checkbox(
-                                        label="Display Face Similarity Scores",  
-                                        value=False
-                                    )
+                              
                                     background_restore = gr.Checkbox(
                                         label="Background Restore",  
                                         value=False
                                     )
-                                with gr.Row():
+                                
                                     makeup_transfer = gr.Checkbox(
                                         label="MakeUp Transfer",
+                                        value=False
+                                    )
+
+                                with gr.Row():
+                                    display_score = gr.Checkbox(
+                                        label="Display Face Similarity Scores",  
+                                        value=False
+                                    )
+                                    ip_adapter_control = gr.Checkbox(
+                                        label="IP-Adapter Control",
                                         value=False
                                     )
                                     face_shape_match = gr.Checkbox(
                                         label="Face Shape Match",
                                         value=False
+                                    )
+
+                                    def ipa_update_score(ip_adapter_control, display_score):
+                                        if not display_score and ip_adapter_control:
+                                            return gr.Checkbox.update(value=True)
+                                        return gr.Checkbox.update(value=display_score)
+                                
+                                    def update_score(ip_adapter_control, display_score):
+                                        if ip_adapter_control:
+                                            return gr.Checkbox.update(value=True)
+                                        return gr.Checkbox.update(value=display_score)
+                                    
+                                    # We need to make sure that Display Similarity Score is mandatory when the user
+                                    # selects IP-Adapter Control. Otherwise, it is not.
+                                    ip_adapter_control.change(
+                                        ipa_update_score,
+                                        inputs=[ip_adapter_control, display_score],
+                                        outputs=[display_score]
+                                    )
+                                    display_score.change(
+                                        update_score,
+                                        inputs=[ip_adapter_control, display_score],
+                                        outputs=[display_score]
                                     )
 
                                 with gr.Row():
@@ -579,27 +609,46 @@ def on_ui_tabs():
                                         step=0.05, label='Makeup Transfer Ratio',
                                         visible=False
                                     )
+                                    ip_adapter_weight = gr.Slider(
+                                        minimum=0.10, maximum=1.00, value=0.50,
+                                        step=0.05, label="IP-Adapter Control Weight",
+                                        visible=False
+                                    )
                                     
                                     super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                     background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
                                     makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
+                                    ip_adapter_control.change(lambda x: ip_adapter_weight.update(visible=x), inputs=[ip_adapter_control], outputs=[ip_adapter_weight])
+                            
+                            ipa_note = gr.Markdown(
+                                value = '''
+                                    IP-Adapter Control notes:
+                                    1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
+                                    2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
+                                ''',
+                                visible=False
+                            )
+                            with gr.Row():
+                                ipa_image_path = gr.Image(label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath", visible=False)
+                            ip_adapter_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_image_path])
+                            ip_adapter_control.change(lambda x: ipa_note.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_note])
 
-                                with gr.Box():
-                                    gr.Markdown(
-                                        '''
-                                        Parameter parsing:
-                                        1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
-                                        2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
-                                        3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
-                                        4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
-                                        5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
-                                        6. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
-                                        7. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
-                                        8. **Background Restore** represents whether to give a different background.
-                                        '''
-                                    )
-                                
-                            display_button = gr.Button('Start Generation')                        
+                            with gr.Box():
+                                gr.Markdown(
+                                    '''
+                                    Parameter parsing:
+                                    1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
+                                    2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
+                                    3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
+                                    4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
+                                    5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
+                                    6. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
+                                    7. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
+                                    8. **Background Restore** represents whether to give a different background.
+                                    '''
+                                )
+                            
+                        display_button = gr.Button('Start Generation')                        
 
                         with gr.Column():
                             gr.Markdown('Generated Results')
@@ -646,7 +695,8 @@ def on_ui_tabs():
                         inputs=[sd_model_checkpoint, selected_template_images, init_image_photo_inference, uploaded_template_images, additional_prompt, 
                                 before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                                 seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                                background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, *uuids],
+                                background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, \
+                                ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids],
                         outputs=[infer_progress, photo_infer_output_images, face_id_outputs]
 
                     )

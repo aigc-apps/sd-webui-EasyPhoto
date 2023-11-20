@@ -16,8 +16,8 @@ from modules.paths import models_path
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
-from modules.sd_models import get_closet_checkpoint_match, load_model
-from modules.sd_vae import find_vae_near_checkpoint
+from modules.sd_models import get_closet_checkpoint_match, load_model, list_models
+from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
 from scripts.animatediff_utils import AnimateDiffProcess, motion_module
@@ -226,6 +226,12 @@ def reload_sd_model_vae(sd_model, vae):
     sd_models.reload_model_weights()
     shared.opts.sd_vae = vae
     sd_vae.reload_vae_weights()
+
+def refresh_model_vae():
+    """Refresh sd model and vae
+    """
+    list_models()
+    refresh_vae_list()
 
 def t2i_call(
         resize_mode=0,
@@ -582,16 +588,9 @@ def i2i_inpaint_call(
     if animatediff_flag:
         gen_image = processed.images
     else:
-        if len(processed.images) > 1:
-            # get the generate image!
-            h_0, w_0, c_0 = np.shape(processed.images[0])
-            h_1, w_1, c_1 = np.shape(processed.images[1])
-            if w_1 != w_0:
-                gen_image = processed.images[1]
-            else:
-                gen_image = processed.images[0]
-        else:
-            gen_image = processed.images[0]
+        if opts.return_mask or opts.return_mask_composite:
+            return processed.images[1]
+        return processed.images[0]
     return gen_image
 
 def get_checkpoint_type(sd_model_checkpoint: str) -> int:
