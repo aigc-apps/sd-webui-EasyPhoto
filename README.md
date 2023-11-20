@@ -38,7 +38,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New:
-- Collaborate with [lanrui-ai](https://www.lanrui-ai.com/), It offers an SDWebUI image with built-in EasyPhoto, promising bi-weekly updates. Personally tested, it can pull up resources in 2 minutes and complete startup within 5 minutes. [🔥 🔥 🔥 🔥 2023.11.20]
+- Thanks to [lanrui-ai](https://www.lanrui-ai.com/). It offers an SDWebUI image with built-in EasyPhoto, promising bi-weekly updates. Personally tested, it can pull up resources in 2 minutes and complete startup within 5 minutes. [🔥 🔥 🔥 🔥 2023.11.20]
 - We are already support Video Inference without more traning! Specific details can go [here](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Video)![🔥 🔥 🔥 🔥 2023.11.10]
 - SDXL Training and Inference Support. Specific details can go [here](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/SDXL)![🔥 🔥 🔥 🔥 2023.11.10]
 - ComfyUI Support at [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), thanks to [THtianhao](https://github.com/THtianhao) great work![🔥 🔥 🔥 2023.10.17]
