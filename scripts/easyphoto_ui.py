@@ -648,7 +648,7 @@ def on_ui_tabs():
                                     '''
                                 )
                             
-                        display_button = gr.Button('Start Generation')                        
+                            display_button = gr.Button('Start Generation')                        
 
                         with gr.Column():
                             gr.Markdown('Generated Results')
@@ -1298,17 +1298,29 @@ def on_ui_tabs():
 
                             parameters_copypaste.add_paste_fields("tryon", template_image_tryon, None)
                             for paste_tabname, paste_button in buttons_photo_infer.items():
-                                parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
-                                    paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=selected_photo_infer_output_image,
-                                    paste_field_names=[]
-                                ))
+                                if paste_tabname in ['img2img','inpaint']:
+                                    parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                        paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=photo_infer_output_images,
+                                        paste_field_names=[]
+                                    ))
+                                else:
+                                    parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                        paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=selected_photo_infer_output_image,
+                                        paste_field_names=[]
+                                    ))
     
                             parameters_copypaste.add_paste_fields("easyphoto", init_image_photo_inference, None)
                             for paste_tabname, paste_button in buttons_tryon.items():
-                                parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
-                                    paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=selected_tryon_output_image,
-                                    paste_field_names=[]
-                                ))
+                                if paste_tabname in ['img2img','inpaint']:
+                                    parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                        paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=tryon_output_images,
+                                        paste_field_names=[]
+                                    ))
+                                else:
+                                    parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
+                                        paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=selected_tryon_output_image,
+                                        paste_field_names=[]
+                                    ))
 
                             infer_progress = gr.Textbox(
                                 label="Generation Progress",
