@@ -99,7 +99,10 @@ def easyphoto_train_forward(
     # Raw data backup
     original_backup_path    = os.path.join(cache_outpath_samples, user_id, "original_backup")
     # Reference backup of face
-    ref_image_path          = os.path.join(cache_outpath_samples, user_id, "ref_image.jpg")
+    if train_scene_lora_bool:
+        ref_image_path = os.path.join(models_path, f"Lora/{user_id}.jpg")
+    else:
+        ref_image_path = os.path.join(cache_outpath_samples, user_id, "ref_image.jpg")
 
     # Training data retention
     user_path               = os.path.join(cache_outpath_samples, user_id, "processed_images")
@@ -130,7 +133,7 @@ def easyphoto_train_forward(
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
     
-    local_validation_prompt = validation_prompt if not train_scene_lora_bool else training_prefix_prompt + "," + validation_prompt_scene
+    local_validation_prompt = validation_prompt if not train_scene_lora_bool else training_prefix_prompt + ", " + validation_prompt_scene
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
     command = [

@@ -320,7 +320,28 @@ if __name__ == "__main__":
                 logging.error(f"Photo detect and count score error, error info: {e}")
         
         if len(images) > 0:
-            images[0].save(ref_image_path)
+            target_size = (224, 224)
+            image = images[0]
+
+            # calculate resize border
+            width, height = image.size
+            aspect_ratio = width / height
+            if aspect_ratio > 1:
+                new_width = int(target_size[0] * aspect_ratio)
+                image = image.resize((new_width, target_size[1]))
+            else:
+                new_height = int(target_size[1] / aspect_ratio)
+                image = image.resize((target_size[0], new_height))
+
+            # crop a 224x224 photo for goodlook
+            width, height = image.size
+            left = (width - target_size[0]) / 2
+            top = (height - target_size[1]) / 2
+            right = (width + target_size[0]) / 2
+            bottom = (height + target_size[1]) / 2
+
+            cropped_image = image.crop((left, top, right, bottom))
+            image.save(ref_image_path)
 
     # write results
     for index, base64_pilimage in enumerate(images):

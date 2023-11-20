@@ -16,6 +16,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         sd_model_checkpoint     = datas.get("sd_model_checkpoint", "Chilloutmix-Ni-pruned-fp16-fix.safetensors")
         id_task                 = datas.get("id_task", "")
         user_id                 = datas.get("user_id", "tmp")
+        train_mode_choose       = datas.get("train_mode_choose", "Train Human Lora")
         resolution              = datas.get("resolution", 512)
         val_and_checkpointing_steps = datas.get("val_and_checkpointing_steps", 100)
         max_train_steps         = datas.get("max_train_steps", 800)
@@ -34,6 +35,8 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         max_rl_time             = datas.get("max_rl_time", 1)
         timestep_fraction       = datas.get("timestep_fraction", 1)
         skin_retouching_bool    = datas.get("skin_retouching_bool", False)
+        training_prefix_prompt  = datas.get("training_prefix_prompt", "")
+        crop_ratio              = datas.get("crop_ratio", 3)
         args                    = datas.get("args", []) 
 
         instance_images         = [api.decode_base64_to_image(init_image) for init_image in instance_images]
@@ -51,11 +54,12 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
             message = easyphoto_train_forward(
                 sd_model_checkpoint,
                 id_task,
-                user_id,
+                user_id, train_mode_choose,
                 resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos,
                 train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, 
                 rank, network_alpha, validation, instance_images,
                 enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool,
+                training_prefix_prompt, crop_ratio, 
                 *args
             )
         except Exception as e:
@@ -74,6 +78,13 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         selected_template_images    = datas.get("selected_template_images", [])
         init_image                  = datas.get("init_image", None)
         uploaded_template_images    = datas.get("uploaded_template_images", [])
+
+        text_to_image_input_prompt  = datas.get("text_to_image_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32")
+        text_to_image_width         = datas.get("text_to_image_width", 624)
+        text_to_image_height        = datas.get("text_to_image_height", 832)
+        scene_id                    = datas.get("scene_id", "none")
+        prompt_generate_sd_model_checkpoint = datas.get("sd_model_checkpoint", "LZ-16K+Optics.safetensors")
+
         additional_prompt           = datas.get("additional_prompt", "")
 
         first_diffusion_steps       = datas.get("first_diffusion_steps", 50)
@@ -99,8 +110,6 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         makeup_transfer             = datas.get("makeup_transfer", False)
         makeup_transfer_ratio       = datas.get("makeup_transfer_ratio", 0.50)
         face_shape_match            = datas.get("face_shape_match", False)
-        sd_xl_input_prompt          = datas.get("sd_xl_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32")
-        sd_xl_resolution            = datas.get("sd_xl_resolution", "(1024, 1024)")
         tabs                        = datas.get("tabs", 1)
 
         if type(user_ids) == str:
@@ -132,10 +141,13 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         tabs = int(tabs)
         try:
             comment, outputs, face_id_outputs = easyphoto_infer_forward(
-                sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
-                before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, \
-                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
+                sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, \
+                text_to_image_input_prompt, text_to_image_width, text_to_image_height, scene_id, prompt_generate_sd_model_checkpoint, \
+                additional_prompt, before_face_fusion_ratio, after_face_fusion_ratio, \
+                first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+                seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
+                background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, \
+                tabs, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
         except Exception as e:

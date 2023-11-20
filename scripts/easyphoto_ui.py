@@ -6,20 +6,16 @@ import gradio as gr
 import modules.generation_parameters_copypaste as parameters_copypaste
 import requests
 from modules import script_callbacks, shared
-
-from scripts.easyphoto_config import (cache_log_file_path, models_path,
-                                      user_id_outpath_samples)
-from scripts.easyphoto_infer import easyphoto_infer_forward
 from modules.ui_components import ToolButton as ToolButton_webui
-from scripts.easyphoto_config import (cache_log_file_path, DEFAULT_SCENE_LORA, 
-                                      easyphoto_outpath_samples, 
+from scripts.easyphoto_config import (DEFAULT_SCENE_LORA, cache_log_file_path,
+                                      easyphoto_outpath_samples,
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples)
 from scripts.easyphoto_infer import (easyphoto_infer_forward,
                                      easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid, check_scene_valid
-from scripts.sdwebui import get_scene_prompt
+from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
 
@@ -123,13 +119,22 @@ def on_ui_tabs():
                         clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)
-                    
-                        gr.Markdown(
+
+                        human_upload_note = gr.Markdown(
                             '''
                             Training steps:
                             1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
                             2. Click on the Start Training button below to start the training process, approximately 25 minutes.
                             3. Switch to Inference and generate photos based on the template. 
+                            4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
+                            '''
+                        )
+                        scene_upload_note = gr.Markdown(
+                            '''
+                            Training steps:
+                            1. Please upload 15-20 photos with human, and please don't make the proportion of your face too small.
+                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
+                            3. Switch to Inference and generate photos based on the scene lora. 
                             4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
                             '''
                         )
@@ -148,18 +153,18 @@ def on_ui_tabs():
                                     outputs=[sd_model_checkpoint]
                                 )
 
-                            with gr.Row():
+                            with gr.Row(visible=False) as sdxl_row:
                                 sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki#4sdxl-training"
                                 sdxl_training_note = gr.Markdown(
                                     value = "**Please check the [[wiki]]({}) before SDXL training**.".format(sdxl_wiki_url),
-                                    visible=False
+                                    visible=True
                                 )
                                 
-                            with gr.Row():
+                            with gr.Row(visible=False) as training_prefix_prompt_row:
                                 training_prefix_prompt = gr.Textbox(
-                                    label="Corresponding Prompts to the Template. (Such as: 1girl, beautiful and delicate girl, red dress, yellow leaves, in autumn)", 
+                                    label="Corresponding Prompts to the Template. (Such as: 1girl, brown_hair, chinese_clothes, dress, earrings, floral_print, hair_ornament, jewelry, lips, makeup, necklace, beige)", 
                                     placeholder="Please write the corresponding prompts to the template.", 
-                                    lines=1, value='', visible=False, interactive=True
+                                    lines=1, value='', visible=True, interactive=True
                                 )
 
                             with gr.Row():
@@ -257,6 +262,19 @@ def on_ui_tabs():
                             enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_option_row1])
                             enable_rl.change(lambda x: rl_option_row1.update(visible=x), inputs=[enable_rl], outputs=[rl_notes])
 
+                            # We will update the default training parameters by the checkpoint type. 
+                            def update_train_parameters(sd_model_checkpoint):
+                                checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+                                if checkpoint_type == 3:  # SDXL
+                                    return gr.Markdown.update(visible=True), 1024, 600, 32, 16, gr.Checkbox.update(value=False)
+                                return gr.Markdown.update(visible=False), 512, 800, 128, 64, gr.Checkbox.update(value=True)
+                            
+                            sd_model_checkpoint.change(
+                                fn=update_train_parameters,
+                                inputs=sd_model_checkpoint,
+                                outputs=[sdxl_row, resolution, max_train_steps, rank, network_alpha, validation]
+                            )
+
                         human_train_notes = gr.Markdown(
                             '''
                             Parameter parsing:
@@ -278,11 +296,11 @@ def on_ui_tabs():
 
                         def update_train_mode(train_mode_choose):
                             if train_mode_choose == "Train Human Lora":
-                                return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)]
+                                return [gr.update(value=512), gr.update(value=128), gr.update(value=64), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
                             else:
-                                return [gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+                                return [gr.update(value=768), gr.update(value=256), gr.update(value=128), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)]
 
-                        train_mode_choose.change(update_train_mode, inputs=train_mode_choose, outputs=[crop_ratio, training_prefix_prompt, val_and_checkpointing_steps, validation, enable_rl, rl_option_row1, rl_notes, skin_retouching_bool, human_train_notes, scene_train_notes])
+                        train_mode_choose.change(update_train_mode, inputs=train_mode_choose, outputs=[resolution, rank, network_alpha, crop_ratio, training_prefix_prompt_row, val_and_checkpointing_steps, validation, enable_rl, rl_option_row1, rl_notes, skin_retouching_bool, human_train_notes, scene_train_notes, human_upload_note, scene_upload_note])
 
                 with gr.Row():
                     with gr.Column(width=3):
@@ -370,8 +388,8 @@ def on_ui_tabs():
                         with gr.TabItem("Text2Photo") as text2photo_tab:
                             with gr.Column():
                                 text_to_image_input_prompt = gr.Textbox(
-                                    label="Input Prompt", interactive=True, lines=2,
-                                    value="upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32", visible=True
+                                    label="Text2Photo Input Prompt", interactive=True, lines=2,
+                                    value="(portrait:1.5), 1girl, bokeh, bouquet, brown_hair, cloud, flower, hairband, hydrangea, lips, long_hair, outdoors, sunlight, white_flower, white_rose, green sweater, sweater", visible=True
                                 )
                                 with gr.Accordion("Scene Lora (Click here to Select Scene Lora)", open=False):
                                     with gr.Column():
@@ -415,7 +433,7 @@ def on_ui_tabs():
                                         scene = sorted(scene)
                                         scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
 
-                                        scene_id = gr.Text(show_label=False, visible=True, placeholder="Selected")
+                                        scene_id = gr.Text(value="none", show_label=False, visible=True, placeholder="Selected")
                                         with gr.Row():
                                             scene_id_gallery = gr.Gallery(
                                                 value=scene, label="Scene Lora Gallery", allow_preview=False,
@@ -725,74 +743,13 @@ def on_ui_tabs():
                         video_model_selected_tab = gr.State(0)
 
                         with gr.TabItem("Text2Video") as video_template_images_tab:
-                            with gr.Row():
-                                t2v_mode_choose = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=shared.opts.data.get("enable_easyphoto_t2v_write_prompt_yourself", False))
-
-                                t2v_resolution = gr.Dropdown(
-                                    value="(512, 768)", elem_id='dropdown', 
-                                    choices=[(768, 512), (512, 512), (512, 768)], 
-                                    label="The Resolution of Video (width x height).", visible=True
-                                )
-
-                            with gr.Row(visible=True) as row1:
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="Gender.", visible=True)
-                                hair_color      = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the hair.", visible=True)
-                                hair_length     = gr.Dropdown(value="long", elem_id='dropdown', choices=["long", "short", "no"], label="Length of the hair.", visible=True)
-                                eyes_color      = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the eye.", visible=True)
-
-                            with gr.Row(visible=True) as row2:
-                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="Wearing of the hair.", visible=True)
-                                cloth_color     = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the Cloth.", visible=True)
-                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "short shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="Cloth on the Person.", visible=True)
-                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does Person do?", visible=True)
-
-                            with gr.Row(visible=True) as row3:
-                                expression      = gr.Dropdown(value="shy", elem_id='dropdown', choices=["shy", "happy"], label="Expression on the face?", visible=True)
-                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="Ratio of Portrait.", visible=True)
-                                where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where.", visible=True)
-                                season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Season?", visible=True)
-
-                            with gr.Row(visible=True) as row4:
-                                time_of_photo   = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "at daytime", "at noot", "at night"], label="Time?", visible=True)
-
                             t2v_input_prompt = gr.Textbox(
                                 label="Text2Video Input Prompt.", interactive=True, lines=3,
-                                value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=False
+                                value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=True
                             )
-
-                            def update_t2v_input_prompt(*args):
-                                # preprocess
-                                args = ["" if arg == "none" else arg for arg in args]
-                                gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo = args
-
-                                gender_limit_prompt_girls = {'dress':'shirt'}
-                                if gender in ['boy', 'man']:
-                                    if cloth in list(gender_limit_prompt_girls.keys()):
-                                        cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
-
-                                input_prompt = f"1{gender}, ({hair_color} hair, {hair_length} hair), {eyes_color} eyes, {hair_wear}, {cloth_color} {cloth}, {doing}, looking at viewer, {expression}, {portrait_ratio}, {where}, {time_of_photo}, {season}"
-                                return input_prompt
-
-                            prompt_inputs = [gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo]
-                            for prompt_input in prompt_inputs:
-                                prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
-                                
-                            def update_t2v_mode(t2v_mode_choose):
-                                if t2v_mode_choose == "Preset With Drowdown":
-                                    return [
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
-                                    ]
-                                else:
-                                    return [
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
-                                    ]
-                            t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo, t2v_input_prompt])
+                            with gr.Row():
+                                t2v_input_width = gr.Slider(minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width")
+                                t2v_input_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Video Height", value=768,elem_id=f"height")
 
                             with gr.Row():
                                 sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
@@ -1095,7 +1052,7 @@ def on_ui_tabs():
                 display_button.click(
                     fn=easyphoto_video_infer_forward,
                     inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-                            t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                            t2v_input_prompt, t2v_input_width, t2v_input_height, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
                             first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                             color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                             makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
@@ -1109,8 +1066,6 @@ def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
         True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
-    shared.opts.add_option("enable_easyphoto_t2v_write_prompt_yourself", shared.OptionInfo(
-        False, "Enable easyphoto text2video write prompt yourself", gr.Checkbox, {}, section=section))
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)

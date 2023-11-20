@@ -384,6 +384,9 @@ def easyphoto_infer_forward(
             reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
 
             if scene_id != 'none':
+                if prompt_generate_sd_model_checkpoint_type == 3:
+                    return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
+
                 # scene lora path
                 scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
                 if not os.path.exists(scene_lora_model_path):
@@ -411,7 +414,7 @@ def easyphoto_infer_forward(
                 ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
                 template_images = inpaint(
                     template_images, None, [], input_prompt=last_scene_lora_prompt_low_weight, \
-                    diffusion_steps=30, denoising_strength=0.30, hr_scale=1.5, \
+                    diffusion_steps=30, denoising_strength=0.20, hr_scale=1.5, \
                     default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
                     seed=str(seed), sampler="Euler a"
                 )
@@ -823,16 +826,7 @@ def easyphoto_infer_forward(
                     controlnet_pairs = [["canny", fusion_image, 1.00, 1], ["tile", fusion_image, 1.00, 1]]
                 else:
                     controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00, 1]]
-                second_diffusion_output_image = inpaint(
-                    input_image,
-                    input_mask,
-                    controlnet_pairs,
-                    input_prompts[index],
-                    diffusion_steps=second_diffusion_steps,
-                    denoising_strength=second_denoising_strength,
-                    hr_scale=default_hr_scale,
-                    seed=str(seed)
-                )
+                second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed))
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -1052,7 +1046,7 @@ def easyphoto_infer_forward(
 @switch_sd_model_vae()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    t2v_input_prompt, t2v_input_width, t2v_input_height, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, tabs, *user_ids,
@@ -1214,11 +1208,10 @@ def easyphoto_video_infer_forward(
 
     if tabs == 0:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
-        t2v_resolution = eval(str(t2v_resolution))
 
         template_images = txt2img(
             [], input_prompt = t2v_input_prompt, \
-            diffusion_steps=30, width=t2v_resolution[0], height=t2v_resolution[1], \
+            diffusion_steps=30, width=t2v_input_width, height=t2v_input_height, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras", 
