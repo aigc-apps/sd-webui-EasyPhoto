@@ -1,3 +1,4 @@
+import base64
 import gradio as gr
 from fastapi import FastAPI
 from modules.api import api
@@ -7,6 +8,7 @@ from scripts.easyphoto_train import *
 import hashlib
 from PIL import Image
 import os
+
 
 def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
     @app.post("/easyphoto/easyphoto_train_forward")
@@ -102,6 +104,9 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         sd_xl_input_prompt          = datas.get("sd_xl_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white shit, standing, in the garden, daytime, f32")
         sd_xl_resolution            = datas.get("sd_xl_resolution", "(1024, 1024)")
         tabs                        = datas.get("tabs", 1)
+        ip_adapter_control          = datas.get("ip_adapter_control", False)
+        ip_adapter_weight           = datas.get("ip_adapter_weight", 0.7)
+        ipa_image_path              = datas.get("ipa_image_path", None)
 
         if type(user_ids) == str:
             user_ids = [user_ids]
@@ -135,16 +140,23 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
                 before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                 seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, \
-                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, *user_ids
+                skin_retouching_bool, display_score, background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, \
+                ip_adapter_control, ip_adapter_weight, ipa_image_path, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
+            face_id_outputs_base64 = []
+            if len(face_id_outputs) != 0:
+                for item in face_id_outputs:
+                    pil_base64 = api.encode_pil_to_base64(item[0])
+                    score_base64 = base64.b64encode(item[1].encode('utf-8')).decode('utf-8')
+                    face_id_outputs_base64.append((pil_base64, score_base64))
         except Exception as e:
             torch.cuda.empty_cache()
             comment = f"Infer error, error info:{str(e)}"
             outputs = []
-            face_id_outputs = []
+            face_id_outputs_base64 = []
 
-        return {"message": comment, "outputs": outputs, "face_id_outputs": face_id_outputs}
+        return {"message": comment, "outputs": outputs, "face_id_outputs": face_id_outputs_base64}
 
 try:
     import modules.script_callbacks as script_callbacks
