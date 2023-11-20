@@ -521,11 +521,10 @@ def easyphoto_infer_forward(
 
     if ip_adapter_control:
         ipa_images = []
-        ipa_face_part_only = True
         ipa_retinaface_boxes = []
         ipa_retinaface_keypoints = []
         ipa_retinaface_masks = []
-        ipa_face_part_only = True
+        ipa_face_part_only = False
 
     ep_logger.info("Start templates and user_ids preprocess.")
 
@@ -926,7 +925,6 @@ def easyphoto_infer_forward(
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                     if ip_adapter_control:
                         controlnet_pairs = [["canny", first_input_image, 1.00], ["ipa_full_face", ipa_image_face, ip_adapter_weight]]
-                        ipa_image_face.save("ipa_image_face.png")
                 else:
                     controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
                     if ip_adapter_control:

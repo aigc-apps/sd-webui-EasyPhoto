@@ -55,7 +55,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "face_shape_match"          : False,
         "tabs"                      : 1,
         "ip_adapter_control"        : True,
-        "ip_adapter_weight"         : 0.7,
+        "ip_adapter_weight"         : 0.5,
         "ipa_image_path"            : None,
     })
     r = requests.post(f'{url}/easyphoto/easyphoto_infer_forward', data=datas, timeout=1500)

@@ -602,7 +602,7 @@ def on_ui_tabs():
                                     visible=False
                                 )
                                 ip_adapter_weight = gr.Slider(
-                                    minimum=0.10, maximum=1.00, value=0.70,
+                                    minimum=0.10, maximum=1.00, value=0.50,
                                     step=0.05, label="IP-Adapter Control Weight",
                                     visible=False
                                 )
