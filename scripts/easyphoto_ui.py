@@ -14,7 +14,7 @@ from scripts.easyphoto_config import (DEFAULT_SCENE_LORA, cache_log_file_path,
 from scripts.easyphoto_infer import (easyphoto_infer_forward,
                                      easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
-from scripts.easyphoto_utils import check_id_valid, check_scene_valid
+from scripts.easyphoto_utils import check_id_valid, check_scene_valid, check_files_exists_and_download
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
@@ -391,7 +391,7 @@ def on_ui_tabs():
                                     label="Text2Photo Input Prompt", interactive=True, lines=2,
                                     value="(portrait:1.5), 1girl, bokeh, bouquet, brown_hair, cloud, flower, hairband, hydrangea, lips, long_hair, outdoors, sunlight, white_flower, white_rose, green sweater, sweater", visible=True
                                 )
-                                with gr.Accordion("Scene Lora (Click here to Select Scene Lora)", open=False):
+                                with gr.Accordion("Scene Lora (Click here to select Scene Lora)", open=False):
                                     with gr.Column():
                                         def scene_change_function(scene_id_gallery, evt: gr.SelectData):
                                             scene_id = scene_id_gallery[evt.index][1]
@@ -399,6 +399,8 @@ def on_ui_tabs():
                                             lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
                                             if scene_id == "none":
                                                 return gr.update(visible=True), gr.update(value="none")
+                                            if scene_id in DEFAULT_SCENE_LORA:
+                                                check_files_exists_and_download(False, download_mode=scene_id)
                                             if not os.path.exists(lora_model_path):
                                                 return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
                                             is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
@@ -434,6 +436,7 @@ def on_ui_tabs():
                                         scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
 
                                         scene_id = gr.Text(value="none", show_label=False, visible=True, placeholder="Selected")
+                                        autodownload_notebook = gr.Markdown(value="**The preset Lora will be downloaded on the first click.**", show_label=False, visible=True)
                                         with gr.Row():
                                             scene_id_gallery = gr.Gallery(
                                                 value=scene, label="Scene Lora Gallery", allow_preview=False,
@@ -449,7 +452,7 @@ def on_ui_tabs():
                                     text_to_image_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Height", value=832,elem_id=f"height")
 
                                 with gr.Row():
-                                    prompt_generate_sd_model_checkpoint = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The checkpoint you use for text to image prompt generate.", interactive=True, visible=True)
+                                    prompt_generate_sd_model_checkpoint = gr.Dropdown(value="LZ-16K+Optics.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The checkpoint you use for text to image prompt generate.", interactive=True, visible=True)
 
                                     prompt_generate_checkpoint_refresh = ToolButton(value="\U0001f504")
                                     prompt_generate_checkpoint_refresh.click(
