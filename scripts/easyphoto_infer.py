@@ -142,7 +142,7 @@ def get_controlnet_unit(
             model='control_sd15_random_color'
         )
 
-        blur_ratio = 24
+        blur_ratio = 1
         if is_batch:
             new_input_image = []
             for _input_image in input_image:
@@ -324,7 +324,7 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = [True, True, True, True]
+check_hash = [True, True, True, True, True, True]
 sdxl_txt2img_flag = False
 
 # this decorate is default to be closed, not every needs this, more for developers
@@ -361,6 +361,17 @@ def easyphoto_infer_forward(
         if check_hash[2]:
             refresh_model_vae()
         check_hash[2] = False
+    if ip_adapter_control:
+        if not sdxl_pipeline_flag:
+            check_files_exists_and_download(check_hash[3], download_mode = "add_ipa_base")
+            if check_hash[3]:
+                refresh_model_vae()
+            check_hash[3] = False
+        else:
+            check_files_exists_and_download(check_hash[4], download_mode = "add_ipa_sdxl")
+            if check_hash[4]:
+                refresh_model_vae()
+            check_hash[4] = False
 
     for user_id in user_ids:
         if user_id != "none":
@@ -825,24 +836,23 @@ def easyphoto_infer_forward(
                 
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
-                if ip_adapter_control:
-                    first_input_image = copy.deepcopy(input_image)
                 first_inpaint_area = ImageChops.multiply(input_image, input_mask)
                 if not face_shape_match:
-                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
-                    if ip_adapter_control:
-                        controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
-
-                    if sdxl_pipeline_flag:
+                    if not sdxl_pipeline_flag:
+                        controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                        if ip_adapter_control:
+                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
+                    else:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                         if ip_adapter_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight])
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
                 else:
-                    controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
-                    if ip_adapter_control:
-                        controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
-                    if sdxl_pipeline_flag:
+                    if not sdxl_pipeline_flag:
+                        controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
+                        if ip_adapter_control:
+                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
+                    else:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                         if ip_adapter_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight])
@@ -924,22 +934,13 @@ def easyphoto_infer_forward(
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
                     if ip_adapter_control:
-                        controlnet_pairs = [["canny", first_input_image, 1.00], ["ipa_full_face", ipa_image_face, ip_adapter_weight]]
+                        controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ip_adapter_weight]]
                 else:
                     controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
                     if ip_adapter_control:
-                        controlnet_pairs = [["sdxl_canny_mid", first_input_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight]]
+                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight]]
 
-                second_diffusion_output_image = inpaint(
-                    input_image,
-                    input_mask,
-                    controlnet_pairs,
-                    input_prompts[index],
-                    diffusion_steps=second_diffusion_steps,
-                    denoising_strength=second_denoising_strength,
-                    hr_scale=default_hr_scale,
-                    seed=str(seed)
-                )
+                second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed))
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -1170,10 +1171,10 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[3], "add_video")
-    if check_hash[3]:
+    check_files_exists_and_download(check_hash[5], "add_video")
+    if check_hash[5]:
         refresh_model_vae()
-    check_hash[3] = False
+    check_hash[5] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     checkpoint_type_text2video = get_checkpoint_type(sd_model_checkpoint_for_animatediff_text2video)
