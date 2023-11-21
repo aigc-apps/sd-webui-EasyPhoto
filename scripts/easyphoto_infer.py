@@ -341,7 +341,7 @@ def easyphoto_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[0], download_mode = "base")
+    # check_files_exists_and_download(check_hash[0], download_mode = "base")
     if check_hash[0]:
         refresh_model_vae()
     check_hash[0] = False
@@ -403,7 +403,9 @@ def easyphoto_infer_forward(
         return "Please choose a user id.", [], []
     
     max_control_net_unit_count = 3 if not ip_adapter_control else 4
-    if shared.opts.data.get("control_net_unit_count") < max_control_net_unit_count:
+    control_net_unit_count = shared.opts.data.get("control_net_unit_count")
+    ep_logger.info("ControlNet unit number: {}".format(control_net_unit_count))
+    if control_net_unit_count is not None and control_net_unit_count < max_control_net_unit_count:
         error_info = (
             "Please go to Settings/ControlNet and at least set {} for "
             "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)
