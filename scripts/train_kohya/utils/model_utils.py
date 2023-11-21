@@ -3,7 +3,8 @@ import os
 import torch
 import diffusers
 from transformers import CLIPTextModel, CLIPTokenizer, CLIPTextConfig, logging
-from diffusers import AutoencoderKL, DDIMScheduler, StableDiffusionPipeline, UNet2DConditionModel
+from diffusers import AutoencoderKL, DDIMScheduler, StableDiffusionPipeline # UNet2DConditionModel
+from .original_unet import UNet2DConditionModel
 from safetensors.torch import load_file
 
 
