@@ -20,7 +20,7 @@ from modules.sd_models import get_closet_checkpoint_match, load_model, list_mode
 from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
-from scripts.animatediff_utils import AnimateDiffProcess, motion_module
+from scripts.animatediff_utils import AnimateDiffProcess
 from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
@@ -614,7 +614,6 @@ def get_checkpoint_type(sd_model_checkpoint: str) -> int:
         if k.startswith("cond_stage_model.model"):
             return 2
     return 1
-
 
 def get_lora_type(filename: str) -> int:
     """Get the type of the Lora given the path `filename`. Modified from `extensions-builtin/Lora/network.py`.
