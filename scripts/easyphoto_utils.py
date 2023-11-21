@@ -96,8 +96,18 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
     ],
     "add_text2image": [
-        # sdxl for text2image
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/SDXL_1.0_ArienMixXL_v2.0.safetensors",
+        # LZ 16k for text2image
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/LZ-16K%2BOptics.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/001.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/002.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/003.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/004.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/005.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/006.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/007.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/008.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/009.png",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/010.png",
     ],
     "add_ipa_base": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter-full-face_sd15.pth",
@@ -112,7 +122,54 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
-    ]
+    ],
+
+    # Scene Lora Collection
+    "Christmas_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors",
+    ],
+    "Cyberpunk_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Cyberpunk_1.safetensors",
+    ],
+    "FairMaidenStyle_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/FairMaidenStyle_1.safetensors",
+    ],
+    "Gentleman_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Gentleman_1.safetensors",
+    ],
+    "GuoFeng_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_1.safetensors",
+    ],
+    "GuoFeng_2": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_2.safetensors",
+    ],
+    "GuoFeng_3": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_3.safetensors",
+    ],
+    "GuoFeng_4": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_4.safetensors",
+    ],
+    "Minimalism_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Minimalism_1.safetensors",
+    ],
+    "NaturalWind_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/NaturalWind_1.safetensors",
+    ],
+    "Princess_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_1.safetensors",
+    ],
+    "Princess_2": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_2.safetensors",
+    ],
+    "Princess_3": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_3.safetensors",
+    ],
+    "SchoolUniform_1": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_1.safetensors",
+    ],
+    "SchoolUniform_2": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
+    ],
 }
 save_filenames = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -149,7 +206,17 @@ save_filenames = {
     ],
     "add_text2image": [
         # sdxl for text2image
-        os.path.join(models_path, f"Stable-diffusion/SDXL_1.0_ArienMixXL_v2.0.safetensors"),
+        os.path.join(models_path, f"Stable-diffusion/LZ-16K+Optics.safetensors"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "001.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "002.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "003.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "004.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "005.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "006.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "007.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "008.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "009.png"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "010.png")
     ],
     "add_ipa_base": [
         [os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
@@ -164,8 +231,65 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
+    ], 
+
+    # Scene Lora Collection
+    "Christmas_1": [
+       os.path.join(models_path, f"Lora/Christmas_1.safetensors"),
+    ],
+    "Cyberpunk_1": [
+       os.path.join(models_path, f"Lora/Cyberpunk_1.safetensors"),
+    ],
+    "FairMaidenStyle_1": [
+       os.path.join(models_path, f"Lora/FairMaidenStyle_1.safetensors"),
+    ],
+    "Gentleman_1": [
+       os.path.join(models_path, f"Lora/Gentleman_1.safetensors"),
+    ],
+    "GuoFeng_1": [
+       os.path.join(models_path, f"Lora/GuoFeng_1.safetensors"),
+    ],
+    "GuoFeng_2": [
+       os.path.join(models_path, f"Lora/GuoFeng_2.safetensors"),
+    ],
+    "GuoFeng_3": [
+       os.path.join(models_path, f"Lora/GuoFeng_3.safetensors"),
+    ],
+    "GuoFeng_4": [
+       os.path.join(models_path, f"Lora/GuoFeng_4.safetensors"),
+    ],
+    "Minimalism_1": [
+       os.path.join(models_path, f"Lora/Minimalism_1.safetensors"),
+    ],
+    "NaturalWind_1": [
+       os.path.join(models_path, f"Lora/NaturalWind_1.safetensors"),
+    ],
+    "Princess_1": [
+       os.path.join(models_path, f"Lora/Princess_1.safetensors"),
+    ],
+    "Princess_2": [
+       os.path.join(models_path, f"Lora/Princess_2.safetensors"),
+    ],
+    "Princess_3": [
+       os.path.join(models_path, f"Lora/Princess_3.safetensors"),
+    ],
+    "SchoolUniform_1": [
+       os.path.join(models_path, f"Lora/SchoolUniform_1.safetensors"),
+    ],
+    "SchoolUniform_2": [
+       os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
     ]
 }
+
+def check_scene_valid(lora_path, models_path):
+    from scripts.sdwebui import get_lora_type
+    safetensors_lora_path = os.path.join(models_path, "Lora", lora_path) 
+    if not safetensors_lora_path.endswith("safetensors"):
+        return False
+    lora_type = get_lora_type(safetensors_lora_path)
+    if lora_type == 4:
+        return True
+    return False
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
     face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
@@ -215,7 +339,7 @@ def check_files_exists_and_download(check_hash, download_mode="base"):
         ep_logger.info(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename[0]), exist_ok=True)
         urldownload_progressbar(url, filename[0])
-       
+
 # Calculate the hash value of the download link and downloaded_file by sha256
 def compare_hasd_link_file(url, file_path):
     r           = requests.head(url)
