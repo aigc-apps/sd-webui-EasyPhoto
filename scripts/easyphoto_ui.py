@@ -508,12 +508,12 @@ def on_ui_tabs():
                         with gr.Row():
                             infer_note = gr.Markdown(
                                 value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                visible=(sd_model_checkpoint.value != shared.opts.sd_model_checkpoint.split(" ")[0])
+                                visible=True
                             )
                         
                             def update_infer_note(sd_model_checkpoint):
                                 # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
-                                if sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
+                                if shared.opts.sd_model_checkpoint is not None and sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
                                     return gr.Markdown.update(visible=False)
                                 return gr.Markdown.update(visible=True)
                             
