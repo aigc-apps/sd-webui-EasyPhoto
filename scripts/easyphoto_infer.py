@@ -474,64 +474,14 @@ def easyphoto_infer_forward(
                 prompt_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
             else:
                 prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
-            reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
 
-            if scene_id != 'none':
-                if prompt_generate_sd_model_checkpoint_type == 3:
-                    return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
-
-                # scene lora path
-                scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
-                if not os.path.exists(scene_lora_model_path):
-                    return "Please check scene lora is exist or not.", [], []
-                is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
-                if not is_scene_lora:
-                    return "Please use the lora trained by ep.", [], []
-                
-                # get lora scene prompt
-                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-
-                # text to image with scene lora 
-                ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-                pose_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.jpg')) + \
-                                glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.png'))
-                
-                pose_template = Image.open(np.random.choice(pose_templates))
-                template_images = txt2img(
-                    [["openpose", pose_template, 0.50, 1]], input_prompt=last_scene_lora_prompt_high_weight, \
-                    diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
-                    default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
-                    seed=str(seed), sampler="Euler a"
-                )
-                ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
-                template_images = inpaint(
-                    template_images, None, [], input_prompt=last_scene_lora_prompt_low_weight, \
-                    diffusion_steps=30, denoising_strength=0.20, hr_scale=1.5, \
-                    default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
-                    seed=str(seed), sampler="Euler a"
-                )
-                template_images = [np.uint8(template_images)]
-            else:
-                # text to image for template 
-                ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
-                template_images = txt2img(
-                    [], input_prompt = text_to_image_input_prompt, \
-                    diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
-                    default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
-                    seed = seed, sampler = "DPM++ 2M SDE Karras"
-                )
-                template_images = [np.uint8(template_images)]
-
+            if prompt_generate_sd_model_checkpoint_type == 3 and scene_id != 'none':
+                return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
+            ep_logger.info("Template images will be generated when you use text2photo")
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
         return "Please choose or upload a template.", [], []
-    
-    if not sdxl_pipeline_flag:
-        reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
-    else:
-        reload_sd_model_vae(sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
     
     # create modelscope model
     if retinaface_detection is None:
@@ -602,6 +552,58 @@ def easyphoto_infer_forward(
         ipa_face_part_only = False
 
     ep_logger.info("Start templates and user_ids preprocess.")
+
+    if tabs == 3:
+        reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
+
+        if scene_id != 'none':
+            # scene lora path
+            scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+            if not os.path.exists(scene_lora_model_path):
+                return "Please check scene lora is exist or not.", [], []
+            is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
+            if not is_scene_lora:
+                return "Please use the lora trained by ep.", [], []
+            
+            # get lora scene prompt
+            last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+
+            # text to image with scene lora 
+            ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
+            pose_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.jpg')) + \
+                            glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.png'))
+            
+            pose_template = Image.open(np.random.choice(pose_templates))
+            template_images = txt2img(
+                [["openpose", pose_template, 0.50, 1]], input_prompt=last_scene_lora_prompt_high_weight, \
+                diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed=str(seed), sampler="Euler a"
+            )
+            ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
+            template_images = inpaint(
+                template_images, None, [], input_prompt=last_scene_lora_prompt_low_weight, \
+                diffusion_steps=30, denoising_strength=0.20, hr_scale=1.5, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed=str(seed), sampler="Euler a"
+            )
+            template_images = [np.uint8(template_images)]
+        else:
+            # text to image for template 
+            ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
+            template_images = txt2img(
+                [], input_prompt = text_to_image_input_prompt, \
+                diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed = seed, sampler = "DPM++ 2M SDE Karras"
+            )
+            template_images = [np.uint8(template_images)]
+
+    if not sdxl_pipeline_flag:
+        reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
+    else:
+        reload_sd_model_vae(sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
 
     # SD web UI will raise the `Error: A tensor with all NaNs was produced in Unet.`
     # when users do img2img with SDXL currently (v1.6.0). Users should launch SD web UI with `--no-half`
