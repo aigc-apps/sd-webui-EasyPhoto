@@ -16,6 +16,7 @@ from scripts.easyphoto_infer import (easyphoto_infer_forward,
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
 from scripts.sdwebui import get_checkpoint_type
+from scripts.animatediff_utils import video_visible
 
 gradio_compat = True
 
@@ -691,392 +692,393 @@ def on_ui_tabs():
                     outputs=[infer_progress, output_images, face_id_outputs]
 
                 )
-    
-        with gr.TabItem('Video Inference'):
-            dummy_component = gr.Label(visible=False)
+        
+        if video_visible:
+            with gr.TabItem('Video Inference'):
+                dummy_component = gr.Label(visible=False)
 
-            with gr.Blocks() as demo:
-                with gr.Row():
-                    with gr.Column():
-                        video_model_selected_tab = gr.State(0)
+                with gr.Blocks() as demo:
+                    with gr.Row():
+                        with gr.Column():
+                            video_model_selected_tab = gr.State(0)
 
-                        with gr.TabItem("Text2Video") as video_template_images_tab:
-                            with gr.Row():
-                                t2v_mode_choose = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=shared.opts.data.get("enable_easyphoto_t2v_write_prompt_yourself", False))
+                            with gr.TabItem("Text2Video") as video_template_images_tab:
+                                with gr.Row():
+                                    t2v_mode_choose = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=shared.opts.data.get("enable_easyphoto_t2v_write_prompt_yourself", False))
 
-                                t2v_resolution = gr.Dropdown(
-                                    value="(512, 768)", elem_id='dropdown', 
-                                    choices=[(768, 512), (512, 512), (512, 768)], 
-                                    label="The Resolution of Video (width x height).", visible=True
+                                    t2v_resolution = gr.Dropdown(
+                                        value="(512, 768)", elem_id='dropdown', 
+                                        choices=[(768, 512), (512, 512), (512, 768)], 
+                                        label="The Resolution of Video (width x height).", visible=True
+                                    )
+
+                                with gr.Row(visible=True) as row1:
+                                    gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="Gender.", visible=True)
+                                    hair_color      = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the hair.", visible=True)
+                                    hair_length     = gr.Dropdown(value="long", elem_id='dropdown', choices=["long", "short", "no"], label="Length of the hair.", visible=True)
+                                    eyes_color      = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the eye.", visible=True)
+
+                                with gr.Row(visible=True) as row2:
+                                    hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="Wearing of the hair.", visible=True)
+                                    cloth_color     = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the Cloth.", visible=True)
+                                    cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "short shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="Cloth on the Person.", visible=True)
+                                    doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does Person do?", visible=True)
+
+                                with gr.Row(visible=True) as row3:
+                                    expression      = gr.Dropdown(value="shy", elem_id='dropdown', choices=["shy", "happy"], label="Expression on the face?", visible=True)
+                                    portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="Ratio of Portrait.", visible=True)
+                                    where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where.", visible=True)
+                                    season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Season?", visible=True)
+
+                                with gr.Row(visible=True) as row4:
+                                    time_of_photo   = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "at daytime", "at noot", "at night"], label="Time?", visible=True)
+
+                                t2v_input_prompt = gr.Textbox(
+                                    label="Text2Video Input Prompt.", interactive=True, lines=3,
+                                    value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=False
                                 )
 
-                            with gr.Row(visible=True) as row1:
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="Gender.", visible=True)
-                                hair_color      = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the hair.", visible=True)
-                                hair_length     = gr.Dropdown(value="long", elem_id='dropdown', choices=["long", "short", "no"], label="Length of the hair.", visible=True)
-                                eyes_color      = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the eye.", visible=True)
+                                def update_t2v_input_prompt(*args):
+                                    # preprocess
+                                    args = ["" if arg == "none" else arg for arg in args]
+                                    gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo = args
 
-                            with gr.Row(visible=True) as row2:
-                                hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="Wearing of the hair.", visible=True)
-                                cloth_color     = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the Cloth.", visible=True)
-                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "short shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="Cloth on the Person.", visible=True)
-                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does Person do?", visible=True)
+                                    gender_limit_prompt_girls = {'dress':'shirt'}
+                                    if gender in ['boy', 'man']:
+                                        if cloth in list(gender_limit_prompt_girls.keys()):
+                                            cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
 
-                            with gr.Row(visible=True) as row3:
-                                expression      = gr.Dropdown(value="shy", elem_id='dropdown', choices=["shy", "happy"], label="Expression on the face?", visible=True)
-                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="Ratio of Portrait.", visible=True)
-                                where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where.", visible=True)
-                                season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Season?", visible=True)
+                                    input_prompt = f"1{gender}, ({hair_color} hair, {hair_length} hair), {eyes_color} eyes, {hair_wear}, {cloth_color} {cloth}, {doing}, looking at viewer, {expression}, {portrait_ratio}, {where}, {time_of_photo}, {season}"
+                                    return input_prompt
 
-                            with gr.Row(visible=True) as row4:
-                                time_of_photo   = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "at daytime", "at noot", "at night"], label="Time?", visible=True)
+                                prompt_inputs = [gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo]
+                                for prompt_input in prompt_inputs:
+                                    prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
+                                    
+                                def update_t2v_mode(t2v_mode_choose):
+                                    if t2v_mode_choose == "Preset With Drowdown":
+                                        return [
+                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
+                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
+                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
+                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
+                                        ]
+                                    else:
+                                        return [
+                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
+                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
+                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
+                                        ]
+                                t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo, t2v_input_prompt])
 
-                            t2v_input_prompt = gr.Textbox(
-                                label="Text2Video Input Prompt.", interactive=True, lines=3,
-                                value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=False
-                            )
+                                with gr.Row():
+                                    sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
 
-                            def update_t2v_input_prompt(*args):
-                                # preprocess
-                                args = ["" if arg == "none" else arg for arg in args]
-                                gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo = args
+                                    checkpoint_refresh = ToolButton(value="\U0001f504")
+                                    checkpoint_refresh.click(
+                                        fn=checkpoint_refresh_function,
+                                        inputs=[],
+                                        outputs=[sd_model_checkpoint_for_animatediff_text2video]
+                                    )
+                                    
+                                gr.Markdown(
+                                    value = '''
+                                    Generate from prompts notes:
+                                    - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results !!!
+                                    - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
+                                    ''',
+                                    visible=True
+                                )
 
-                                gender_limit_prompt_girls = {'dress':'shirt'}
-                                if gender in ['boy', 'man']:
-                                    if cloth in list(gender_limit_prompt_girls.keys()):
-                                        cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
-
-                                input_prompt = f"1{gender}, ({hair_color} hair, {hair_length} hair), {eyes_color} eyes, {hair_wear}, {cloth_color} {cloth}, {doing}, looking at viewer, {expression}, {portrait_ratio}, {where}, {time_of_photo}, {season}"
-                                return input_prompt
-
-                            prompt_inputs = [gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo]
-                            for prompt_input in prompt_inputs:
-                                prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
+                            with gr.TabItem("Image2Video") as video_upload_image_tab:
+                                i2v_mode_choose     = gr.Dropdown(value="Base on One Image", elem_id='dropdown', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", visible=True)
                                 
-                            def update_t2v_mode(t2v_mode_choose):
-                                if t2v_mode_choose == "Preset With Drowdown":
-                                    return [
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
-                                        gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
-                                    ]
-                                else:
-                                    return [
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
-                                        gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
-                                    ]
-                            t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo, t2v_input_prompt])
+                                with gr.Row():
+                                    init_image      = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
+                                    last_image      = gr.Image(label="Last image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload", visible=False)
+                                init_image_prompt   = gr.Textbox(label="Prompt For Image2Video", value="", show_label=True, visible=True, placeholder="Please write the corresponding prompts using the template.")
+                                
+                                def update_i2v_mode(i2v_mode_choose):
+                                    if i2v_mode_choose == "Base on One Image":
+                                        return [
+                                            gr.update(label="Image for easyphoto to Image2Video", value=None, visible=True), \
+                                            gr.update(value=None, visible=False)
+                                        ]
+                                    else:
+                                        return [
+                                            gr.update(label="First Image for easyphoto to Image2Video", value=None, visible=True), \
+                                            gr.update(value=None, visible=True)
+                                        ]
+                                i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
+
+                                with gr.Row():
+                                    sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Image2Video(For animatediff only).", visible=True)
+
+                                    checkpoint_refresh = ToolButton(value="\U0001f504")
+                                    checkpoint_refresh.click(
+                                        fn=checkpoint_refresh_function,
+                                        inputs=[],
+                                        outputs=[sd_model_checkpoint_for_animatediff_image2video]
+                                    )
+                                gr.Markdown(
+                                    value = '''
+                                    Generate from image notes:
+                                    - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results!!!
+                                    - **Please write the corresponding prompts using the template**.
+                                    - The Generate from prompts is an experimental feature aiming to generate great portrait with template for users.
+                                    ''',
+                                    visible=True
+                                )
+
+                            with gr.TabItem("Video2Video") as video_upload_video_tab:
+                                init_video = gr.Video(label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload")
+
+                            model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
+                            for i, tab in enumerate(model_selected_tabs):
+                                tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
 
                             with gr.Row():
-                                sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
+                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
                                 checkpoint_refresh = ToolButton(value="\U0001f504")
                                 checkpoint_refresh.click(
                                     fn=checkpoint_refresh_function,
                                     inputs=[],
-                                    outputs=[sd_model_checkpoint_for_animatediff_text2video]
+                                    outputs=[sd_model_checkpoint]
                                 )
-                                
-                            gr.Markdown(
-                                value = '''
-                                Generate from prompts notes:
-                                - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results !!!
-                                - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
-                                ''',
-                                visible=True
-                            )
-
-                        with gr.TabItem("Image2Video") as video_upload_image_tab:
-                            i2v_mode_choose     = gr.Dropdown(value="Base on One Image", elem_id='dropdown', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", visible=True)
-                            
-                            with gr.Row():
-                                init_image      = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
-                                last_image      = gr.Image(label="Last image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload", visible=False)
-                            init_image_prompt   = gr.Textbox(label="Prompt For Image2Video", value="", show_label=True, visible=True, placeholder="Please write the corresponding prompts using the template.")
-                            
-                            def update_i2v_mode(i2v_mode_choose):
-                                if i2v_mode_choose == "Base on One Image":
-                                    return [
-                                        gr.update(label="Image for easyphoto to Image2Video", value=None, visible=True), \
-                                        gr.update(value=None, visible=False)
-                                    ]
-                                else:
-                                    return [
-                                        gr.update(label="First Image for easyphoto to Image2Video", value=None, visible=True), \
-                                        gr.update(value=None, visible=True)
-                                    ]
-                            i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
 
                             with gr.Row():
-                                sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Image2Video(For animatediff only).", visible=True)
+                                def select_function():
+                                    ids = []
+                                    if os.path.exists(user_id_outpath_samples):
+                                        _ids = os.listdir(user_id_outpath_samples)
+                                        for _id in _ids:
+                                            if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                                ids.append(_id)
+                                    ids = sorted(ids)
+                                    return gr.update(choices=["none"] + ids)
 
-                                checkpoint_refresh = ToolButton(value="\U0001f504")
-                                checkpoint_refresh.click(
-                                    fn=checkpoint_refresh_function,
-                                    inputs=[],
-                                    outputs=[sd_model_checkpoint_for_animatediff_image2video]
-                                )
-                            gr.Markdown(
-                                value = '''
-                                Generate from image notes:
-                                - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results!!!
-                                - **Please write the corresponding prompts using the template**.
-                                - The Generate from prompts is an experimental feature aiming to generate great portrait with template for users.
-                                ''',
-                                visible=True
-                            )
-
-                        with gr.TabItem("Video2Video") as video_upload_video_tab:
-                            init_video = gr.Video(label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload")
-
-                        model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
-                        for i, tab in enumerate(model_selected_tabs):
-                            tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
-
-                        with gr.Row():
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
-
-                            checkpoint_refresh = ToolButton(value="\U0001f504")
-                            checkpoint_refresh.click(
-                                fn=checkpoint_refresh_function,
-                                inputs=[],
-                                outputs=[sd_model_checkpoint]
-                            )
-
-                        with gr.Row():
-                            def select_function():
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
                                     _ids = os.listdir(user_id_outpath_samples)
                                     for _id in _ids:
                                         if check_id_valid(_id, user_id_outpath_samples, models_path):
                                             ids.append(_id)
-                                ids = sorted(ids)
-                                return gr.update(choices=["none"] + ids)
+                                    ids = sorted(ids)
 
-                            ids = []
-                            if os.path.exists(user_id_outpath_samples):
-                                _ids = os.listdir(user_id_outpath_samples)
-                                for _id in _ids:
-                                    if check_id_valid(_id, user_id_outpath_samples, models_path):
-                                        ids.append(_id)
-                                ids = sorted(ids)
+                                num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid", visible=False)
 
-                            num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid", visible=False)
+                                uuids           = []
+                                visibles        = [True, False, False, False, False]
+                                for i in range(int(5)):
+                                    uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=80, label=f"User_{i} id", visible=visibles[i])
+                                    uuids.append(uuid)
 
-                            uuids           = []
-                            visibles        = [True, False, False, False, False]
-                            for i in range(int(5)):
-                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=80, label=f"User_{i} id", visible=visibles[i])
-                                uuids.append(uuid)
-
-                            def update_uuids(_num_of_faceid):
-                                _uuids = []
-                                for i in range(int(_num_of_faceid)):
-                                    _uuids.append(gr.update(value="none", visible=True))
-                                for i in range(int(5 - int(_num_of_faceid))):
-                                    _uuids.append(gr.update(value="none", visible=False))
-                                return _uuids
-                            
-                            num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
-                            
-                            refresh = ToolButton(value="\U0001f504")
-                            for i in range(int(5)):
-                                refresh.click(
-                                    fn=select_function,
-                                    inputs=[],
-                                    outputs=[uuids[i]]
-                                )
-
-                        with gr.Accordion("Advanced Options", open=False):
-                            additional_prompt = gr.Textbox(
-                                label="Video Additional Prompt",
-                                lines=3,
-                                value='masterpiece, beauty',
-                                interactive=True
-                            )
-                            seed = gr.Textbox(
-                                label="Video Seed", 
-                                value=-1,
-                            )
-                            with gr.Row():
-                                max_frames = gr.Textbox(
-                                    label="Video Max frames", 
-                                    value=32,
-                                )
-                                max_fps = gr.Textbox(
-                                    label="Video Max fps", 
-                                    value=8,
-                                )
-                                save_as = gr.Dropdown(
-                                    value="gif", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
-                                )
-
-                            with gr.Row():
-                                before_face_fusion_ratio = gr.Slider(
-                                    minimum=0.2, maximum=0.8, value=0.50,
-                                    step=0.05, label='Video Face Fusion Ratio Before'
-                                )
-                                after_face_fusion_ratio = gr.Slider(
-                                    minimum=0.2, maximum=0.8, value=0.50,
-                                    step=0.05, label='Video Face Fusion Ratio After'
-                                )
-
-                            with gr.Row():
-                                first_diffusion_steps = gr.Slider(
-                                    minimum=15, maximum=50, value=50,
-                                    step=1, label='Video First Diffusion steps'
-                                )
-                                first_denoising_strength = gr.Slider(
-                                    minimum=0.30, maximum=0.60, value=0.45,
-                                    step=0.05, label='Video First Diffusion denoising strength'
-                                )
-                            with gr.Row():
-                                crop_face_preprocess = gr.Checkbox(
-                                    label="Video Crop Face Preprocess",  
-                                    value=True
-                                )
-                                apply_face_fusion_before = gr.Checkbox(
-                                    label="Video Apply Face Fusion Before", 
-                                    value=True
-                                )
-                                apply_face_fusion_after = gr.Checkbox(
-                                    label="Video Apply Face Fusion After",  
-                                    value=True
-                                )
-                            with gr.Row():
-                                color_shift_middle = gr.Checkbox(
-                                    label="Video Apply color shift first",  
-                                    value=True
-                                )
-                                super_resolution = gr.Checkbox(
-                                    label="Video Super Resolution at last",  
-                                    value=True
-                                )
-                                skin_retouching_bool = gr.Checkbox(
-                                    label="Video Skin Retouching",  
-                                    value=False
-                                )
-                            with gr.Row():
-                                display_score = gr.Checkbox(
-                                    label="Display Face Similarity Scores",  
-                                    value=False
-                                )
-                                makeup_transfer = gr.Checkbox(
-                                    label="Video MakeUp Transfer",
-                                    value=False
-                                )
-                                face_shape_match = gr.Checkbox(
-                                    label="Video Face Shape Match",
-                                    value=False
-                                )
-                            with gr.Row():
-                                video_interpolation = gr.Checkbox(
-                                    label="Video Interpolation",
-                                    value=False
-                                )
-
-                            with gr.Row():
-                                super_resolution_method = gr.Dropdown(
-                                    value="gpen", \
-                                    choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=True
-                                )
-                                makeup_transfer_ratio = gr.Slider(
-                                    minimum=0.00, maximum=1.00, value=0.50,
-                                    step=0.05, label='Video Makeup Transfer Ratio',
-                                    visible=False
-                                )
-                                super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
-                                makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
-
-                            with gr.Row():
-                                video_interpolation_ext = gr.Slider(
-                                    minimum=1, maximum=2, value=1,
-                                    step=1, label='Video Interpolation Ratio (1 for 2x, 2 for 4x)',
-                                    visible=False
-                                )
-                                video_interpolation.change(lambda x: video_interpolation_ext.update(visible=x), inputs=[video_interpolation], outputs=[video_interpolation_ext])
-
-                            with gr.Box():
-                                gr.Markdown(
-                                    '''
-                                    Parameter parsing:
-                                    1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
-                                    2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
-                                    3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
-                                    4. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
-                                    5. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
-                                    '''
-                                )
-                            
-                        display_button = gr.Button('Start Generation')
-
-                    with gr.Column():
-                        gr.Markdown('Generated Results')
-
-                        output_video    = gr.Video(label='Output of Video', visible=False)
-                        output_gif      = gr.Image(label='Output of GIF')
-
-                        def update_save_as_mode(save_as_mode):
-                            if save_as_mode == "mp4":
-                                return [gr.update(visible=True), gr.update(visible=False)]
-                            else:
-                                return [gr.update(visible=False), gr.update(visible=True)]
-                            
-                        save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
+                                def update_uuids(_num_of_faceid):
+                                    _uuids = []
+                                    for i in range(int(_num_of_faceid)):
+                                        _uuids.append(gr.update(value="none", visible=True))
+                                    for i in range(int(5 - int(_num_of_faceid))):
+                                        _uuids.append(gr.update(value="none", visible=False))
+                                    return _uuids
                                 
-                        output_images = gr.Gallery(
-                            label='Output Frames',
-                        ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                                num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
+                                
+                                refresh = ToolButton(value="\U0001f504")
+                                for i in range(int(5)):
+                                    refresh.click(
+                                        fn=select_function,
+                                        inputs=[],
+                                        outputs=[uuids[i]]
+                                    )
 
-                        infer_progress = gr.Textbox(
-                            label="Generation Progress",
-                            value="No task currently",
-                            interactive=False
-                        )
-                        with gr.Row():
-                            def save_video():
-                                origin_path = os.path.join(easyphoto_video_outpath_samples, "origin")
-                                crop_path = os.path.join(easyphoto_video_outpath_samples, "crop")
-                                if not os.path.exists(origin_path):
-                                    os.makedirs(origin_path, exist_ok=True)
-                                index = len([path for path in os.listdir(origin_path)]) + 1
+                            with gr.Accordion("Advanced Options", open=False):
+                                additional_prompt = gr.Textbox(
+                                    label="Video Additional Prompt",
+                                    lines=3,
+                                    value='masterpiece, beauty',
+                                    interactive=True
+                                )
+                                seed = gr.Textbox(
+                                    label="Video Seed", 
+                                    value=-1,
+                                )
+                                with gr.Row():
+                                    max_frames = gr.Textbox(
+                                        label="Video Max frames", 
+                                        value=32,
+                                    )
+                                    max_fps = gr.Textbox(
+                                        label="Video Max fps", 
+                                        value=8,
+                                    )
+                                    save_as = gr.Dropdown(
+                                        value="gif", elem_id='dropdown', choices=["gif", "mp4"], min_width=30, label=f"Video Save as", visible=True
+                                    )
 
-                                video_path = []
-                                video_crop_path = []
-                                for sub_index in range(max(index - 3, 0), index):
-                                    video_mp4_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.mp4')
-                                    video_gif_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.gif')
-                                    for _video_path in [video_mp4_path, video_gif_path]:
-                                        if os.path.exists(_video_path):
-                                            video_path.append(_video_path)
-                                            continue
+                                with gr.Row():
+                                    before_face_fusion_ratio = gr.Slider(
+                                        minimum=0.2, maximum=0.8, value=0.50,
+                                        step=0.05, label='Video Face Fusion Ratio Before'
+                                    )
+                                    after_face_fusion_ratio = gr.Slider(
+                                        minimum=0.2, maximum=0.8, value=0.50,
+                                        step=0.05, label='Video Face Fusion Ratio After'
+                                    )
 
-                                    video_mp4_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.mp4')
-                                    video_gif_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.gif')
-                                    for _video_path in [video_mp4_crop_path, video_gif_crop_path]:
-                                        if os.path.exists(_video_path):
-                                            video_crop_path.append(_video_path)
-                                            continue
-                                return gr.File.update(value=video_path, visible=True), gr.File.update(value=video_crop_path, visible=True)
+                                with gr.Row():
+                                    first_diffusion_steps = gr.Slider(
+                                        minimum=15, maximum=50, value=50,
+                                        step=1, label='Video First Diffusion steps'
+                                    )
+                                    first_denoising_strength = gr.Slider(
+                                        minimum=0.30, maximum=0.60, value=0.45,
+                                        step=0.05, label='Video First Diffusion denoising strength'
+                                    )
+                                with gr.Row():
+                                    crop_face_preprocess = gr.Checkbox(
+                                        label="Video Crop Face Preprocess",  
+                                        value=True
+                                    )
+                                    apply_face_fusion_before = gr.Checkbox(
+                                        label="Video Apply Face Fusion Before", 
+                                        value=True
+                                    )
+                                    apply_face_fusion_after = gr.Checkbox(
+                                        label="Video Apply Face Fusion After",  
+                                        value=True
+                                    )
+                                with gr.Row():
+                                    color_shift_middle = gr.Checkbox(
+                                        label="Video Apply color shift first",  
+                                        value=True
+                                    )
+                                    super_resolution = gr.Checkbox(
+                                        label="Video Super Resolution at last",  
+                                        value=True
+                                    )
+                                    skin_retouching_bool = gr.Checkbox(
+                                        label="Video Skin Retouching",  
+                                        value=False
+                                    )
+                                with gr.Row():
+                                    display_score = gr.Checkbox(
+                                        label="Display Face Similarity Scores",  
+                                        value=False
+                                    )
+                                    makeup_transfer = gr.Checkbox(
+                                        label="Video MakeUp Transfer",
+                                        value=False
+                                    )
+                                    face_shape_match = gr.Checkbox(
+                                        label="Video Face Shape Match",
+                                        value=False
+                                    )
+                                with gr.Row():
+                                    video_interpolation = gr.Checkbox(
+                                        label="Video Interpolation",
+                                        value=False
+                                    )
 
-                            save = gr.Button('List Recent Conversion Results', elem_id=f'save')
-                            download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
-                            download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
-                            save.click(fn=save_video, inputs=None, outputs=[download_origin_files, download_crop_files], show_progress=False)
-                    
-                display_button.click(
-                    fn=easyphoto_video_infer_forward,
-                    inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-                            t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
-                            first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
-                            color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
-                    outputs=[infer_progress, output_video, output_gif, output_images]
-                )
+                                with gr.Row():
+                                    super_resolution_method = gr.Dropdown(
+                                        value="gpen", \
+                                        choices=list(["gpen", "realesrgan"]), label="The video super resolution way you use.", visible=True
+                                    )
+                                    makeup_transfer_ratio = gr.Slider(
+                                        minimum=0.00, maximum=1.00, value=0.50,
+                                        step=0.05, label='Video Makeup Transfer Ratio',
+                                        visible=False
+                                    )
+                                    super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
+                                    makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
+
+                                with gr.Row():
+                                    video_interpolation_ext = gr.Slider(
+                                        minimum=1, maximum=2, value=1,
+                                        step=1, label='Video Interpolation Ratio (1 for 2x, 2 for 4x)',
+                                        visible=False
+                                    )
+                                    video_interpolation.change(lambda x: video_interpolation_ext.update(visible=x), inputs=[video_interpolation], outputs=[video_interpolation_ext])
+
+                                with gr.Box():
+                                    gr.Markdown(
+                                        '''
+                                        Parameter parsing:
+                                        1. **Face Fusion Ratio Before** represents the proportion of the first facial fusion, which is higher and more similar to the training object.  
+                                        2. **Face Fusion Ratio After** represents the proportion of the second facial fusion, which is higher and more similar to the training object.  
+                                        3. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
+                                        4. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
+                                        5. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
+                                        '''
+                                    )
+                                
+                            display_button = gr.Button('Start Generation')
+
+                        with gr.Column():
+                            gr.Markdown('Generated Results')
+
+                            output_video    = gr.Video(label='Output of Video', visible=False)
+                            output_gif      = gr.Image(label='Output of GIF')
+
+                            def update_save_as_mode(save_as_mode):
+                                if save_as_mode == "mp4":
+                                    return [gr.update(visible=True), gr.update(visible=False)]
+                                else:
+                                    return [gr.update(visible=False), gr.update(visible=True)]
+                                
+                            save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
+                                    
+                            output_images = gr.Gallery(
+                                label='Output Frames',
+                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                            infer_progress = gr.Textbox(
+                                label="Generation Progress",
+                                value="No task currently",
+                                interactive=False
+                            )
+                            with gr.Row():
+                                def save_video():
+                                    origin_path = os.path.join(easyphoto_video_outpath_samples, "origin")
+                                    crop_path = os.path.join(easyphoto_video_outpath_samples, "crop")
+                                    if not os.path.exists(origin_path):
+                                        os.makedirs(origin_path, exist_ok=True)
+                                    index = len([path for path in os.listdir(origin_path)]) + 1
+
+                                    video_path = []
+                                    video_crop_path = []
+                                    for sub_index in range(max(index - 3, 0), index):
+                                        video_mp4_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.mp4')
+                                        video_gif_path = os.path.join(origin_path, str(sub_index).zfill(8) + '.gif')
+                                        for _video_path in [video_mp4_path, video_gif_path]:
+                                            if os.path.exists(_video_path):
+                                                video_path.append(_video_path)
+                                                continue
+
+                                        video_mp4_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.mp4')
+                                        video_gif_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + '.gif')
+                                        for _video_path in [video_mp4_crop_path, video_gif_crop_path]:
+                                            if os.path.exists(_video_path):
+                                                video_crop_path.append(_video_path)
+                                                continue
+                                    return gr.File.update(value=video_path, visible=True), gr.File.update(value=video_crop_path, visible=True)
+
+                                save = gr.Button('List Recent Conversion Results', elem_id=f'save')
+                                download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+                                download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+                                save.click(fn=save_video, inputs=None, outputs=[download_origin_files, download_crop_files], show_progress=False)
+                        
+                    display_button.click(
+                        fn=easyphoto_video_infer_forward,
+                        inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
+                                t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                                first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
+                                color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
+                                makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
+                        outputs=[infer_progress, output_video, output_gif, output_images]
+                    )
 
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 

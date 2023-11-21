@@ -343,7 +343,7 @@ def easyphoto_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    # check_files_exists_and_download(check_hash[0], download_mode = "base")
+    check_files_exists_and_download(check_hash[0], download_mode = "base")
     if check_hash[0]:
         refresh_model_vae()
     check_hash[0] = False

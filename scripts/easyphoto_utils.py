@@ -423,7 +423,6 @@ def unload_models():
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
 
-
 def get_controlnet_version() -> str:
     """Adapte from sd-webui-controlnet/patch_version.py.
     """
