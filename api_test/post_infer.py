@@ -54,7 +54,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "makeup_transfer_ratio"     : 0.50,
         "face_shape_match"          : False,
         "tabs"                      : 1,
-        "ip_adapter_control"        : True,
+        "ip_adapter_control"        : False,
         "ip_adapter_weight"         : 0.5,
         "ipa_image_path"            : None,
     })

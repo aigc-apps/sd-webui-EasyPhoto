@@ -8,18 +8,19 @@ import time
 from glob import glob
 from shutil import copyfile
 
-from PIL import Image, ImageOps
-
 from modules.sd_models_config import config_sdxl
-from scripts.easyphoto_config import (easyphoto_outpath_samples, models_path, cache_log_file_path,
+from PIL import Image, ImageOps
+from scripts.easyphoto_config import (cache_log_file_path,
+                                      easyphoto_outpath_samples, models_path,
+                                      scene_id_outpath_samples,
                                       user_id_outpath_samples,
-                                      validation_prompt)
+                                      validation_prompt,
+                                      validation_prompt_scene)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
-                                     check_id_valid,
+                                     check_id_valid, check_scene_valid,
                                      unload_models)
-from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 from scripts.sdwebui import get_checkpoint_type, unload_sd
-
+from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 python_executable_path = sys.executable
 check_hash             = [True, True]
@@ -29,7 +30,7 @@ check_hash             = [True, True]
 def easyphoto_train_forward(
     sd_model_checkpoint: str,
     id_task: str,
-    user_id: str,
+    user_id: str, train_mode_choose: str,
     resolution: int, val_and_checkpointing_steps: int, max_train_steps: int, steps_per_photos: int,
     train_batch_size: int, gradient_accumulation_steps: int, dataloader_num_workers: int, learning_rate: float, 
     rank: int, network_alpha: int,
@@ -39,6 +40,8 @@ def easyphoto_train_forward(
     max_rl_time: float,
     timestep_fraction: float,
     skin_retouching_bool: bool,
+    training_prefix_prompt: str,
+    crop_ratio: float,
     *args
 ):  
     global check_hash
@@ -54,6 +57,10 @@ def easyphoto_train_forward(
         for _id in _ids:
             if check_id_valid(_id, user_id_outpath_samples, models_path):
                 ids.append(_id)
+    _scenes = os.listdir(os.path.join(models_path, "Lora"))
+    for _scene in _scenes:
+        if check_scene_valid(_scene, models_path):
+            ids.append(os.path.splitext(_scene)[0])
     ids = sorted(ids)
 
     if user_id in ids:
@@ -74,11 +81,17 @@ def easyphoto_train_forward(
     if sdxl_pipeline_flag:
         check_files_exists_and_download(check_hash[1], "sdxl")
         check_hash[1] = False
+
+    # check if user want to train Scene Lora
+    train_scene_lora_bool = True if train_mode_choose == "Train Scene Lora" else False
+    cache_outpath_samples = scene_id_outpath_samples if train_scene_lora_bool else user_id_outpath_samples 
         
     # Check conflicted arguments in SDXL training.
     if sdxl_pipeline_flag:
         if enable_rl:
             return "EasyPhoto does not support RL with the SDXL checkpoint: {}.".format(sd_model_checkpoint)
+        if train_scene_lora_bool:
+            return "EasyPhoto does not support train scene with the SDXL checkpoint: {}.".format(sd_model_checkpoint)
         if int(resolution) < 1024:
             return "The resolution for SDXL Training needs to be 1024."
         if validation:
@@ -88,24 +101,27 @@ def easyphoto_train_forward(
     # Template address
     training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
     # Raw data backup
-    original_backup_path    = os.path.join(user_id_outpath_samples, user_id, "original_backup")
+    original_backup_path    = os.path.join(cache_outpath_samples, user_id, "original_backup")
     # Reference backup of face
-    ref_image_path          = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
+    if train_scene_lora_bool:
+        ref_image_path = os.path.join(models_path, f"Lora/{user_id}.jpg")
+    else:
+        ref_image_path = os.path.join(cache_outpath_samples, user_id, "ref_image.jpg")
 
     # Training data retention
-    user_path               = os.path.join(user_id_outpath_samples, user_id, "processed_images")
-    images_save_path        = os.path.join(user_id_outpath_samples, user_id, "processed_images", "train")
-    json_save_path          = os.path.join(user_id_outpath_samples, user_id, "processed_images", "metadata.jsonl")
+    user_path               = os.path.join(cache_outpath_samples, user_id, "processed_images")
+    images_save_path        = os.path.join(cache_outpath_samples, user_id, "processed_images", "train")
+    json_save_path          = os.path.join(cache_outpath_samples, user_id, "processed_images", "metadata.jsonl")
 
     # Training weight saving
-    weights_save_path       = os.path.join(user_id_outpath_samples, user_id, "user_weights")
+    weights_save_path       = os.path.join(cache_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
     sd_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
     if sdxl_pipeline_flag:
         sd_save_path = sd_save_path.replace("stable-diffusion-v1-5", "stable-diffusion-xl/stabilityai_stable_diffusion_xl_base_1.0")
-    if enable_rl:
-        ddpo_weight_save_path = os.path.join(user_id_outpath_samples, user_id, "ddpo_weights")
+    if enable_rl and not train_scene_lora_bool:
+        ddpo_weight_save_path = os.path.join(cache_outpath_samples, user_id, "ddpo_weights")
         face_lora_path = os.path.join(weights_save_path, f"best_outputs/{user_id}.safetensors")
         ddpo_webui_save_path = os.path.join(models_path, f"Lora/ddpo_{user_id}.safetensors")
     
@@ -121,18 +137,22 @@ def easyphoto_train_forward(
         image = ImageOps.exif_transpose(image).convert("RGB")
         image.save(os.path.join(original_backup_path, str(index) + ".jpg"))
     
+    local_validation_prompt = validation_prompt if not train_scene_lora_bool else training_prefix_prompt + ", " + validation_prompt_scene
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
     command = [
             f'{python_executable_path}', f'{preprocess_path}',
             f'--images_save_path={images_save_path}',
             f'--json_save_path={json_save_path}', 
-            f'--validation_prompt={validation_prompt}',
+            f'--validation_prompt={local_validation_prompt}',
             f'--inputs_dir={original_backup_path}',
-            f'--ref_image_path={ref_image_path}'
+            f'--ref_image_path={ref_image_path}',
+            f'--crop_ratio={crop_ratio}'
         ]
     if skin_retouching_bool:
         command += ["--skin_retouching_bool"]
+    if train_scene_lora_bool:
+        command += ["--train_scene_lora_bool"]
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
@@ -150,7 +170,7 @@ def easyphoto_train_forward(
     else:
         train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora_sd_XL.py")
     print("train_file_path : ", train_kohya_path)
-    if enable_rl:
+    if enable_rl and not train_scene_lora_bool:
         train_ddpo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_ddpo.py")
         print("train_ddpo_path : ", train_kohya_path)
     
@@ -197,7 +217,7 @@ def easyphoto_train_forward(
             '--seed=42', 
             f'--rank={rank}',
             f'--network_alpha={network_alpha}', 
-            f'--validation_prompt={validation_prompt}', 
+            f'--validation_prompt={local_validation_prompt}', 
             f'--validation_steps={val_and_checkpointing_steps}', 
             f'--output_dir={os.path.relpath(weights_save_path, pwd)}', 
             f'--logging_dir={os.path.relpath(weights_save_path, pwd)}', 
@@ -209,18 +229,20 @@ def easyphoto_train_forward(
             f'--merge_best_lora_name={user_id}',
             f'--cache_log_file={cache_log_file_path}'
         ]
-        if validation:
+        if validation and not train_scene_lora_bool:
             command += ["--validation"]
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+        if train_scene_lora_bool:
+            command += ["--train_scene_lora_bool"]
         try:
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
         
         # Reinforcement learning after LoRA training.
-        if enable_rl:
+        if enable_rl and not train_scene_lora_bool:
             # The DDPO (LoRA) distributed training is unstable due to a known accelerate/diffusers issue. Set `num_processes` to 1.
             # See https://github.com/kvablack/ddpo-pytorch/issues/10 for details.
             command = [
@@ -282,7 +304,7 @@ def easyphoto_train_forward(
             '--seed=42', 
             f'--rank={rank}',
             f'--network_alpha={network_alpha}', 
-            f'--validation_prompt={validation_prompt}', 
+            f'--validation_prompt={local_validation_prompt}', 
             f'--validation_steps={val_and_checkpointing_steps}', 
             f'--output_dir={weights_save_path}', 
             f'--logging_dir={weights_save_path}', 
@@ -294,18 +316,20 @@ def easyphoto_train_forward(
             f'--merge_best_lora_name={user_id}',
             f'--cache_log_file={cache_log_file_path}'
         ]
-        if validation:
+        if validation and not train_scene_lora_bool:
             command += ["--validation"]
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+        if train_scene_lora_bool:
+            command += ["--train_scene_lora_bool"]
         try:
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error executing the command: {e}")
         
         # Reinforcement learning after LoRA training.
-        if enable_rl:
+        if enable_rl and not train_scene_lora_bool:
             # The DDPO (LoRA) distributed training is unstable due to a known accelerate/diffusers issue. Set `num_processes` to 1.
             # See https://github.com/kvablack/ddpo-pytorch/issues/10 for details.
             command = [
@@ -357,7 +381,7 @@ def easyphoto_train_forward(
 
     copyfile(best_weight_path, webui_save_path)
     
-    if enable_rl:
+    if enable_rl and not train_scene_lora_bool:
         # Currently, the best (reward_mean) ddpo lora checkpoint will be selected and saved to the WebUI Lora folder.
         best_output_dir = os.path.join(ddpo_weight_save_path, "best_outputs")
         if not os.path.exists(best_output_dir):
@@ -365,7 +389,4 @@ def easyphoto_train_forward(
         ddpo_lora_path = os.path.join(best_output_dir, "pytorch_lora_weights.bin")
         convert_lora_to_safetensors(ddpo_lora_path, ddpo_webui_save_path)
     
-    # It has been abandoned and will be deleted later.
-    # with open(id_path, "a") as f:
-    #     f.write(f"{user_id}\n")
     return "The training has been completed."

@@ -7,16 +7,17 @@ import modules.generation_parameters_copypaste as parameters_copypaste
 import requests
 from modules import script_callbacks, shared
 from modules.ui_components import ToolButton as ToolButton_webui
-from scripts.easyphoto_config import (cache_log_file_path,
+from scripts.animatediff_utils import video_visible
+from scripts.easyphoto_config import (DEFAULT_SCENE_LORA, cache_log_file_path,
                                       easyphoto_outpath_samples,
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples)
 from scripts.easyphoto_infer import (easyphoto_infer_forward,
                                      easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
-from scripts.easyphoto_utils import check_id_valid
-from scripts.sdwebui import get_checkpoint_type
-from scripts.animatediff_utils import video_visible
+from scripts.easyphoto_utils import (check_files_exists_and_download,
+                                     check_id_valid, check_scene_valid)
+from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
 
@@ -38,6 +39,27 @@ def get_external_ckpts():
                 external_checkpoints.append(_checkpoint)
     return external_checkpoints
 external_checkpoints = get_external_ckpts()
+
+def checkpoint_refresh_function():
+    checkpoints = []
+    models_dir = os.path.join(models_path, "Stable-diffusion")
+    
+    for root, dirs, files in os.walk(models_dir):
+        for _checkpoint in files:
+            if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
+                checkpoints.append(rel_path)
+    
+    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
+    
+checkpoints = []
+models_dir = os.path.join(models_path, "Stable-diffusion")
+
+for root, dirs, files in os.walk(models_dir):
+    for _checkpoint in files:
+        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+            rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
+            checkpoints.append(rel_path)
 
 def upload_file(files, current_files):
     file_paths = [file_d['name'] for file_d in current_files] + [file.name for file in files]
@@ -77,7 +99,7 @@ class ToolButton(gr.Button, gr.components.FormComponent):
 
     def get_block_name(self):
         return "button"
-    
+
 def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) as easyphoto_tabs:
         with gr.TabItem('Train'):
@@ -99,8 +121,8 @@ def on_ui_tabs():
                         clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
                         upload_button.upload(upload_file, inputs=[upload_button, instance_images], outputs=instance_images, queue=False)
-                    
-                        gr.Markdown(
+
+                        human_upload_note = gr.Markdown(
                             '''
                             Training steps:
                             1. Please upload 5-20 half-body photos or head-and-shoulder photos, and please don't make the proportion of your face too small.
@@ -109,27 +131,23 @@ def on_ui_tabs():
                             4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
                             '''
                         )
+                        scene_upload_note = gr.Markdown(
+                            '''
+                            Training steps:
+                            1. Please upload 15-20 photos with human, and please don't make the proportion of your face too small.
+                            2. Click on the Start Training button below to start the training process, approximately 25 minutes.
+                            3. Switch to Inference and generate photos based on the scene lora. 
+                            4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
+                            ''',
+                            visible=False
+                        )
                     with gr.Column():
                         gr.Markdown('Params Setting')
                         with gr.Accordion("Advanced Options", open=True):
                             with gr.Row():
-                                def checkpoint_refresh_function():
-                                    checkpoints = []
-                                    models_dir = os.path.join(models_path, "Stable-diffusion")
-                                    
-                                    for root, dirs, files in os.walk(models_dir):
-                                        for _checkpoint in files:
-                                            if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                                rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
-                                                checkpoints.append(rel_path)
-                                    
-                                    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
+                                train_mode_choose = gr.Dropdown(value="Train Human Lora", elem_id='radio', scale=1, min_width=20, choices=["Train Human Lora", "Train Scene Lora"], label="The Type of Lora", visible=True)
 
-                                checkpoints = []
-                                for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                    if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                        checkpoints.append(_checkpoint)
-                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
+                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", scale=3, choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
                                 checkpoint_refresh = ToolButton(value="\U0001f504")
                                 checkpoint_refresh.click(
@@ -137,15 +155,28 @@ def on_ui_tabs():
                                     inputs=[],
                                     outputs=[sd_model_checkpoint]
                                 )
-                            
-                            with gr.Row():
+
+                            with gr.Row(visible=False) as sdxl_row:
                                 sdxl_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki#4sdxl-training"
                                 sdxl_training_note = gr.Markdown(
                                     value = "**Please check the [[wiki]]({}) before SDXL training**.".format(sdxl_wiki_url),
-                                    visible=False
+                                    visible=True
+                                )
+                                
+                            with gr.Row(visible=False) as training_prefix_prompt_row:
+                                training_prefix_prompt = gr.Textbox(
+                                    label="Corresponding Prompts to the Template. (Such as: 1girl, brown_hair, chinese_clothes, dress, earrings, floral_print, hair_ornament, jewelry, lips, makeup, necklace, beige)", 
+                                    placeholder="Please write the corresponding prompts to the template.", 
+                                    lines=1, value='', visible=True, interactive=True
                                 )
 
                             with gr.Row():
+                                crop_ratio = gr.Textbox(
+                                    label="crop ratio",
+                                    value=3,
+                                    interactive=True,
+                                    visible=False
+                                )
                                 resolution = gr.Textbox(
                                     label="resolution",
                                     value=512,
@@ -166,7 +197,6 @@ def on_ui_tabs():
                                     value=200,
                                     interactive=True
                                 )
-
                             with gr.Row():
                                 train_batch_size = gr.Textbox(
                                     label="train batch size",
@@ -245,13 +275,12 @@ def on_ui_tabs():
                             sd_model_checkpoint.change(
                                 fn=update_train_parameters,
                                 inputs=sd_model_checkpoint,
-                                outputs=[sdxl_training_note, resolution, max_train_steps, rank, network_alpha, validation]
+                                outputs=[sdxl_row, resolution, max_train_steps, rank, network_alpha, validation]
                             )
 
-                        gr.Markdown(
+                        human_train_notes = gr.Markdown(
                             '''
                             Parameter parsing:
-                            - **The base checkpoint** can be SD1 or SDXL.
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
@@ -259,6 +288,23 @@ def on_ui_tabs():
                             - **Skin retouching** Whether to use skin retouching to preprocess training data face
                             '''
                         )
+                        scene_train_notes = gr.Markdown(
+                            '''
+                            Parameter parsing:
+                            - **max steps per photo** represents the maximum number of training steps per photo.
+                            - **max train steps** represents the maximum training step.
+                            - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
+                            ''',
+                            visible=False
+                        )
+
+                        def update_train_mode(train_mode_choose):
+                            if train_mode_choose == "Train Human Lora":
+                                return [gr.update(value=512), gr.update(value=128), gr.update(value=64), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)]
+                            else:
+                                return [gr.update(value=768), gr.update(value=256), gr.update(value=128), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)]
+
+                        train_mode_choose.change(update_train_mode, inputs=train_mode_choose, outputs=[resolution, rank, network_alpha, crop_ratio, training_prefix_prompt_row, val_and_checkpointing_steps, validation, enable_rl, rl_option_row1, rl_notes, skin_retouching_bool, human_train_notes, scene_train_notes, human_upload_note, scene_upload_note])
 
                 with gr.Row():
                     with gr.Column(width=3):
@@ -289,9 +335,10 @@ def on_ui_tabs():
                                 _js="ask_for_style_name",
                                 inputs=[
                                     sd_model_checkpoint, dummy_component,
-                                    uuid,
+                                    uuid, train_mode_choose, 
                                     resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images,
-                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool
+                                    enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool, 
+                                    training_prefix_prompt, crop_ratio
                                 ],
                                 outputs=[output_message])
                                 
@@ -304,107 +351,152 @@ def on_ui_tabs():
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
-                        model_selected_tab = gr.State(0)
+                        with gr.TabItem("Photo2Photo") as template_images_tab:
+                            upload_way = gr.Radio(["Template Gallery", "Single Image Upload", "Batch Images Upload"], value="Template Gallery", show_label=False)
 
-                        with gr.TabItem("template gallery") as template_images_tab:
-                            template_gallery_list = [(i, i) for i in preset_template]
-                            gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                            with gr.Column() as template_gallery:
+                                template_gallery_list = [(i, i) for i in preset_template]
+                                gallery = gr.Gallery(template_gallery_list).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                                
+                                def select_function(evt: gr.SelectData):
+                                    return [preset_template[evt.index]]
+
+                                selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
+                                gallery.select(select_function, None, selected_template_images)
+                                
+                            with gr.Column(visible=False) as single_image_upload:
+                                init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
                             
-                            def select_function(evt: gr.SelectData):
-                                return [preset_template[evt.index]]
+                            with gr.Column(visible=False) as batch_images_upload:
+                                uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
-                            selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                            gallery.select(select_function, None, selected_template_images)
+                                with gr.Row():
+                                    upload_dir_button = gr.UploadButton(
+                                        "Upload Photos", file_types=["image"], file_count="multiple"
+                                    )
+                                    clear_dir_button = gr.Button("Clear Photos")
+                                clear_dir_button.click(fn=lambda: [], inputs=None, outputs=uploaded_template_images)
+
+                                upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
                             
-                        with gr.TabItem("upload") as upload_image_tab:
-                            init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
+                            def upload_way_change(upload_way):
+                                if upload_way == "Template Gallery":
+                                    return [gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)]
+                                elif upload_way == "Single Image Upload":
+                                    return [gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)]
+                                else:
+                                    return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+
+                            upload_way.change(upload_way_change, upload_way, [template_gallery, single_image_upload, batch_images_upload])
                             
-
-                        with gr.TabItem("batch upload") as upload_dir_tab:
-                            uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
-
-                            with gr.Row():
-                                upload_dir_button = gr.UploadButton(
-                                    "Upload Photos", file_types=["image"], file_count="multiple"
+                        with gr.TabItem("Text2Photo") as text2photo_tab:
+                            with gr.Column():
+                                text_to_image_input_prompt = gr.Textbox(
+                                    label="Text2Photo Input Prompt", interactive=True, lines=2,
+                                    value="(portrait:1.5), 1girl, bokeh, bouquet, brown_hair, cloud, flower, hairband, hydrangea, lips, long_hair, outdoors, sunlight, white_flower, white_rose, green sweater, sweater", visible=True
                                 )
-                                clear_dir_button = gr.Button("Clear Photos")
-                            clear_dir_button.click(fn=lambda: [], inputs=None, outputs=uploaded_template_images)
-
-                            upload_dir_button.upload(upload_file, inputs=[upload_dir_button, uploaded_template_images], outputs=uploaded_template_images, queue=False)
-
-                        with gr.TabItem("text2photo") as generate_tab:
-                            
-                            sd_xl_resolution  = gr.Dropdown(
-                                value="(768, 1344)", elem_id='dropdown', 
-                                choices=[(704, 1408), (768, 1344), (832, 1216), (896, 1152), (960, 1088), (1024, 1024), (1088, 960), (1152, 896), (1216, 832), (1344, 768), (1408, 704), (1536, 640), (1664, 576)], 
-                                label="The Resolution of Photo (width x height).", visible=True
-                            )
-                            
-                            with gr.Row():
-                                portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="The Portrait Ratio.", visible=True)
-                                gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="The Gender of the Person.", visible=True)
-                                cloth_color     = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="The Color of the Cloth.", visible=True)
-                                cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "overcoat", "dress", "coat", "vest"], label="The Cloth on the Person.", visible=True)
-                            with gr.Row():
-                                doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does the Person do?", visible=True)
-                                where           = gr.Dropdown(value="in the garden with flowers", elem_id='dropdown', choices=["in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where is the Person?", visible=True)
-                                season          = gr.Dropdown(value="in the winter", elem_id='dropdown', choices=["in the spring", "in the summer", "in the autumn", "in the winter"], label="Where is the season?", visible=True)
-                                time_of_photo   = gr.Dropdown(value="daytime", elem_id='dropdown', choices=["daytime", "night"], label="Where is the Time?", visible=True)
-                            with gr.Row():
-                                weather         = gr.Dropdown(value="snow", elem_id='dropdown', choices=["snow", "rainy", "sunny"], label="Where is the weather?", visible=True)
-
-                            sd_xl_input_prompt = gr.Text(
-                                label="Sd XL Input Prompt", interactive=False,
-                                value="upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32", visible=False
-                            )
-
-                            def update_sd_xl_input_prompt(portrait_ratio, gender, cloth_color, cloth, doing, where, season, time_of_photo, weather):
-                                
-                                # first time add gender hack for XL prompt, suggest by Nenly
-                                gender_limit_prompt_girls = {'dress':'shirt'}
-                                if gender in ['boy', 'man']:
-                                    if cloth in list(gender_limit_prompt_girls.keys()):
-                                        cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
+                                with gr.Accordion("Scene Lora (Click here to select Scene Lora)", open=False):
+                                    with gr.Column():
+                                        def scene_change_function(scene_id_gallery, evt: gr.SelectData):
+                                            scene_id = scene_id_gallery[evt.index][1]
+                                            # scene lora path
+                                            lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+                                            if scene_id == "none":
+                                                return gr.update(visible=True), gr.update(value="none")
+                                            if scene_id in DEFAULT_SCENE_LORA:
+                                                check_files_exists_and_download(False, download_mode=scene_id)
+                                            if not os.path.exists(lora_model_path):
+                                                return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
+                                            is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+                                            
+                                            return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
                                         
-                                input_prompt = f"{portrait_ratio}, look at viewer, one twenty years old {gender}, wear {cloth_color} {cloth}, {doing}, {where}, {season}, {time_of_photo}, {weather}, f32"
-                                return input_prompt
+                                        def scene_refresh_function():
+                                            scene = [[os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "scene_lora", f'{_scene}.jpg'), _scene] for _scene in DEFAULT_SCENE_LORA]
+                                            _scenes = os.listdir(os.path.join(models_path, "Lora"))
+                                            for _scene in _scenes:
+                                                if check_scene_valid(_scene, models_path):
+                                                    if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+                                                        continue
+                                                    ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+                                                    if not os.path.exists(ref_image):
+                                                        ref_image = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg')
+                                                    scene.append([ref_image, os.path.splitext(_scene)[0]])
+                                            scene = sorted(scene)
+                                            scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
+                                            return gr.update(value=scene)
+                                    
+                                        scene = [[os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "scene_lora", f'{_scene}.jpg'), _scene] for _scene in DEFAULT_SCENE_LORA]
+                                        _scenes = os.listdir(os.path.join(models_path, "Lora"))
+                                        for _scene in _scenes:
+                                            if check_scene_valid(_scene, models_path):
+                                                if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+                                                    continue
+                                                ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+                                                if not os.path.exists(ref_image):
+                                                    ref_image = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg')
+                                                scene.append([ref_image, os.path.splitext(_scene)[0]])
+                                        scene = sorted(scene)
+                                        scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
 
-                            prompt_inputs = [portrait_ratio, gender, cloth_color, cloth, doing, where, season, time_of_photo, weather]
-                            for prompt_input in prompt_inputs:
-                                prompt_input.change(update_sd_xl_input_prompt, inputs=prompt_inputs, outputs=sd_xl_input_prompt)
-                                
-                            gr.Markdown(
-                                value = '''
-                                Generate from prompts notes:
-                                - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
-                                - We use sd-xl generate template first and then do the portrait reconstruction. So we need to download another sdxl model.
-                                - 16GB GPU memory is required at least. 12GB GPU memory would be very slow because of the lack of GPU memory.
-                                ''',
-                                visible=True
-                            )
+                                        scene_id = gr.Text(value="none", show_label=False, visible=True, placeholder="Selected", interactive=False)
+                                        autodownload_notebook = gr.Markdown(value="**The preset Lora will be downloaded on the first click.**", show_label=False, visible=True)
+                                        with gr.Row():
+                                            scene_id_gallery = gr.Gallery(
+                                                value=scene, label="Scene Lora Gallery", allow_preview=False, elem_id="scene_id_select", 
+                                                show_share_button=False, visible=True
+                                            ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
+                                            scene_id_gallery.select(scene_change_function, [scene_id_gallery], [text_to_image_input_prompt, scene_id])
 
-                        model_selected_tabs = [template_images_tab, upload_image_tab, upload_dir_tab, generate_tab]
+                                            scene_id_refresh = ToolButton(value="\U0001f504")
+                                            scene_id_refresh.click(fn=scene_refresh_function, inputs=[], outputs=[scene_id_gallery])
+
+                                with gr.Row():
+                                    text_to_image_width = gr.Slider(minimum=64, maximum=2048, step=8, label="Width", value=624, elem_id=f"width")
+                                    text_to_image_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Height", value=832,elem_id=f"height")
+
+                                with gr.Row():
+                                    prompt_generate_sd_model_checkpoint = gr.Dropdown(value="LZ-16K+Optics.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The checkpoint you use for text to image prompt generate.", interactive=True, visible=True)
+
+                                    prompt_generate_checkpoint_refresh = ToolButton(value="\U0001f504")
+                                    prompt_generate_checkpoint_refresh.click(
+                                        fn=checkpoint_refresh_function,
+                                        inputs=[],
+                                        outputs=[prompt_generate_sd_model_checkpoint]
+                                    )
+
+                                gr.Markdown(
+                                    value = '''
+                                        Generate from prompts notes:
+                                        - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
+                                        - We use scene lora for background generation. So we need to train scene lora first.
+                                    ''',
+                                    visible=True
+                                )
+
+                        def generate_tabs(model_selected_tab, upload_way):
+                            if model_selected_tab == 0:
+                                tabs = {
+                                    "Template Gallery"          : 0, 
+                                    "Single Image Upload"       : 1,
+                                    "Batch Images Upload"       : 2,
+                                }[upload_way]
+                            else:
+                                tabs = 3
+                            return tabs
+                        
+                        # get tabs
+                        state_tab           = gr.State(0)
+                        model_selected_tab  = gr.State(0)
+                        model_selected_tabs = [template_images_tab, text2photo_tab]
                         for i, tab in enumerate(model_selected_tabs):
                             tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
+                            tab.select(generate_tabs, [model_selected_tab, upload_way], state_tab)
+
+                        upload_way.change(generate_tabs, [model_selected_tab, upload_way], state_tab)
                         
                         with gr.Row():
-                            def checkpoint_refresh_function():
-                                checkpoints = []
-                                models_dir = os.path.join(models_path, "Stable-diffusion")
-                                
-                                for root, dirs, files in os.walk(models_dir):
-                                    for _checkpoint in files:
-                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                            rel_path = os.path.relpath(os.path.join(root, _checkpoint), models_dir)
-                                            checkpoints.append(rel_path)
-                                
-                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
-                            
-                            checkpoints = []
-                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                    checkpoints.append(_checkpoint)
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", interactive=True, visible=True)
 
                             checkpoint_refresh = ToolButton(value="\U0001f504")
                             checkpoint_refresh.click(
@@ -684,13 +776,16 @@ def on_ui_tabs():
                     
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, 
-                            before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
-                            seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-                            background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, model_selected_tab, \
-                            ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids],
+                    inputs=[
+                        sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, \
+                        text_to_image_input_prompt, text_to_image_width, text_to_image_height, scene_id, prompt_generate_sd_model_checkpoint, \
+                        additional_prompt, before_face_fusion_ratio, after_face_fusion_ratio, \
+                        first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+                        seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
+                        background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, state_tab, \
+                        ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids
+                    ],
                     outputs=[infer_progress, output_images, face_id_outputs]
-
                 )
         
         with gr.TabItem('Video Inference'):
@@ -710,74 +805,13 @@ def on_ui_tabs():
                             video_model_selected_tab = gr.State(0)
 
                             with gr.TabItem("Text2Video") as video_template_images_tab:
-                                with gr.Row():
-                                    t2v_mode_choose = gr.Dropdown(value="Preset With Drowdown", elem_id='dropdown', choices=["Preset With Drowdown", "Write Prompt Yourself"], label="Use Preset With Drowdown or Write Prompt Yourself for T2V.", visible=shared.opts.data.get("enable_easyphoto_t2v_write_prompt_yourself", False))
-
-                                    t2v_resolution = gr.Dropdown(
-                                        value="(512, 768)", elem_id='dropdown', 
-                                        choices=[(768, 512), (512, 512), (512, 768)], 
-                                        label="The Resolution of Video (width x height).", visible=True
-                                    )
-
-                                with gr.Row(visible=True) as row1:
-                                    gender          = gr.Dropdown(value="girl", elem_id='dropdown', choices=["girl", "woman", "boy", "man"], label="Gender.", visible=True)
-                                    hair_color      = gr.Dropdown(value="white", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the hair.", visible=True)
-                                    hair_length     = gr.Dropdown(value="long", elem_id='dropdown', choices=["long", "short", "no"], label="Length of the hair.", visible=True)
-                                    eyes_color      = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the eye.", visible=True)
-
-                                with gr.Row(visible=True) as row2:
-                                    hair_wear       = gr.Dropdown(value="hair ornament", elem_id='dropdown', choices=["hair ornament", "wreath", "hairpin"], label="Wearing of the hair.", visible=True)
-                                    cloth_color     = gr.Dropdown(value="blue", elem_id='dropdown', choices=["white", "orange", "pink", "black", "red", "blue"], label="Color of the Cloth.", visible=True)
-                                    cloth           = gr.Dropdown(value="dress", elem_id='dropdown', choices=["shirt", "short shirt", "overcoat", "dress", "dress with off shoulder", "coat", "vest"], label="Cloth on the Person.", visible=True)
-                                    doing           = gr.Dropdown(value="standing", elem_id='dropdown', choices=["standing", "sit"], label="What does Person do?", visible=True)
-
-                                with gr.Row(visible=True) as row3:
-                                    expression      = gr.Dropdown(value="shy", elem_id='dropdown', choices=["shy", "happy"], label="Expression on the face?", visible=True)
-                                    portrait_ratio  = gr.Dropdown(value="upper-body", elem_id='dropdown', choices=["upper-body", "headshot"], label="Ratio of Portrait.", visible=True)
-                                    where           = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the garden with flowers", "in the house", "on the lawn", "besides the sea", "besides the lake", "on the bridge", "in the forest", "on the mountain", "on the street", "under water", "under sky"], label="Where.", visible=True)
-                                    season          = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "in the spring", "in the summer", "in the autumn", "in the winter"], label="Season?", visible=True)
-
-                                with gr.Row(visible=True) as row4:
-                                    time_of_photo   = gr.Dropdown(value="none", elem_id='dropdown', choices=["none", "at daytime", "at noot", "at night"], label="Time?", visible=True)
-
                                 t2v_input_prompt = gr.Textbox(
                                     label="Text2Video Input Prompt.", interactive=True, lines=3,
-                                    value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=False
+                                    value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ", visible=True
                                 )
-
-                                def update_t2v_input_prompt(*args):
-                                    # preprocess
-                                    args = ["" if arg == "none" else arg for arg in args]
-                                    gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo = args
-
-                                    gender_limit_prompt_girls = {'dress':'shirt'}
-                                    if gender in ['boy', 'man']:
-                                        if cloth in list(gender_limit_prompt_girls.keys()):
-                                            cloth = gender_limit_prompt_girls.get(cloth, 'shirt')
-
-                                    input_prompt = f"1{gender}, ({hair_color} hair, {hair_length} hair), {eyes_color} eyes, {hair_wear}, {cloth_color} {cloth}, {doing}, looking at viewer, {expression}, {portrait_ratio}, {where}, {time_of_photo}, {season}"
-                                    return input_prompt
-
-                                prompt_inputs = [gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo]
-                                for prompt_input in prompt_inputs:
-                                    prompt_input.change(update_t2v_input_prompt, inputs=prompt_inputs, outputs=t2v_input_prompt)
-                                    
-                                def update_t2v_mode(t2v_mode_choose):
-                                    if t2v_mode_choose == "Preset With Drowdown":
-                                        return [
-                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True),
-                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), 
-                                            gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
-                                        ]
-                                    else:
-                                        return [
-                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), 
-                                            gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
-                                        ]
-                                t2v_mode_choose.change(update_t2v_mode, inputs=t2v_mode_choose, outputs=[row1, row2, row3, row4, gender, hair_color, hair_length, eyes_color, hair_wear, cloth_color, cloth, doing, expression, portrait_ratio, where, season, time_of_photo, t2v_input_prompt])
+                                with gr.Row():
+                                    t2v_input_width = gr.Slider(minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width")
+                                    t2v_input_height = gr.Slider(minimum=64, maximum=2048, step=8, label="Video Height", value=768,elem_id=f"height")
 
                                 with gr.Row():
                                     sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(value="majicmixRealistic_v7.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), elem_id='dropdown', min_width=40, label="The base checkpoint you use for Text2Video(For animatediff only).", visible=True)
@@ -799,7 +833,7 @@ def on_ui_tabs():
                                 )
 
                             with gr.TabItem("Image2Video") as video_upload_image_tab:
-                                i2v_mode_choose     = gr.Dropdown(value="Base on One Image", elem_id='dropdown', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", visible=True)
+                                i2v_mode_choose     = gr.Radio(value="Base on One Image", elem_id='Radio', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", show_label=False, visible=True)
                                 
                                 with gr.Row():
                                     init_image      = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
@@ -1080,7 +1114,7 @@ def on_ui_tabs():
                     display_button.click(
                         fn=easyphoto_video_infer_forward,
                         inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-                                t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+                                t2v_input_prompt, t2v_input_width, t2v_input_height, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
                                 first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
                                 color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                                 makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, video_model_selected_tab, *uuids],
@@ -1094,8 +1128,6 @@ def on_ui_settings():
     section = ('EasyPhoto', "EasyPhoto")
     shared.opts.add_option("easyphoto_cache_model", shared.OptionInfo(
         True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section))
-    shared.opts.add_option("enable_easyphoto_t2v_write_prompt_yourself", shared.OptionInfo(
-        False, "Enable easyphoto text2video write prompt yourself", gr.Checkbox, {}, section=section))
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页
 script_callbacks.on_ui_tabs(on_ui_tabs)

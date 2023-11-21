@@ -13,6 +13,7 @@ def post_train(encoded_images, url='http://0.0.0.0:7860'):
     datas = json.dumps({
         "user_id"               : "test", # A custom ID that identifies the trained face model
         "sd_model_checkpoint"   : "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
+        "train_mode_choose"     : "Train Human Lora",
         "resolution"            : 512,
         "val_and_checkpointing_steps" : 100,
         "max_train_steps"       : 800, # Training steps
