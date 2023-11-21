@@ -693,8 +693,15 @@ def on_ui_tabs():
 
                 )
         
-        if video_visible:
-            with gr.TabItem('Video Inference'):
+        with gr.TabItem('Video Inference'):
+            if not video_visible:
+                gr.Markdown(
+                    '''
+                    Animatediff is not Support when the version of Stable Diffusion Webui is under v1.6.0. If you want to use the video feature of EasyPhoto, please update your Stable Diffusion Webui.  
+                    Animatediff 无法在 Stable Diffusion Webui 的版本低于v1.6.0时使用。如果你想要使用EasyPhoto的Video功能，请更新您的Stable Diffusion Webui。
+                    '''
+                )
+            else:
                 dummy_component = gr.Label(visible=False)
 
                 with gr.Blocks() as demo:
