@@ -138,7 +138,8 @@ def on_ui_tabs():
                             2. Click on the Start Training button below to start the training process, approximately 25 minutes.
                             3. Switch to Inference and generate photos based on the scene lora. 
                             4. If you encounter lag when uploading, please modify the size of the uploaded pictures and try to limit it to 1.5MB.
-                            '''
+                            ''',
+                            visible=False
                         )
                     with gr.Column():
                         gr.Markdown('Params Setting')
@@ -299,7 +300,7 @@ def on_ui_tabs():
 
                         def update_train_mode(train_mode_choose):
                             if train_mode_choose == "Train Human Lora":
-                                return [gr.update(value=512), gr.update(value=128), gr.update(value=64), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+                                return [gr.update(value=512), gr.update(value=128), gr.update(value=64), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)]
                             else:
                                 return [gr.update(value=768), gr.update(value=256), gr.update(value=128), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)]
 
@@ -832,7 +833,7 @@ def on_ui_tabs():
                                 )
 
                             with gr.TabItem("Image2Video") as video_upload_image_tab:
-                                i2v_mode_choose     = gr.Dropdown(value="Base on One Image", elem_id='dropdown', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", visible=True)
+                                i2v_mode_choose     = gr.Radio(value="Base on One Image", elem_id='Radio', choices=["Base on One Image", "From One Image to another"], label="Generate video from one image or more images", show_label=False, visible=True)
                                 
                                 with gr.Row():
                                     init_image      = gr.Image(label="Image for easyphoto to Image2Video", show_label=True, elem_id="{id_part}_image", source="upload")
