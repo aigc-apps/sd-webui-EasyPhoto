@@ -520,6 +520,9 @@ def on_ui_tabs():
                             sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
 
                         with gr.Row():
+                            ref_mode_choose = gr.Radio(["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)"], value="Infer with Pretrained Lora", show_label=False)
+
+                        with gr.Row() as uid_and_refresh:
                             def select_function():
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
@@ -563,6 +566,10 @@ def on_ui_tabs():
                                     inputs=[],
                                     outputs=[uuids[i]]
                                 )
+
+                        with gr.Row(visible=False) as ipa_only_row:
+                            ipa_only_image_path = gr.Image(label="Image Prompt for IP-Adapter Only", show_label=True, source="upload", type="filepath")
+                            ipa_only_weight = gr.Slider(minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Only Control Weight",)
 
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
@@ -656,27 +663,37 @@ def on_ui_tabs():
                                     value=False
                                 )
 
-                                def ipa_update_score(ip_adapter_control, display_score):
-                                    if not display_score and ip_adapter_control:
-                                        return gr.Checkbox.update(value=True)
-                                    return gr.Checkbox.update(value=display_score)
-                                
-                                def update_score(ip_adapter_control, display_score):
+                                def ipa_update_score(ip_adapter_control):
                                     if ip_adapter_control:
-                                        return gr.Checkbox.update(value=True)
-                                    return gr.Checkbox.update(value=display_score)
+                                        return gr.update(value=True)
+                                    return gr.update(visible=True)
+                                
+                                def update_score(ip_adapter_control, ref_mode_choose, display_score):
+                                    if ip_adapter_control or ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+                                        return gr.update(value=True)
+                                    return gr.update(value=display_score)
+                                
+                                def use_ipa_only(ref_mode_choose):
+                                    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+                                        return gr.update(value=True), gr.update(value=False, visible=False), gr.update(visible=False), gr.update(visible=True)
+                                    return gr.update(visible=True), gr.update(value=False, visible=True), gr.update(visible=True), gr.update(visible=False)
                                 
                                 # We need to make sure that Display Similarity Score is mandatory when the user
                                 # selects IP-Adapter Control. Otherwise, it is not.
                                 ip_adapter_control.change(
                                     ipa_update_score,
-                                    inputs=[ip_adapter_control, display_score],
+                                    inputs=[ip_adapter_control],
                                     outputs=[display_score]
                                 )
                                 display_score.change(
                                     update_score,
-                                    inputs=[ip_adapter_control, display_score],
+                                    inputs=[ip_adapter_control, ref_mode_choose, display_score],
                                     outputs=[display_score]
+                                )
+                                ref_mode_choose.change(
+                                    use_ipa_only,
+                                    inputs=[ref_mode_choose],
+                                    outputs=[display_score, ip_adapter_control, uid_and_refresh, ipa_only_row]
                                 )
 
                             with gr.Row():
@@ -757,7 +774,6 @@ def on_ui_tabs():
                                 paste_field_names=[]
                             ))
 
-
                         face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
                         face_id_outputs = gr.Gallery(
                             label ="Face Similarity Scores",
@@ -783,7 +799,7 @@ def on_ui_tabs():
                         first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                         seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                         background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, state_tab, \
-                        ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids
+                        ip_adapter_control, ip_adapter_weight, ipa_image_path, ref_mode_choose, ipa_only_image_path, ipa_only_weight, *uuids
                     ],
                     outputs=[infer_progress, output_images, face_id_outputs]
                 )
