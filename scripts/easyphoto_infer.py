@@ -3,6 +3,7 @@ import glob
 import math
 import os
 import traceback
+import re
 from typing import Any, Dict, List, Optional, Union
 
 import cv2
@@ -32,7 +33,8 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      ep_logger, get_mov_all_images,
                                      modelscope_models_to_cpu,
                                      modelscope_models_to_gpu,
-                                     switch_ms_model_cpu, unload_models)
+                                     switch_ms_model_cpu, unload_models,
+                                     get_controlnet_version)
 from scripts.face_process_utils import (
     Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
     crop_and_paste, safe_get_box_mask_keypoints_and_padding_image)
@@ -409,9 +411,20 @@ def easyphoto_infer_forward(
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
     
+    # check the version of controlnets
+    controlnet_version = get_controlnet_version()
+    major, minor, patch = map(int, controlnet_version.split("."))
+    if major == 0 and minor == 0 and patch == 0:
+        return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", [], []
+    if ip_adapter_control:
+        if major < 1 or minor < 1 or patch < 417:
+            return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", [], []
+
     # check the number of controlnets
     max_control_net_unit_count = 3 if not ip_adapter_control else 4
-    if shared.opts.data.get("control_net_unit_count") < max_control_net_unit_count:
+    control_net_unit_count = shared.opts.data.get("control_net_unit_count", 3)
+    ep_logger.info("ControlNet unit number: {}".format(control_net_unit_count))
+    if control_net_unit_count < max_control_net_unit_count:
         error_info = (
             "Please go to Settings/ControlNet and at least set {} for "
             "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)

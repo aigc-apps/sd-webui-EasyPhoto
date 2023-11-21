@@ -20,7 +20,7 @@ from modules.sd_models import get_closet_checkpoint_match, load_model, list_mode
 from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
-from scripts.animatediff_utils import AnimateDiffProcess, motion_module
+from scripts.animatediff_utils import AnimateDiffProcess
 from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
@@ -588,7 +588,7 @@ def i2i_inpaint_call(
     if animatediff_flag:
         gen_image = processed.images
     else:
-        if opts.return_mask or opts.return_mask_composite:
+        if (opts.return_mask or opts.return_mask_composite) and mask_image is not None:
             return processed.images[1]
         return processed.images[0]
     return gen_image
