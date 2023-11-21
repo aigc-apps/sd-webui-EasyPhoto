@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import traceback
+import re
 from contextlib import ContextDecorator
 from glob import glob
 
@@ -15,6 +16,7 @@ import torch
 import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
 from modules.paths import models_path
+from modules.paths_internal import extensions_dir, script_path
 from PIL import Image
 from scripts.easyphoto_config import data_path
 from tqdm import tqdm
@@ -420,3 +422,24 @@ def unload_models():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+
+
+def get_controlnet_version() -> str:
+    """Adapte from sd-webui-controlnet/patch_version.py.
+    """
+    version_file = "scripts/controlnet_version.py"
+    version_file_path = os.path.join(controlnet_extensions_path, version_file)
+    if not os.path.exists(version_file_path):
+        builtin_version_file_path = os.path.join(controlnet_extensions_builtin_path, version_file)
+        if not os.path.exists(builtin_version_file_path):
+            return "0.0.0"
+        else:
+            with open(builtin_version_file_path, "r") as f:
+                content = f.read()
+    else:
+        with open(version_file_path, "r") as f:
+            content = f.read()
+    version_pattern = r"version_flag\s*=\s*'v(\d+\.\d+\.\d+)'"
+    controlnet_version = re.search(version_pattern, content).group(1)
+
+    return controlnet_version
