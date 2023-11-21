@@ -588,16 +588,9 @@ def i2i_inpaint_call(
     if animatediff_flag:
         gen_image = processed.images
     else:
-        if len(processed.images) > 1:
-            # get the generate image!
-            h_0, w_0, c_0 = np.shape(processed.images[0])
-            h_1, w_1, c_1 = np.shape(processed.images[1])
-            if w_1 != w_0:
-                gen_image = processed.images[1]
-            else:
-                gen_image = processed.images[0]
-        else:
-            gen_image = processed.images[0]
+        if opts.return_mask or opts.return_mask_composite:
+            return processed.images[1]
+        return processed.images[0]
     return gen_image
 
 def get_checkpoint_type(sd_model_checkpoint: str) -> int:

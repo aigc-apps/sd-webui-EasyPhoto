@@ -49,12 +49,15 @@ models_annotator_path               = os.path.join(data_path, "models")
 if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
+    controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_builtin_path
+    controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/clip_vision")
 else:
     controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
+    controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
 
 download_urls = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -103,6 +106,14 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/008.png",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/009.png",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/pose_templates/010.png",
+    ],
+    "add_ipa_base": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter-full-face_sd15.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/clip_h.pth",
+    ],
+    "add_ipa_sdxl": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter-plus-face_sdxl_vit-h.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/clip_g.pth",
     ],
     "add_video": [
         # new backbone for video
@@ -204,6 +215,14 @@ save_filenames = {
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "008.png"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "009.png"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "010.png")
+    ],
+    "add_ipa_base": [
+        [os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
+        os.path.join(controlnet_clip_annotator_cache_path, f"clip_h.pth"),
+    ],
+    "add_ipa_sdxl": [
+        [os.path.join(models_path, f"ControlNet/ip-adapter-plus-face_sdxl_vit-h.safetensors"), os.path.join(controlnet_cache_path, f"models/ip-adapter-plus-face_sdxl_vit-h.safetensors")],
+        os.path.join(controlnet_clip_annotator_cache_path, f"clip_g.pth"),
     ],
     "add_video": [
         # new backbone for video
