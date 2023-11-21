@@ -349,11 +349,13 @@ def easyphoto_infer_forward(
         refresh_model_vae()
     check_hash[0] = False
 
+    # check the checkpoint_type of sd_model_checkpoint
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
+    # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
         check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
         if check_hash[1]:
@@ -376,11 +378,13 @@ def easyphoto_infer_forward(
                 refresh_model_vae()
             check_hash[4] = False
 
+    # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
         if user_id != "none":
+            # Check if the user_id is valid
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []  
-            # Check if the type of the stable diffusion model and the user LoRA match.
+            # Check if the type of the stable diffusion model and the user LoRA match
             sdxl_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
             sdxl_lora_flag = True if sdxl_lora_type == 3 else False
             if sdxl_lora_flag != sdxl_pipeline_flag:
@@ -405,6 +409,7 @@ def easyphoto_infer_forward(
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
     
+    # check the number of controlnets
     max_control_net_unit_count = 3 if not ip_adapter_control else 4
     if shared.opts.data.get("control_net_unit_count") < max_control_net_unit_count:
         error_info = (

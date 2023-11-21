@@ -291,7 +291,8 @@ def on_ui_tabs():
                             - **max steps per photo** represents the maximum number of training steps per photo.
                             - **max train steps** represents the maximum training step.
                             - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
-                            '''
+                            ''',
+                            visible=False
                         )
 
                         def update_train_mode(train_mode_choose):
@@ -435,13 +436,13 @@ def on_ui_tabs():
                                         scene = sorted(scene)
                                         scene.insert(0, [os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), 'no_found_image.jpg'), "none"])
 
-                                        scene_id = gr.Text(value="none", show_label=False, visible=True, placeholder="Selected")
+                                        scene_id = gr.Text(value="none", show_label=False, visible=True, placeholder="Selected", interactive=False)
                                         autodownload_notebook = gr.Markdown(value="**The preset Lora will be downloaded on the first click.**", show_label=False, visible=True)
                                         with gr.Row():
                                             scene_id_gallery = gr.Gallery(
-                                                value=scene, label="Scene Lora Gallery", allow_preview=False,
-                                                show_share_button=False, visible=True, height=300,
-                                            ).style(columns=[5], rows=[2])
+                                                value=scene, label="Scene Lora Gallery", allow_preview=False, elem_id="scene_id_select", 
+                                                show_share_button=False, visible=True
+                                            ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
                                             scene_id_gallery.select(scene_change_function, [scene_id_gallery], [text_to_image_input_prompt, scene_id])
 
                                             scene_id_refresh = ToolButton(value="\U0001f504")
