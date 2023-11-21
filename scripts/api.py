@@ -59,9 +59,15 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
                 user_id, train_mode_choose,
                 resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos,
                 train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, 
-                rank, network_alpha, validation, instance_images,
-                enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool,
-                training_prefix_prompt, crop_ratio, 
+                rank, network_alpha, 
+                validation, 
+                instance_images,
+                enable_rl, 
+                max_rl_time, 
+                timestep_fraction, 
+                skin_retouching_bool,
+                training_prefix_prompt, 
+                crop_ratio, 
                 *args
             )
         except Exception as e:
