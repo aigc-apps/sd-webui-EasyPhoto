@@ -308,9 +308,9 @@ def on_ui_tabs():
 
                 with gr.Row():
                     with gr.Column(width=3):
-                        run_button = gr.Button('Start Training')
+                        run_button = gr.Button('Start Training', variant='primary')
                     with gr.Column(width=1):
-                        refresh_button = gr.Button('Refresh Log')
+                        refresh_button = gr.Button('Refresh Log', variant='primary')
 
                 gr.Markdown(
                     '''
@@ -496,7 +496,7 @@ def on_ui_tabs():
                         upload_way.change(generate_tabs, [model_selected_tab, upload_way], state_tab)
                         
                         with gr.Row():
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", interactive=True, visible=True)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use. (Please keep it same with the checkpoint in the upper left corner for faster speed.)", interactive=True, visible=True)
 
                             checkpoint_refresh = ToolButton(value="\U0001f504")
                             checkpoint_refresh.click(
@@ -504,20 +504,6 @@ def on_ui_tabs():
                                 inputs=[],
                                 outputs=[sd_model_checkpoint]
                             )
-
-                        with gr.Row():
-                            infer_note = gr.Markdown(
-                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                visible=True
-                            )
-                        
-                            def update_infer_note(sd_model_checkpoint):
-                                # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
-                                if shared.opts.sd_model_checkpoint is not None and sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
-                                    return gr.Markdown.update(visible=False)
-                                return gr.Markdown.update(visible=True)
-                            
-                            sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
 
                         with gr.Row():
                             ref_mode_choose = gr.Radio(["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)"], value="Infer with Pretrained Lora", show_label=False)
@@ -768,13 +754,13 @@ def on_ui_tabs():
                                 'extras': ToolButton_webui('📐', elem_id=f'{tabname}_send_to_extras', tooltip="Send image and generation parameters to extras tab.")
                             }
 
-                        display_button = gr.Button('Start Generation')
-
                         for paste_tabname, paste_button in buttons.items():
                             parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
                                 paste_button=paste_button, tabname=paste_tabname, source_tabname="txt2img" if tabname == "txt2img" else None, source_image_component=output_images,
                                 paste_field_names=[]
                             ))
+
+                        display_button = gr.Button('Start Generation', variant='primary')
 
                         face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
                         face_id_outputs = gr.Gallery(
@@ -1086,7 +1072,7 @@ def on_ui_tabs():
                                     return [gr.update(visible=False), gr.update(visible=True)]
                             save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
 
-                            display_button = gr.Button('Start Generation')
+                            display_button = gr.Button('Start Generation', variant='primary')
                             with gr.Row():
                                 save = gr.Button('List Recent Conversion Results', elem_id=f'save')
                                 download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
