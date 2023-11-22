@@ -636,7 +636,7 @@ def easyphoto_infer_forward(
                 ipa_retinaface_masks.append([])
         elif user_id == "ip_adapter_control_only":
             # get prompt
-            input_prompt = f"{validation_prompt}, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            input_prompt = f"1person, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
             
             face_id_image = Image.open(ipa_image_path).convert("RGB")
             roop_image = Image.open(ipa_image_path).convert("RGB")
@@ -893,14 +893,16 @@ def easyphoto_infer_forward(
                     
                     # Since the image encoder of IP-Adapter will crop/resize the image prompt to (224, 224),
                     # we pad the face w.r.t the long side for an aspect ratio of 1.
-                    ipa_image_face = ImageChops.multiply(ipa_images[index], ipa_mask)
-                    ipa_image_face = ipa_image_face.crop(ipa_retinaface_box)
+                    ipa_mask        = np.array(ipa_mask, np.uint8) / 255
+                    ipa_image_face  = np.ones_like(np.array(ipa_images[index])) * 255 
+                    ipa_image_face  = Image.fromarray(np.uint8(np.array(ipa_images[index]) * ipa_mask + ipa_image_face * (1 - ipa_mask)))
+                    ipa_image_face  = ipa_image_face.crop(ipa_retinaface_box)
                     ipa_face_width, ipa_face_height = ipa_image_face.size
                     if ipa_face_width > ipa_face_height:
                         padded_size = (ipa_face_width, ipa_face_width)
                     else:
                         padded_size = (ipa_face_height, ipa_face_height)
-                    ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
+                    ipa_image_face  = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
                 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:

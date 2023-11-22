@@ -567,9 +567,9 @@ def on_ui_tabs():
                                     outputs=[uuids[i]]
                                 )
 
-                        with gr.Row(visible=False) as ipa_only_row:
+                        with gr.Column(visible=False) as ipa_only_col:
                             ipa_only_image_path = gr.Image(label="Image Prompt for IP-Adapter Only", show_label=True, source="upload", type="filepath")
-                            ipa_only_weight = gr.Slider(minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Only Control Weight",)
+                            ipa_only_weight = gr.Slider(minimum=0.10, maximum=1.00, value=0.60, step=0.05, label="IP-Adapter Only Control Weight",)
 
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
@@ -693,7 +693,7 @@ def on_ui_tabs():
                                 ref_mode_choose.change(
                                     use_ipa_only,
                                     inputs=[ref_mode_choose],
-                                    outputs=[display_score, ip_adapter_control, uid_and_refresh, ipa_only_row]
+                                    outputs=[display_score, ip_adapter_control, uid_and_refresh, ipa_only_col]
                                 )
 
                             with gr.Row():
