@@ -240,7 +240,7 @@ def on_ui_tabs():
                                 )
                                 skin_retouching_bool = gr.Checkbox(
                                     label="Skin Retouching",
-                                    value=True
+                                    value=False
                                 )
                             
                             # Reinforcement Learning Options
@@ -750,9 +750,8 @@ def on_ui_tabs():
                                     '''
                                 )
                             
-                        display_button = gr.Button('Start Generation')
-
                     with gr.Column():
+
                         gr.Markdown('Generated Results')
 
                         output_images = gr.Gallery(
@@ -767,6 +766,8 @@ def on_ui_tabs():
                                 'inpaint': ToolButton_webui('🎨️', elem_id=f'{tabname}_send_to_inpaint', tooltip="Send image and generation parameters to img2img inpaint tab."),
                                 'extras': ToolButton_webui('📐', elem_id=f'{tabname}_send_to_extras', tooltip="Send image and generation parameters to extras tab.")
                             }
+
+                        display_button = gr.Button('Start Generation')
 
                         for paste_tabname, paste_button in buttons.items():
                             parameters_copypaste.register_paste_params_button(parameters_copypaste.ParamBinding(
@@ -1071,8 +1072,6 @@ def on_ui_tabs():
                                         '''
                                     )
                                 
-                            display_button = gr.Button('Start Generation')
-
                         with gr.Column():
                             gr.Markdown('Generated Results')
 
@@ -1084,19 +1083,14 @@ def on_ui_tabs():
                                     return [gr.update(visible=True), gr.update(visible=False)]
                                 else:
                                     return [gr.update(visible=False), gr.update(visible=True)]
-                                
                             save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
-                                    
-                            output_images = gr.Gallery(
-                                label='Output Frames',
-                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
-                            infer_progress = gr.Textbox(
-                                label="Generation Progress",
-                                value="No task currently",
-                                interactive=False
-                            )
+                            display_button = gr.Button('Start Generation')
                             with gr.Row():
+                                save = gr.Button('List Recent Conversion Results', elem_id=f'save')
+                                download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+                                download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+
                                 def save_video():
                                     origin_path = os.path.join(easyphoto_video_outpath_samples, "origin")
                                     crop_path = os.path.join(easyphoto_video_outpath_samples, "crop")
@@ -1122,11 +1116,19 @@ def on_ui_tabs():
                                                 continue
                                     return gr.File.update(value=video_path, visible=True), gr.File.update(value=video_crop_path, visible=True)
 
-                                save = gr.Button('List Recent Conversion Results', elem_id=f'save')
-                                download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
-                                download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
                                 save.click(fn=save_video, inputs=None, outputs=[download_origin_files, download_crop_files], show_progress=False)
                         
+                            output_images = gr.Gallery(
+                                label='Output Frames',
+                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                            infer_progress = gr.Textbox(
+                                label="Generation Progress",
+                                value="No task currently",
+                                interactive=False
+                            )
+                    
+
                     display_button.click(
                         fn=easyphoto_video_infer_forward,
                         inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
