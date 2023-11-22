@@ -77,7 +77,8 @@ def get_controlnet_unit(
     # Any should be replaced with a more specific image type
     input_image: Union[Any, List[Any]],
     weight: float,
-    is_batch: bool = False  # Default to False, assuming single image input by default
+    is_batch: bool = False,  # Default to False, assuming single image input by default
+    control_mode: int = 1 # 0 balanced 1 prompt 2 control
 ):
     if unit == "canny":
         control_unit = dict(
@@ -85,7 +86,7 @@ def get_controlnet_unit(
             module='canny',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode='Just Resize',
             threshold_a=100,
             threshold_b=200,
@@ -98,7 +99,7 @@ def get_controlnet_unit(
             module='canny',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             processor_res=1024,
             resize_mode='Just Resize',
             threshold_a=100,
@@ -112,7 +113,7 @@ def get_controlnet_unit(
             module='openpose_full',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode='Just Resize',
             model='control_v11p_sd15_openpose'
         )
@@ -135,7 +136,7 @@ def get_controlnet_unit(
             module='none',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode='Just Resize',
             model='control_sd15_random_color'
         )
@@ -185,7 +186,7 @@ def get_controlnet_unit(
             module='tile_resample',
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode='Just Resize',
             threshold_a=1,
             threshold_b=200,
@@ -198,7 +199,7 @@ def get_controlnet_unit(
             module="depth_midas",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="control_v11f1p_sd15_depth",
         )
@@ -209,7 +210,7 @@ def get_controlnet_unit(
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="ip-adapter_sd15",
         )
@@ -220,7 +221,7 @@ def get_controlnet_unit(
             module=None,
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Crop and Resize",
             threshold_a=100,
             threshold_b=200,
@@ -233,7 +234,7 @@ def get_controlnet_unit(
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="ip-adapter-full-face_sd15",
         )
@@ -243,7 +244,7 @@ def get_controlnet_unit(
             module="ip-adapter_clip_sdxl_plus_vith",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="ip-adapter-plus-face_sdxl_vit-h",
         )
@@ -332,10 +333,17 @@ def inpaint(
         input_image) is not list else int(input_image[0].height)
 
     for pair in controlnet_pairs:
-        controlnet_units_list.append(
-            get_controlnet_unit(pair[0], pair[1], pair[2], False if type(
-                input_image) is not list else True)
-        )
+        if len(pair)==4:
+            # set control_mode
+            controlnet_units_list.append(
+                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(
+                    input_image) is not list else True, pair[3])
+            )
+        else:
+            controlnet_units_list.append(
+                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(
+                    input_image) is not list else True)
+            )
 
     positive = f'{input_prompt}, {default_positive_prompt}'
     negative = f'{default_negative_prompt}'

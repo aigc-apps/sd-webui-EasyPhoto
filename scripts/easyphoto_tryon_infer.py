@@ -41,19 +41,21 @@ from scripts.easyphoto_tryon_process_utils import (align_and_overlay_images,
                                                    resize_image_with_pad,
                                                    seg_by_box)
 from scripts.easyphoto_utils import check_tryon_files_exists_and_download
-from scripts.sdwebui import get_checkpoint_type
+from scripts.sdwebui import get_checkpoint_type, switch_sd_model_vae, reload_sd_model_vae
 from segment_anything import SamPredictor, sam_model_registry
 
 python_executable_path = sys.executable
 check_hash = True
 
-
+@switch_sd_model_vae()
 def easyphoto_tryon_infer_forward(
     sd_model_checkpoint, template_image, selected_cloth_template_images, input_ref_img_path, additional_prompt, seed, first_diffusion_steps,
     first_denoising_strength, lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound,
     pure_image, ref_image_selected_tab, cloth_uuid, max_train_steps
 ):
     global check_hash
+    # change system ckpt if not match
+    reload_sd_model_vae(sd_model_checkpoint,"vae-ft-mse-840000-ema-pruned.ckpt")
 
     # check input
     check_tryon_files_exists_and_download(check_hash)
@@ -87,8 +89,9 @@ def easyphoto_tryon_infer_forward(
 
     except Exception as e:
         torch.cuda.empty_cache()
-        traceback.print_exc()
-        return "Please choose or upload a reference image.", [], []
+        info = "Please choose or upload a reference image."
+        print(info)
+        return info, [], []
 
     if template_image is None:
         info = "Please upload a template image."
@@ -331,7 +334,6 @@ def easyphoto_tryon_infer_forward(
 
     box_template = expand_roi(
         box_template, ratio=expand_ratio, max_box=[0, 0, W, H])
-    mask_template_copy = copy.deepcopy(mask_template)  # use for second paste
 
     # Step2: prepare background image for paste
     if pure_image:
@@ -484,9 +486,15 @@ def easyphoto_tryon_infer_forward(
     for i in range(batch_size):
         print("Start First diffusion.")
 
+        # control image
+        cv2.imwrite('debug_res_canny.jpg',res_canny)
+        cv2.imwrite('debug_resize_img_template.jpg',resize_img_template[:,:,::-1])
+        resize_image_input.save('debug_resize_image_input.jpg')
+        mask_template_input.save('debug_mask_template_input.jpg')
+
         controlnet_pairs = [
-            ["canny_no_pre", res_canny, 1.0],
-            ["depth", resize_img_template, 1.0],
+            ["canny_no_pre", res_canny, 1.0, 0],
+            ["depth", resize_img_template, 1.0, 0],
         ]
 
         result_img = inpaint(
@@ -507,6 +515,8 @@ def easyphoto_tryon_infer_forward(
         result_img = result_img.resize((target_width, target_height))
         resize_mask_template = mask_template.resize(
             (target_width, target_height))
+
+        result_img.save('debug_first_inpaint_output.jpg')
 
         # copy back
         template_copy = np.array(template_copy, np.uint8)
@@ -564,7 +574,7 @@ def easyphoto_tryon_infer_forward(
             )
 
             # generate
-            controlnet_pairs = [["canny", input_control_img, 1.0]]
+            controlnet_pairs = [["canny", input_control_img, 1.0, False, 0]]
 
             input_mask = Image.fromarray(np.uint8(input_mask))
             input_img = Image.fromarray(input_img)

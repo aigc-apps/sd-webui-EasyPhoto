@@ -30,7 +30,7 @@ def timing_decorator(func):
     return wrapper
 
 
-def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=1) -> np.ndarray:
+def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=5) -> np.ndarray:
     """
     Apply a mask to an image to keep pixels where the mask is 255 and set other areas to white.
 
