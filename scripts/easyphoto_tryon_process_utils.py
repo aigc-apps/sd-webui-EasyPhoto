@@ -1,19 +1,21 @@
+import json
+import math
 import os
+import platform
+import time
+from typing import List, Optional, Tuple, Union
+
+import numpy as np
+from PIL import Image
+from scipy.optimize import minimize
+
+import cv2
+import torch
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from segment_anything import SamPredictor, sam_model_registry
-import torch
-import cv2
-import numpy as np
-from typing import List, Tuple, Union, Optional
-import platform
-import json
-from PIL import Image
-from scipy.optimize import minimize
 from shapely.geometry import Polygon
-import time
-import math
 
 
 def timing_decorator(func):
@@ -41,21 +43,14 @@ def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, 
     Returns:
         np.ndarray: The processed image with the specified pixels retained and other areas set to white.
     """
-    # # Create a white background
-    # white_background = np.full_like(img, 255, dtype=np.uint8)
-
-    # # Use the mask to retain pixels in the image where the mask is 255
-    # result = cv2.bitwise_and(img, img, mask=mask)
-
-    # # Set areas not retained by the mask to white
-    # result[np.where(mask == 0)] = [255, 255, 255]
     mask = cv2.dilate(np.array(mask), np.ones(
-            (expand_kernal, expand_kernal), np.uint8), iterations=1)
+        (expand_kernal, expand_kernal), np.uint8), iterations=1)
     mask_blur = cv2.GaussianBlur(
         np.array(np.uint8(mask)), (mask_blur, mask_blur), 0
     )
     mask_blur = np.stack((mask_blur,) * 3, axis=-1)
-    result = np.array(img_foreground, np.uint8)*(mask_blur/255.) + np.array(img_background, np.uint8)*((255-mask_blur)/255.)
+    result = np.array(img_foreground, np.uint8)*(mask_blur/255.) + \
+        np.array(img_background, np.uint8)*((255-mask_blur)/255.)
 
     return result
 
@@ -140,6 +135,7 @@ def seg_by_box(
 
     return mask_image
 
+
 def draw_box_on_image(
     image: np.ndarray,
     box: tuple,
@@ -171,32 +167,27 @@ def draw_box_on_image(
 
 def prepare_tryon_train_data(ref_image_path, images_save_path, json_save_path, validation_prompt):
     # remove input background
-    salient_detect = pipeline(Tasks.semantic_segmentation, model='damo/cv_u2net_salient-detection')
+    salient_detect = pipeline(
+        Tasks.semantic_segmentation, model='damo/cv_u2net_salient-detection')
     result = salient_detect(ref_image_path)
-    mask = result[OutputKeys.MASKS] # 1 channel
+    mask = result[OutputKeys.MASKS]  # 1 channel
 
     # TODO remove hand/skin/ or other useless
-    # sam = sam_model_registry["vit_l"]()
-    # sam.load_state_dict(torch.load(sam_model_path))
-    # predictor = SamPredictor(sam.cuda())
-    # _, box = mask_to_box(np.uint8(mask))
-    # img = cv2.imread(ref_image_path)
-    # draw_box_on_image(img, box, "box1.jpg")
 
-    # mask_refine = np.uint8(seg_by_box(np.array(img), box, predictor))
-    # cv2.imwrite('mask_refine.jpg', mask_refine)
-
-    background = np.full((mask.shape[0], mask.shape[1], 3), [255,255,255], dtype=np.uint8)
-    result_img = apply_mask_to_image(cv2.imread(ref_image_path), background, mask)
+    background = np.full((mask.shape[0], mask.shape[1], 3), [
+                         255, 255, 255], dtype=np.uint8)
+    result_img = apply_mask_to_image(
+        cv2.imread(ref_image_path), background, mask)
 
     # hard mask for find background color
-    mask[mask<128]=0
-    mask[mask>128]=255
-    
-    cv2.imwrite(ref_image_path,result_img)
-    cv2.imwrite(ref_image_path.replace('ref_image.jpg','ref_image_mask.jpg'), mask)
+    mask[mask < 128] = 0
+    mask[mask > 128] = 255
 
-    cv2.imwrite(f'{images_save_path}/0.jpg',result_img)
+    cv2.imwrite(ref_image_path, result_img)
+    cv2.imwrite(ref_image_path.replace(
+        'ref_image.jpg', 'ref_image_mask.jpg'), mask)
+
+    cv2.imwrite(f'{images_save_path}/0.jpg', result_img)
     with open(os.path.join(images_save_path, str(0) + ".txt"), "w") as f:
         f.write(validation_prompt)
 
@@ -213,11 +204,12 @@ def prepare_tryon_train_data(ref_image_path, images_save_path, json_save_path, v
                         jpg_path_split = path.split("/")
                         file_name = os.path.join(*jpg_path_split[-2:])
                         a = {
-                            "file_name": file_name, 
+                            "file_name": file_name,
                             "text": prompt
                         }
                         f.write(json.dumps(eval(str(a))))
                         f.write("\n")
+
 
 def crop_image(
     img: np.ndarray, box: Tuple[int, int, int, int], expand_ratio: float = 1.0
@@ -281,10 +273,11 @@ def compute_color_similarity(color1, color2):
 
 def get_no_white(colors, threshold=10):
     for color in colors:
-        dis = compute_color_similarity(color,[255,255,255])
-        if dis>threshold:
+        dis = compute_color_similarity(color, [255, 255, 255])
+        if dis > threshold:
             return color
     return colors[0]
+
 
 def get_background_color(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
@@ -314,6 +307,7 @@ def get_background_color(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     most_frequent_value = get_no_white(sorted_colors)
 
     return most_frequent_value
+
 
 def resize_and_stretch(
     img: Union[np.ndarray, Image.Image],
@@ -449,11 +443,11 @@ def find_best_angle_ratio(
         iou, in_iou = align_and_compute_iou(
             polygon1, polygon2, x, y, parameters
         )
-        return - iou - 0.1* in_iou + 0.1 * angle_loss(angle_target, parameters)
+        return - iou - 0.1 * in_iou + 0.1 * angle_loss(angle_target, parameters)
 
     # Define the constraint function
     def constraint_function(parameters: Tuple[float, float]) -> float:
-        iou,_ = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
+        iou, _ = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
         return iou - iou_threshold
 
     # Define the angle loss function
@@ -592,14 +586,6 @@ def align_and_overlay_images(
         )
         resized_mask1 = resized_mask1[:, :, 0]
 
-    # cv2.imwrite("resized_img1.jpg", resized_img1)
-    # cv2.imwrite("resized_mask1.jpg", resized_mask1)
-    # cv2.imwrite("resized_img2.jpg", img2)
-    # print("align and overlay (resized img1):", resized_img1.shape)
-    # print("align and overlay (resized mask1):", resized_mask1.shape)
-    # print("align and overlay (resized img2):", img2.shape)
-    # print("align and overlay (resized mask2):", mask2.shape)
-
     # rotate & expand img1, and paste to the center of img2
     final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(
         resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio
@@ -699,16 +685,8 @@ def rotate_resize_image(
         mask = rotated_mat == 0
         rotated_mat = np.where(mask, white_bg, rotated_mat)
 
-    # Scale
-    # scaled_mat = cv2.resize(
-    #     rotated_mat,
-    #     None,
-    #     fx=scale_ratio,
-    #     fy=scale_ratio,
-    #     interpolation=cv2.INTER_LINEAR,
-    # )
-
     return rotated_mat
+
 
 def merge_images(
     img1: np.ndarray,
@@ -759,8 +737,6 @@ def merge_images(
     expand_mask1 = paste_image_center(mask1, expand_mask1)
     expand_mask2 = paste_image_center(mask2, expand_mask2)
 
-    # cv2.imwrite('expand_mask1.jpg',expand_mask1)
-    # cv2.imwrite('expand_mask2.jpg',expand_mask2)
     # Calculate IoU between the expanded masks
     iou = calculate_mask_iou(expand_mask1, expand_mask2)
 
@@ -772,13 +748,6 @@ def merge_images(
     # Combine images based on the merge mask
     result_img[merge_mask == 255] = expand_img1[merge_mask == 255]
     result_img[merge_mask == 0] = expand_img2[merge_mask == 0]
-
-    # Determine areas that were expanded with img2 and fill them with the specified color
-    # expand_region_mask = copy.deepcopy(expand_mask2)
-    # expand_region_mask[merge_mask == 255] = 0
-
-    # white_area = np.where(expand_region_mask > 128)
-    # result_img[white_area] = color
 
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
 
@@ -857,31 +826,19 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
     _, resize_mask1 = canny(mask1)
     _, resize_mask2 = canny(mask2)
 
-    # Create a mask outline using morphological operations
-    # mask1_outline = np.uint8(
-    #     cv2.dilate(np.array(resize_mask1), np.ones(
-    #         (10, 10), np.uint8), iterations=1)
-    #     - cv2.erode(np.array(resize_mask1),
-    #                 np.ones((5, 5), np.uint8), iterations=1)
-    # )
-
-    # erode_kernal = int(0.1* min(resize_mask1.shape[0], resize_mask1.shape[1]))
     mask1_outline = np.uint8(
-            cv2.dilate(np.array(resize_mask1), np.ones(
-                (10, 10), np.uint8), iterations=1)
-            - cv2.erode(np.array(resize_mask1),
-                        np.ones((10, 10), np.uint8), iterations=1)
-        )
+        cv2.dilate(np.array(resize_mask1), np.ones(
+            (10, 10), np.uint8), iterations=1)
+        - cv2.erode(np.array(resize_mask1),
+                    np.ones((10, 10), np.uint8), iterations=1)
+    )
 
     mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
-
-    cv2.imwrite('mask1_outline.jpg', mask1_outline)
 
     # Remove the mask1 outline from the Canny image to obtain inner edges
     canny_image_inner = remove_outline(canny_image, mask1_outline)
 
     return resize_image, canny_image_inner
-
 
 
 def remove_outline(img: np.ndarray, outline_mask: np.ndarray) -> np.ndarray:
@@ -901,14 +858,15 @@ def remove_outline(img: np.ndarray, outline_mask: np.ndarray) -> np.ndarray:
 
     return filtered_img
 
+
 def canny(img, res=512, thr_a=100, thr_b=200, **kwargs):
     l, h = thr_a, thr_b
     img, remove_pad = resize_image_with_pad(img, res)
-    # global model_canny
-    # if model_canny is None:
+
     model_canny = apply_canny
     result = model_canny(img, l, h)
     return remove_pad(result), remove_pad(img)
+
 
 def resize_image_with_pad(input_image, resolution, skip_hwc3=False):
     if skip_hwc3:
@@ -957,9 +915,11 @@ def pad64(x):
 def apply_canny(img, low_threshold, high_threshold):
     return cv2.Canny(img, low_threshold, high_threshold)
 
+
 def safer_memory(x):
     # Fix many MAC/AMD problems
     return np.ascontiguousarray(x.copy()).copy()
+
 
 def copy_white_mask_to_template(img: np.ndarray, mask: np.ndarray, template: np.ndarray, box: list) -> np.ndarray:
     """
@@ -975,19 +935,12 @@ def copy_white_mask_to_template(img: np.ndarray, mask: np.ndarray, template: np.
         np.ndarray: The resulting image with the masked region copied to the template.
     """
     h, w, _ = template.shape
-    # expand_mask = np.zeros((h, w))
 
-    # Expand the mask to match the specified bounding box
-    # expand_mask[box[1]:box[3], box[0]:box[2]] = mask
-
-    # result = np.zeros_like(template)
     result = template
     template_crop = template[box[1]:box[3], box[0]:box[2]]
-    # result[box[1]:box[3], box[0]:box[2]] = np.array(img, np.uint8)*(mask/255.) + np.array(template_crop, np.uint8)*((255-mask)/255.)
-    result[box[1]:box[3], box[0]:box[2]] = apply_mask_to_image(img, template_crop, mask)
 
-    # Copy the region from the template to the result where the mask is 0
-    # result[expand_mask == 0] = template[expand_mask == 0]
+    result[box[1]:box[3], box[0]:box[2]] = apply_mask_to_image(
+        img, template_crop, mask)
 
     return result
 

@@ -1,51 +1,56 @@
-from scripts.easyphoto_utils import (check_tryon_files_exists_and_download,
-                                     
-                                     )
-from scripts.sdwebui import get_checkpoint_type
-from scripts.easyphoto_config import cloth_id_outpath_samples, validation_tryon_prompt,cache_log_file_path,easyphoto_outpath_samples,CLOTH_LORA_PREFIX
-from scripts.easyphoto_tryon_process_utils import (prepare_tryon_train_data,mask_to_box,
-                                                   seg_by_box,
-                                                   crop_image,expand_roi,
-                                                   apply_mask_to_image,
-                                                   get_background_color,
-                                                   resize_and_stretch,
-                                                   mask_to_polygon,
-                                                   compute_rotation_angle,
-                                                   find_best_angle_ratio,
-                                                   align_and_overlay_images,
-                                                   merge_with_inner_canny,
-                                                   resize_image_with_pad,
-                                                   copy_white_mask_to_template,
-                                                   expand_box_by_pad)
-from scripts.easyphoto_infer import inpaint
+import copy
 import os
-from glob import glob
-from modules.paths import models_path
-import torch
-import traceback
-from PIL import Image, ImageOps
-import cv2
-import shutil
 import platform
-import sys
-from shutil import copyfile
+import shutil
 import subprocess
+import sys
+import traceback
+from glob import glob
+from shutil import copyfile
+
 import numpy as np
+from PIL import Image, ImageOps
+
+import cv2
+import torch
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from segment_anything import SamPredictor, sam_model_registry
-import copy
 from modules.images import save_image
+from modules.paths import models_path
 from modules.shared import opts, state
-
+from scripts.easyphoto_config import (CLOTH_LORA_PREFIX, cache_log_file_path,
+                                      cloth_id_outpath_samples,
+                                      easyphoto_outpath_samples,
+                                      validation_tryon_prompt)
+from scripts.easyphoto_infer import inpaint
+from scripts.easyphoto_tryon_process_utils import (align_and_overlay_images,
+                                                   apply_mask_to_image,
+                                                   compute_rotation_angle,
+                                                   copy_white_mask_to_template,
+                                                   crop_image,
+                                                   expand_box_by_pad,
+                                                   expand_roi,
+                                                   find_best_angle_ratio,
+                                                   get_background_color,
+                                                   mask_to_box,
+                                                   mask_to_polygon,
+                                                   merge_with_inner_canny,
+                                                   prepare_tryon_train_data,
+                                                   resize_and_stretch,
+                                                   resize_image_with_pad,
+                                                   seg_by_box)
+from scripts.easyphoto_utils import check_tryon_files_exists_and_download
+from scripts.sdwebui import get_checkpoint_type
+from segment_anything import SamPredictor, sam_model_registry
 
 python_executable_path = sys.executable
 check_hash = True
 
+
 def easyphoto_tryon_infer_forward(
-    sd_model_checkpoint, template_image, selected_cloth_template_images, input_ref_img_path, additional_prompt, seed, first_diffusion_steps, 
-    first_denoising_strength, lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
+    sd_model_checkpoint, template_image, selected_cloth_template_images, input_ref_img_path, additional_prompt, seed, first_diffusion_steps,
+    first_denoising_strength, lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound,
     pure_image, ref_image_selected_tab, cloth_uuid, max_train_steps
 ):
     global check_hash
@@ -60,8 +65,9 @@ def easyphoto_tryon_infer_forward(
         print(info)
         return info, [], []
 
-    cloth_gallery_dir = os.path.join(cloth_id_outpath_samples,'gallery')
-    gallery_lists = glob(os.path.join(cloth_gallery_dir,'*.jpg')) + glob(os.path.join(cloth_gallery_dir,'*.png'))
+    cloth_gallery_dir = os.path.join(cloth_id_outpath_samples, 'gallery')
+    gallery_lists = glob(os.path.join(cloth_gallery_dir, '*.jpg')) + \
+        glob(os.path.join(cloth_gallery_dir, '*.png'))
     user_ids = [i.split('/')[-1].split('.')[0] for i in gallery_lists]
     print('user_ids:', user_ids)
 
@@ -76,7 +82,7 @@ def easyphoto_tryon_infer_forward(
                 info = "The user id cannot be empty."
                 print(info)
                 return info, [], []
-    
+
             cloth_uuid = CLOTH_LORA_PREFIX+cloth_uuid+'_'+str(max_train_steps)
 
     except Exception as e:
@@ -88,12 +94,13 @@ def easyphoto_tryon_infer_forward(
         info = "Please upload a template image."
         print(info)
         return info, [], []
-    
+
     print(f'cloth user id: {cloth_uuid}')
-    
+
     return_msg = ''
 
-    webui_save_path = os.path.join(models_path, f"Lora/{cloth_uuid}.safetensors")
+    webui_save_path = os.path.join(
+        models_path, f"Lora/{cloth_uuid}.safetensors")
 
     if os.path.exists(webui_save_path):
         return_msg += f'Use exists LoRA of {cloth_uuid}.\n'
@@ -109,27 +116,36 @@ def easyphoto_tryon_infer_forward(
             return_msg += f'Update LoRA of {uuid} with {max_train_steps} steps.\n'
         else:
             return_msg += f'Train a new LoRA of {cloth_uuid} of {max_train_steps} steps.\n'
-        print('Start Training')
 
+        print('Start Training')
         # ref image copy
-        ref_image_path          = os.path.join(cloth_id_outpath_samples, cloth_uuid, "ref_image.jpg")
+        ref_image_path = os.path.join(
+            cloth_id_outpath_samples, cloth_uuid, "ref_image.jpg")
 
         # Training data retention
-        user_path               = os.path.join(cloth_id_outpath_samples, cloth_uuid, "processed_images")
-        images_save_path        = os.path.join(cloth_id_outpath_samples, cloth_uuid, "processed_images", "train")
-        json_save_path          = os.path.join(cloth_id_outpath_samples, cloth_uuid, "processed_images", "metadata.jsonl")
+        user_path = os.path.join(
+            cloth_id_outpath_samples, cloth_uuid, "processed_images")
+        images_save_path = os.path.join(
+            cloth_id_outpath_samples, cloth_uuid, "processed_images", "train")
+        json_save_path = os.path.join(
+            cloth_id_outpath_samples, cloth_uuid, "processed_images", "metadata.jsonl")
 
         # Training weight saving
-        weights_save_path       = os.path.join(cloth_id_outpath_samples, cloth_uuid, "user_weights")
-        webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
-        sd15_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+        weights_save_path = os.path.join(
+            cloth_id_outpath_samples, cloth_uuid, "user_weights")
+        webui_load_path = os.path.join(
+            models_path, f"Stable-diffusion", sd_model_checkpoint)
+        sd15_save_path = os.path.join(os.path.abspath(os.path.dirname(
+            __file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
 
         os.makedirs(user_path, exist_ok=True)
         os.makedirs(images_save_path, exist_ok=True)
-        os.makedirs(os.path.dirname(os.path.abspath(webui_save_path)), exist_ok=True)
+        os.makedirs(os.path.dirname(
+            os.path.abspath(webui_save_path)), exist_ok=True)
 
-        shutil.copy(input_ref_img_path,ref_image_path)
-        prepare_tryon_train_data(ref_image_path, images_save_path, json_save_path, validation_tryon_prompt)
+        shutil.copy(input_ref_img_path, ref_image_path)
+        prepare_tryon_train_data(
+            ref_image_path, images_save_path, json_save_path, validation_tryon_prompt)
 
         # start train
         # check preprocess results
@@ -139,9 +155,10 @@ def easyphoto_tryon_infer_forward(
         if not os.path.exists(json_save_path):
             return "Failed to obtain preprocessed metadata.jsonl, please check the preprocessing process."
 
-        train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
+        train_kohya_path = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "train_kohya/train_lora.py")
         print("train_file_path : ", train_kohya_path)
-        
+
         # extensions/sd-webui-EasyPhoto/train_kohya_log.txt, use to cache log and flush to UI
         print("cache_log_file_path:", cache_log_file_path)
         if not os.path.exists(os.path.dirname(cache_log_file_path)):
@@ -159,63 +176,63 @@ def easyphoto_tryon_infer_forward(
 
         if platform.system() == 'Windows':
             pwd = os.getcwd()
-            dataloader_num_workers = 0 # for solve multi process bug
+            dataloader_num_workers = 0  # for solve multi process bug
 
             command = [
                 f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
                 f'--pretrained_model_name_or_path={os.path.relpath(sd15_save_path, pwd)}',
-                f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}', 
+                f'--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}',
                 f'--train_data_dir={os.path.relpath(user_path, pwd)}',
-                '--caption_column=text', 
+                '--caption_column=text',
                 f'--resolution={resolution}',
                 # '--random_flip',
                 f'--train_batch_size={train_batch_size}',
                 f'--gradient_accumulation_steps={gradient_accumulation_steps}',
-                f'--dataloader_num_workers={dataloader_num_workers}', 
+                f'--dataloader_num_workers={dataloader_num_workers}',
                 f'--max_train_steps={max_train_steps}',
-                f'--checkpointing_steps={val_and_checkpointing_steps}', 
+                f'--checkpointing_steps={val_and_checkpointing_steps}',
                 f'--learning_rate={learning_rate}',
                 '--lr_scheduler=constant',
-                '--lr_warmup_steps=0', 
-                '--train_text_encoder', 
-                '--seed=42', 
+                '--lr_warmup_steps=0',
+                '--train_text_encoder',
+                '--seed=42',
                 f'--rank={rank}',
-                f'--network_alpha={network_alpha}', 
-                f'--output_dir={os.path.relpath(weights_save_path, pwd)}', 
-                f'--logging_dir={os.path.relpath(weights_save_path, pwd)}', 
-                '--enable_xformers_memory_efficient_attention', 
-                '--mixed_precision=fp16', 
+                f'--network_alpha={network_alpha}',
+                f'--output_dir={os.path.relpath(weights_save_path, pwd)}',
+                f'--logging_dir={os.path.relpath(weights_save_path, pwd)}',
+                '--enable_xformers_memory_efficient_attention',
+                '--mixed_precision=fp16',
                 f'--cache_log_file={cache_log_file_path}'
             ]
             try:
                 subprocess.run(command, check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
-            
+
         else:
             command = [
                 f'{python_executable_path}', '-m', 'accelerate.commands.launch', '--mixed_precision=fp16', "--main_process_port=3456", f'{train_kohya_path}',
                 f'--pretrained_model_name_or_path={sd15_save_path}',
-                f'--pretrained_model_ckpt={webui_load_path}', 
+                f'--pretrained_model_ckpt={webui_load_path}',
                 f'--train_data_dir={user_path}',
-                '--caption_column=text', 
+                '--caption_column=text',
                 f'--resolution={resolution}',
                 f'--train_batch_size={train_batch_size}',
                 f'--gradient_accumulation_steps={gradient_accumulation_steps}',
-                f'--dataloader_num_workers={dataloader_num_workers}', 
+                f'--dataloader_num_workers={dataloader_num_workers}',
                 f'--max_train_steps={max_train_steps}',
-                f'--checkpointing_steps={val_and_checkpointing_steps}', 
+                f'--checkpointing_steps={val_and_checkpointing_steps}',
                 f'--learning_rate={learning_rate}',
                 '--lr_scheduler=constant',
-                '--lr_warmup_steps=0', 
-                '--train_text_encoder', 
-                '--seed=42', 
+                '--lr_warmup_steps=0',
+                '--train_text_encoder',
+                '--seed=42',
                 f'--rank={rank}',
-                f'--network_alpha={network_alpha}', 
-                f'--output_dir={weights_save_path}', 
-                f'--logging_dir={weights_save_path}', 
-                '--enable_xformers_memory_efficient_attention', 
-                '--mixed_precision=fp16', 
+                f'--network_alpha={network_alpha}',
+                f'--output_dir={weights_save_path}',
+                f'--logging_dir={weights_save_path}',
+                '--enable_xformers_memory_efficient_attention',
+                '--mixed_precision=fp16',
                 f'--cache_log_file={cache_log_file_path}'
             ]
             try:
@@ -223,16 +240,17 @@ def easyphoto_tryon_infer_forward(
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
 
-        best_weight_path = os.path.join(weights_save_path, f"pytorch_lora_weights.safetensors")
+        best_weight_path = os.path.join(
+            weights_save_path, f"pytorch_lora_weights.safetensors")
         if not os.path.exists(best_weight_path):
-            return "Failed to obtain Lora after training, please check the training process.",[]
+            return "Failed to obtain Lora after training, please check the training process.", []
 
         # save to gallery
-        Image.open(input_ref_img_path).save(os.path.join(cloth_gallery_dir,f'{cloth_uuid}.jpg'))
+        Image.open(input_ref_img_path).save(
+            os.path.join(cloth_gallery_dir, f'{cloth_uuid}.jpg'))
         # save to models/LoRA
         copyfile(best_weight_path, webui_save_path)
 
-    
     # infer
     # get random seed
     if int(seed) == -1:
@@ -256,122 +274,116 @@ def easyphoto_tryon_infer_forward(
     input_prompt = f"{validation_tryon_prompt}, <lora:{cloth_uuid}:{lora_weight}>"
     print("input_prompt:", input_prompt)
 
-     # model init
+    # model init
     sam = sam_model_registry["vit_l"]()
     sam.load_state_dict(torch.load(sam_checkpoint))
     predictor = SamPredictor(sam.cuda())
 
     # Step1: open image and prepare for mask
-    # main
-    img1 = np.uint8(
+    # reference image
+    img_ref = np.uint8(
         Image.open(os.path.join(cloth_id_outpath_samples,
                    cloth_uuid, "ref_image.jpg"))
     )
-    # get mask1
-    mask1 = np.uint8(
+    mask_ref = np.uint8(
         Image.open(
             os.path.join(cloth_id_outpath_samples,
                          cloth_uuid, "ref_image_mask.jpg")
         )
     )
+    if len(mask_ref.shape) == 2:
+        mask_ref = np.repeat(mask_ref[:, :, np.newaxis], 3, axis=2)
 
-    # box cal & refine mask
-    if len(mask1.shape)==2:
-        mask1 = np.repeat(mask1[:, :, np.newaxis], 3, axis=2)
+    # template image
+    img_template = np.uint8(Image.fromarray(np.uint8(template_image["image"])))
+    mask_template_input = np.uint8(
+        Image.fromarray(np.uint8(template_image["mask"])))
 
-    img2 = np.uint8(Image.fromarray(np.uint8(template_image["image"])))  # template
-    mask2_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
-
-    if mask2_input.max()==0:
+    if mask_template_input.max() == 0:
         print('Please mark the target region on the inference template!')
         return 'Please mark the target region on the inference template!', [], []
-    
-    _, box_main = mask_to_box(np.uint8(mask1[:,:,0]))
-    # draw_box_on_image(img1, box_main, "box1.jpg")
 
-    # get mask2
+    _, box_main = mask_to_box(np.uint8(mask_ref[:, :, 0]))
+
     if refine_input_mask:
-        _, box_template = mask_to_box(mask2_input[:, :, 0])
-        # draw_box_on_image(img2, box_template,'box.jpg')
-        mask2 = np.uint8(seg_by_box(np.array(img2), box_template, predictor))
+        _, box_template = mask_to_box(mask_template_input[:, :, 0])
+        mask_template = np.uint8(seg_by_box(
+            np.array(img_template), box_template, predictor))
     else:
-        mask2 = mask2_input[:, :, 0]
+        mask_template = mask_template_input[:, :, 0]
 
     # for final paste
-    _, box_template = mask_to_box(mask2)
-    template_copy = copy.deepcopy(img2)
-    mask_copy = copy.deepcopy(mask2)
-
-    cv2.imwrite("mask2_input.jpg", mask2)
+    _, box_template = mask_to_box(mask_template)
+    template_copy = copy.deepcopy(img_template)
+    mask_copy = copy.deepcopy(mask_template)
 
     # crop to get local img
-    W, H = np.array(img2).shape[1], np.array(img2).shape[0]
-
+    W, H = np.array(img_template).shape[1], np.array(img_template).shape[0]
     expand_ratio = 1.2
-    img1 = crop_image(np.array(img1), box_main, expand_ratio=expand_ratio)
-    mask1 = crop_image(np.array(mask1), box_main, expand_ratio=expand_ratio)
-    img2 = crop_image(np.array(img2), box_template, expand_ratio=expand_ratio)
-    mask2 = crop_image(np.array(mask2), box_template, expand_ratio=expand_ratio)
+    img_ref = crop_image(np.array(img_ref), box_main,
+                         expand_ratio=expand_ratio)
+    mask_ref = crop_image(np.array(mask_ref), box_main,
+                          expand_ratio=expand_ratio)
+    img_template = crop_image(np.array(img_template),
+                              box_template, expand_ratio=expand_ratio)
+    mask_template = crop_image(
+        np.array(mask_template), box_template, expand_ratio=expand_ratio)
 
-    box_template = expand_roi(box_template, ratio=expand_ratio, max_box=[0, 0, W, H])
-    mask2_copy = copy.deepcopy(mask2)  # use for second paste
-    
+    box_template = expand_roi(
+        box_template, ratio=expand_ratio, max_box=[0, 0, W, H])
+    mask_template_copy = copy.deepcopy(mask_template)  # use for second paste
+
     # Step2: prepare background image for paste
     if pure_image:
         # main background with most frequent color
-        color = get_background_color(img1, mask1[:, :, 0])
-        color_img = np.full((img2.shape[0], img2.shape[1], 3), color, dtype=np.uint8)
-        background_img = apply_mask_to_image(color_img, img2, mask2)
+        color = get_background_color(img_ref, mask_ref[:, :, 0])
+        color_img = np.full(
+            (img_template.shape[0], img_template.shape[1], 3), color, dtype=np.uint8)
+        background_img = apply_mask_to_image(
+            color_img, img_template, mask_template)
     else:
-        # generate background_image with ipa (referenced img1)
+        # generate background_image with ipa (referenced img_ref)
         controlnet_pairs = [
-                ["ipa", img1, 2.0],
-                ["depth", img2, 1.0],
-            ]
-
+            ["ipa", img_ref, 2.0],
+            ["depth", img_template, 1.0],
+        ]
 
         background_diffusion_steps = 20
         background_denoising_strength = 0.8
         background_img = inpaint(
-                Image.fromarray(np.uint8(img2)),
-                Image.fromarray(np.uint8(mask2)),
-                controlnet_pairs,
-                diffusion_steps=background_diffusion_steps,
-                denoising_strength=background_denoising_strength,
-                input_prompt=input_prompt,
-                hr_scale=1.0,
-                seed=str(seed),
-                sd_model_checkpoint=sd_model_checkpoint,
-            )
+            Image.fromarray(np.uint8(img_template)),
+            Image.fromarray(np.uint8(mask_template)),
+            controlnet_pairs,
+            diffusion_steps=background_diffusion_steps,
+            denoising_strength=background_denoising_strength,
+            input_prompt=input_prompt,
+            hr_scale=1.0,
+            seed=str(seed),
+            sd_model_checkpoint=sd_model_checkpoint,
+        )
 
-        background_img = background_img.resize((img2.shape[1],img2.shape[0]), Image.Resampling.LANCZOS)
+        background_img = background_img.resize(
+            (img_template.shape[1], img_template.shape[0]), Image.Resampling.LANCZOS)
         background_img = np.array(background_img)
 
-    # cv2.imwrite('background.jpg',background_img)
-
     # Step3: optimize match and paste
-    if azimuth !=0:
+    if azimuth != 0:
         return_msg += 'Please refer to the anyid branch to use zero123 for a 3d rotation. (Set to 0 here.)\n'
         azimuth = 0
 
     if optimize_angle_and_ratio:
         print('Start optimize angle and ratio!')
         # find optimzal angle and ratio
-        # resize mask1 to same size as mask2 (init ratio as 1)
-        resized_mask1 = resize_and_stretch(
-            mask1, target_size=(mask2.shape[1], mask2.shape[0])
+        # resize mask_ref to same size as mask_template (init ratio as 1)
+        resized_mask_ref = resize_and_stretch(
+            mask_ref, target_size=(
+                mask_template.shape[1], mask_template.shape[0])
         )
-        resized_mask1 = resized_mask1[:, :, 0]
-
-        # cv2.imwrite("before_optimize_mask1.jpg", resized_mask1)
-        # cv2.imwrite("before_optimize_mask2.jpg", mask2)
-
-        # print(resized_mask1.shape)
-        # print(mask2.shape)
+        resized_mask_ref = resized_mask_ref[:, :, 0]
 
         # get polygon
-        polygon1 = mask_to_polygon(resized_mask1)
-        polygon2 = mask_to_polygon(mask2)
+        polygon1 = mask_to_polygon(resized_mask_ref)
+        polygon2 = mask_to_polygon(mask_template)
 
         # target angle: 2 to 0
         rotation_angle2 = compute_rotation_angle(polygon2)
@@ -384,13 +396,13 @@ def easyphoto_tryon_infer_forward(
         if rotation_angle1 > 20:
             rotation_angle1 = 0
         # polygon angle is reverse to img angle
-        angle_target =  rotation_angle2 - rotation_angle1
+        angle_target = rotation_angle2 - rotation_angle1
 
         print(
             f"target rotation: 1 to 0: {rotation_angle1}, 2 to 0: {rotation_angle2}, final_rotate: {angle_target}")
 
         # center
-        x, y = mask2.shape[1] // 2, mask2.shape[0] // 2
+        x, y = mask_template.shape[1] // 2, mask_template.shape[0] // 2
 
         initial_parameters = np.array([angle, ratio])
         max_iters = 100
@@ -405,15 +417,15 @@ def easyphoto_tryon_infer_forward(
             max_iters,
             iou_threshold,
         )
-    
+
     print(f'Set angle:{angle}, ratio: {ratio}, azimuth: {azimuth}')
 
     # paste
-    result_img, rotate_img1, mask1, mask2, iou = align_and_overlay_images(
-        np.array(img1),
+    result_img, rotate_img_ref, mask_ref, mask_template, iou = align_and_overlay_images(
+        np.array(img_ref),
         np.array(background_img),
-        np.array(mask1),
-        np.array(mask2),
+        np.array(mask_ref),
+        np.array(mask_template),
         angle=-angle,
         ratio=ratio,
     )
@@ -421,49 +433,51 @@ def easyphoto_tryon_infer_forward(
     return_msg += f'Paste with angle {angle}, ratio: {ratio}, Match IoU: {iou}, optimize: {optimize_angle_and_ratio}. \n See paste result above, if you are not satisfatory with the optimized result, close the optimize_angle_and_ratio and manually set a angle and ratio.\n'
 
     # Step4: prepare for control image
-    # get the img2 box
     h_expand, w_expand = result_img.shape[:2]
-    h2, w2 = np.array(img2).shape[:2]
-    crop_img2_box_first = [
+    h2, w2 = np.array(img_template).shape[:2]
+    crop_img_template_box_first = [
         (w_expand - w2) // 2,
         (h_expand - h2) // 2,
         (w_expand + w2) // 2,
         (h_expand + h2) // 2,
     ]
 
-    first_paste = crop_image(result_img, crop_img2_box_first)
+    first_paste = crop_image(result_img, crop_img_template_box_first)
     first_paste = Image.fromarray(np.uint8(first_paste))
 
-    result_img = crop_image(result_img, crop_img2_box_first)
-    mask1 = crop_image(mask1, crop_img2_box_first)
-    mask2 = crop_image(mask2, crop_img2_box_first)
-    resize_img1 = crop_image(rotate_img1, crop_img2_box_first)
+    result_img = crop_image(result_img, crop_img_template_box_first)
+    mask_ref = crop_image(mask_ref, crop_img_template_box_first)
+    mask_template = crop_image(mask_template, crop_img_template_box_first)
+    resize_img_ref = crop_image(rotate_img_ref, crop_img_template_box_first)
 
     result_img = Image.fromarray(np.uint8(result_img))
 
     # get inner canny and resize img to 512
     resize_image, res_canny = merge_with_inner_canny(
-        np.array(result_img).astype(np.uint8), mask1, mask2
+        np.array(result_img).astype(np.uint8), mask_ref, mask_template
     )
 
-    resize_mask2, remove_pad = resize_image_with_pad(mask2, resolution=512)
-    resize_mask2 = remove_pad(resize_mask2)
+    resize_mask_template, remove_pad = resize_image_with_pad(
+        mask_template, resolution=512)
+    resize_mask_template = remove_pad(resize_mask_template)
 
-    resize_img2, remove_pad = resize_image_with_pad(img2, resolution=512)
-    resize_img2 = remove_pad(resize_img2)
+    resize_img_template, remove_pad = resize_image_with_pad(
+        img_template, resolution=512)
+    resize_img_template = remove_pad(resize_img_template)
 
-    resize_mask1, remove_pad = resize_image_with_pad(mask1, resolution=512)
-    resize_mask1 = remove_pad(resize_mask1)
+    resize_mask_ref, remove_pad = resize_image_with_pad(
+        mask_ref, resolution=512)
+    resize_mask_ref = remove_pad(resize_mask_ref)
 
-    resize_img1, remove_pad = resize_image_with_pad(
-        resize_img1, resolution=512)
-    resize_img1 = remove_pad(resize_img1)
+    resize_img_ref, remove_pad = resize_image_with_pad(
+        resize_img_ref, resolution=512)
+    resize_img_ref = remove_pad(resize_img_ref)
 
-    mask2 = Image.fromarray(
-            np.uint8(resize_mask2))
+    mask_template = Image.fromarray(
+        np.uint8(resize_mask_template))
     resize_image = Image.fromarray(resize_image)
     resize_image_input = copy.deepcopy(resize_image)
-    mask2_input = copy.deepcopy(mask2)
+    mask_template_input = copy.deepcopy(mask_template)
 
     # Step5: generation
     return_res = []
@@ -471,13 +485,13 @@ def easyphoto_tryon_infer_forward(
         print("Start First diffusion.")
 
         controlnet_pairs = [
-                    ["canny_no_pre", res_canny, 1.0],
-                    ["depth", resize_img2, 1.0],
-                ]
+            ["canny_no_pre", res_canny, 1.0],
+            ["depth", resize_img_template, 1.0],
+        ]
 
         result_img = inpaint(
             resize_image_input,
-            mask2_input,
+            mask_template_input,
             controlnet_pairs,
             diffusion_steps=first_diffusion_steps,
             denoising_strength=first_denoising_strength,
@@ -491,22 +505,24 @@ def easyphoto_tryon_infer_forward(
         target_width = box_template[2] - box_template[0]
         target_height = box_template[3] - box_template[1]
         result_img = result_img.resize((target_width, target_height))
-        resize_mask2 = mask2.resize((target_width, target_height))
+        resize_mask_template = mask_template.resize(
+            (target_width, target_height))
 
         # copy back
         template_copy = np.array(template_copy, np.uint8)
 
-        if len(np.array(np.uint8(resize_mask2)).shape)==2:
+        if len(np.array(np.uint8(resize_mask_template)).shape) == 2:
             init_generation = copy_white_mask_to_template(
-                np.array(result_img), np.array(np.uint8(resize_mask2)), template_copy, box_template
+                np.array(result_img), np.array(
+                    np.uint8(resize_mask_template)), template_copy, box_template
             )
         else:
             init_generation = copy_white_mask_to_template(
-                np.array(result_img), np.array(np.uint8(resize_mask2))[:, :, 0], template_copy, box_template
+                np.array(result_img), np.array(np.uint8(resize_mask_template))[
+                    :, :, 0], template_copy, box_template
             )
 
         return_res.append(Image.fromarray(np.uint8(init_generation)))
-
 
         if refine_bound:
             print('Start Refine Boundary.')
@@ -518,31 +534,27 @@ def easyphoto_tryon_infer_forward(
                 max_size=(template_copy.shape[1], template_copy.shape[0]),
                 padding_size=padding,
             )
-            print("box_pad:", box_pad)
             padding_size = abs(np.array(box_pad) - np.array(box_template))
-            print("padding_size:", padding_size)
 
             input_img = init_generation[box_pad[1]: box_pad[3], box_pad[0]: box_pad[2]]
             input_control_img = template_copy[
                 box_pad[1]: box_pad[3], box_pad[0]: box_pad[2]
             ]
-            # up down left right
 
-            if len(np.array(np.uint8(resize_mask2)).shape)==2:
-                mask_array = np.array(np.uint8(resize_mask2))
+            if len(np.array(np.uint8(resize_mask_template)).shape) == 2:
+                mask_array = np.array(np.uint8(resize_mask_template))
             else:
-                mask_array = np.array(np.uint8(resize_mask2))[:, :, 0]
-            
+                mask_array = np.array(np.uint8(resize_mask_template))[:, :, 0]
+
             input_mask = np.pad(
                 mask_array,
                 ((padding_size[1], padding_size[3]),
-                (padding_size[0], padding_size[2])),
+                 (padding_size[0], padding_size[2])),
                 mode="constant",
                 constant_values=0,
             )
-            # cv2.imwrite("input_mask.jpg", input_mask)
+
             input_mask_copy = copy.deepcopy(input_mask)
-            print("input_mask_copy:", input_mask_copy.shape)
 
             input_mask = np.uint8(
                 cv2.dilate(np.array(input_mask), np.ones(
@@ -551,22 +563,9 @@ def easyphoto_tryon_infer_forward(
                             np.ones((10, 10), np.uint8), iterations=1)
             )
 
-
-            # cv2.imwrite("input_mask_outline.jpg", input_mask)
-            # cv2.imwrite("input_img.jpg", input_img)
-            # cv2.imwrite("input_control_img.jpg", input_control_img)
-
-            # print(input_mask.shape)
-            # print(input_img.shape)
-            # print("input_control:", input_control_img.shape)
-
             # generate
             controlnet_pairs = [["canny", input_control_img, 1.0]]
-            # input_mask = Image.fromarray(
-            #     np.uint8(np.clip((np.float32(input_mask) * 255), 0, 255))
-            # )
-            
-            print(input_mask.max())
+
             input_mask = Image.fromarray(np.uint8(input_mask))
             input_img = Image.fromarray(input_img)
 
@@ -585,39 +584,27 @@ def easyphoto_tryon_infer_forward(
                 sd_model_checkpoint=sd_model_checkpoint,
             )
 
-            print("res shape:", result_img.size)
-
             # resize diffusion results
             target_width = box_pad[2] - box_pad[0]
             target_height = box_pad[3] - box_pad[1]
             result_img = result_img.resize((target_width, target_height))
             input_mask = input_mask.resize((target_width, target_height))
 
-            # result_img.save('result_img.jpg')
-            # cv2.imwrite('template_copy.jpg', template_copy[:,:,::-1])
-            # cv2.imwrite('input_mask_copy.jpg', input_mask_copy)
-
-            print(box_pad)
-
-            # copy back
-            # mask_blur = cv2.GaussianBlur(
-            #     np.array(np.uint8(input_mask_copy)), (5, 5), 0)
-            # cv2.imwrite("mask_blur2.jpg", mask_blur)
-
             final_generation = copy_white_mask_to_template(
-                np.array(result_img), np.array(np.uint8(input_mask_copy)), template_copy, box_pad
+                np.array(result_img), np.array(
+                    np.uint8(input_mask_copy)), template_copy, box_pad
             )
 
             return_res.append(Image.fromarray(np.uint8(final_generation)))
         else:
             final_generation = init_generation
 
-        save_image(Image.fromarray(np.uint8(final_generation)), easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+        save_image(Image.fromarray(np.uint8(final_generation)), easyphoto_outpath_samples, "EasyPhoto", None,
+                   None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
 
         return_res.append(first_paste)
         torch.cuda.empty_cache()
 
+        print('Finished')
+
     return 'Success\n'+return_msg, return_res
-    
-
-
