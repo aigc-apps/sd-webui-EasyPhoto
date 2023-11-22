@@ -20,7 +20,7 @@ from modules.sd_models import get_closet_checkpoint_match, load_model, list_mode
 from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
-from scripts.animatediff_utils import AnimateDiffProcess, motion_module
+from scripts.animatediff_utils import AnimateDiffProcess
 from scripts.easyphoto_utils import ep_logger
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
@@ -588,7 +588,7 @@ def i2i_inpaint_call(
     if animatediff_flag:
         gen_image = processed.images
     else:
-        if opts.return_mask or opts.return_mask_composite:
+        if (opts.return_mask or opts.return_mask_composite) and mask_image is not None:
             return processed.images[1]
         return processed.images[0]
     return gen_image
@@ -615,7 +615,6 @@ def get_checkpoint_type(sd_model_checkpoint: str) -> int:
             return 2
     return 1
 
-
 def get_lora_type(filename: str) -> int:
     """Get the type of the Lora given the path `filename`. Modified from `extensions-builtin/Lora/network.py`.
 
@@ -636,9 +635,37 @@ def get_lora_type(filename: str) -> int:
         metadata = sd_models.read_metadata_from_safetensors(filename)
     except Exception as e:
         errors.display(e, f"reading lora {filename}")
-    if str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):
+
+    if str(metadata.get('ep_lora_version', "")).startswith("scene"):
+        return 4
+    elif str(metadata.get('ss_base_model_version', "")).startswith("sdxl_"):
         return 3
     elif str(metadata.get('ss_v2', "")) == "True":
         return 2
     return 1
+
+def get_scene_prompt(filename: str) -> int:
+    """Get the type of the Lora given the path `filename`. Modified from `extensions-builtin/Lora/network.py`.
+
+    Args:
+        filename (str): the Lora file path.
+    
+    Returns:
+        The prompt of this scene lora.
+    """
+    # Firstly, read the metadata of the Lora from the cache. If the Lora is added to the folder 
+    # after the SD Web UI launches, then read the Lora from the hard disk to get the metadata.
+    try:
+        name = os.path.splitext(os.path.basename(filename))[0]
+        read_metadata = lambda filename: sd_models.read_metadata_from_safetensors(filename)
+        # It will return None if the Lora file has not be cached before.
+        metadata = cache.cached_data_for_file("safetensors-metadata", "lora/" + name, filename, read_metadata)
+    except TypeError as e:
+        metadata = sd_models.read_metadata_from_safetensors(filename)
+    except Exception as e:
+        errors.display(e, f"reading lora {filename}")
+
+    if str(metadata.get('ep_lora_version', "")).startswith("scene"):
+        return True, str(metadata.get('ep_prompt', ""))
+    return False, ""
 

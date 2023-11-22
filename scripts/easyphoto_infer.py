@@ -3,6 +3,7 @@ import glob
 import math
 import os
 import traceback
+import re
 from typing import Any, Dict, List, Optional, Union
 
 import cv2
@@ -17,30 +18,32 @@ from modules.paths import models_path
 from modules.shared import opts, state
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_AD,
-                                      DEFAULT_NEGATIVE_XL, DEFAULT_POSITIVE,
-                                      DEFAULT_POSITIVE_AD, DEFAULT_POSITIVE_XL,
-                                      SDXL_MODEL_NAME,
+                                      DEFAULT_NEGATIVE_T2I, DEFAULT_POSITIVE,
+                                      DEFAULT_POSITIVE_AD,
+                                      DEFAULT_POSITIVE_T2I, SDXL_MODEL_NAME,
                                       easyphoto_img2img_samples,
                                       easyphoto_outpath_samples,
                                       easyphoto_txt2img_samples,
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples,
-                                      validation_prompt)
+                                      validation_prompt,
+                                      validation_prompt_scene)
 from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      check_id_valid, convert_to_video,
                                      ep_logger, get_mov_all_images,
                                      modelscope_models_to_cpu,
                                      modelscope_models_to_gpu,
-                                     switch_ms_model_cpu, unload_models)
+                                     switch_ms_model_cpu, unload_models,
+                                     get_controlnet_version)
 from scripts.face_process_utils import (
     Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
     crop_and_paste, safe_get_box_mask_keypoints_and_padding_image)
 from scripts.FIRE_utils import FIRE_forward
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
-                             get_lora_type, i2i_inpaint_call,
-                             reload_sd_model_vae, switch_sd_model_vae,
-                             refresh_model_vae, t2i_call)
+                             get_lora_type, get_scene_prompt, i2i_inpaint_call,
+                             refresh_model_vae, reload_sd_model_vae,
+                             switch_sd_model_vae, t2i_call)
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
 
@@ -105,7 +108,7 @@ def get_controlnet_unit(
 
     elif unit == "openpose":
         control_unit = dict(
-            input_image=None,
+            image=None,
             module='openpose_full',
             weight=weight,
             guidance_end=1,
@@ -114,10 +117,12 @@ def get_controlnet_unit(
             model='control_v11p_sd15_openpose'
         )
 
+
         # if is_batch:
         #     control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         # else:
-        #     control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+        #     control_unit['image'] = {'image': np.asarray(input_image), 'mask': None}
+
 
     elif unit == "sdxl_openpose":
         control_unit = dict(
@@ -252,6 +257,7 @@ def get_controlnet_unit(
             control_unit['batch_images'] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         else:
             control_unit['input_image'] = {'image': np.asarray(input_image), 'mask': None}
+    
     return control_unit
 
 
@@ -373,10 +379,12 @@ sdxl_txt2img_flag = False
 # @gpu_monitor_decorator() 
 @switch_sd_model_vae()
 def easyphoto_infer_forward(
-    sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, additional_prompt, \
-    before_face_fusion_ratio, after_face_fusion_ratio, first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
+    sd_model_checkpoint, selected_template_images, init_image, uploaded_template_images, \
+    text_to_image_input_prompt, text_to_image_width, text_to_image_height, scene_id, prompt_generate_sd_model_checkpoint, \
+    additional_prompt, before_face_fusion_ratio, after_face_fusion_ratio, \
+    first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
-    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, sd_xl_input_prompt, sd_xl_resolution, tabs, \
+    background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, \
     ip_adapter_control, ip_adapter_weight, ipa_image_path, *user_ids
 ): 
     # global
@@ -388,11 +396,13 @@ def easyphoto_infer_forward(
         refresh_model_vae()
     check_hash[0] = False
 
+    # check the checkpoint_type of sd_model_checkpoint
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
+    # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
         check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
         if check_hash[1]:
@@ -415,11 +425,13 @@ def easyphoto_infer_forward(
                 refresh_model_vae()
             check_hash[4] = False
 
+    # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
         if user_id != "none":
+            # Check if the user_id is valid
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []  
-            # Check if the type of the stable diffusion model and the user LoRA match.
+            # Check if the type of the stable diffusion model and the user LoRA match
             sdxl_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
             sdxl_lora_flag = True if sdxl_lora_type == 3 else False
             if sdxl_lora_flag != sdxl_pipeline_flag:
@@ -444,8 +456,20 @@ def easyphoto_infer_forward(
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
     
+    # check the version of controlnets
+    controlnet_version = get_controlnet_version()
+    major, minor, patch = map(int, controlnet_version.split("."))
+    if major == 0 and minor == 0 and patch == 0:
+        return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", [], []
+    if ip_adapter_control:
+        if major < 1 or minor < 1 or patch < 417:
+            return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", [], []
+
+    # check the number of controlnets
     max_control_net_unit_count = 3 if not ip_adapter_control else 4
-    if shared.opts.data.get("control_net_unit_count") < max_control_net_unit_count:
+    control_net_unit_count = shared.opts.data.get("control_net_unit_count", 3)
+    ep_logger.info("ControlNet unit number: {}".format(control_net_unit_count))
+    if control_net_unit_count < max_control_net_unit_count:
         error_info = (
             "Please go to Settings/ControlNet and at least set {} for "
             "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)
@@ -489,27 +513,20 @@ def easyphoto_infer_forward(
         elif tabs == 2:
             template_images = [file_d['name'] for file_d in uploaded_template_images]
         elif tabs == 3:
-            reload_sd_model_vae(SDXL_MODEL_NAME, "madebyollin-sdxl-vae-fp16-fix.safetensors")
-            ep_logger.info(sd_xl_input_prompt)
-            sd_xl_resolution = eval(str(sd_xl_resolution))
-            template_images = txt2img(
-                [], input_prompt = sd_xl_input_prompt, \
-                diffusion_steps=30, width=sd_xl_resolution[0], height=sd_xl_resolution[1], \
-                default_positive_prompt=DEFAULT_POSITIVE_XL, \
-                default_negative_prompt=DEFAULT_NEGATIVE_XL, \
-                seed = seed,
-                sampler = "DPM++ 2M SDE Karras"
-            )
-            template_images = [np.uint8(template_images)]
+            # load sd and vae
+            prompt_generate_sd_model_checkpoint_type = get_checkpoint_type(prompt_generate_sd_model_checkpoint)
+            if prompt_generate_sd_model_checkpoint_type == 3:
+                prompt_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
+            else:
+                prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+
+            if prompt_generate_sd_model_checkpoint_type == 3 and scene_id != 'none':
+                return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
+            ep_logger.info("Template images will be generated when you use text2photo")
     except Exception as e:
         torch.cuda.empty_cache()
         traceback.print_exc()
         return "Please choose or upload a template.", [], []
-    
-    if not sdxl_pipeline_flag:
-        reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
-    else:
-        reload_sd_model_vae(sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
     
     # create modelscope model
     if retinaface_detection is None:
@@ -580,6 +597,58 @@ def easyphoto_infer_forward(
         ipa_face_part_only = False
 
     ep_logger.info("Start templates and user_ids preprocess.")
+
+    if tabs == 3:
+        reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
+
+        if scene_id != 'none':
+            # scene lora path
+            scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+            if not os.path.exists(scene_lora_model_path):
+                return "Please check scene lora is exist or not.", [], []
+            is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
+            if not is_scene_lora:
+                return "Please use the lora trained by ep.", [], []
+            
+            # get lora scene prompt
+            last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+
+            # text to image with scene lora 
+            ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
+            pose_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.jpg')) + \
+                            glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.png'))
+            
+            pose_template = Image.open(np.random.choice(pose_templates))
+            template_images = txt2img(
+                [["openpose", pose_template, 0.50, 1]], input_prompt=last_scene_lora_prompt_high_weight, \
+                diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed=str(seed), sampler="Euler a"
+            )
+            ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
+            template_images = inpaint(
+                template_images, None, [], input_prompt=last_scene_lora_prompt_low_weight, \
+                diffusion_steps=30, denoising_strength=0.20, hr_scale=1.5, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed=str(seed), sampler="Euler a"
+            )
+            template_images = [np.uint8(template_images)]
+        else:
+            # text to image for template 
+            ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
+            template_images = txt2img(
+                [], input_prompt = text_to_image_input_prompt, \
+                diffusion_steps=30, width=text_to_image_width, height=text_to_image_height, \
+                default_positive_prompt=DEFAULT_POSITIVE_T2I, default_negative_prompt=DEFAULT_NEGATIVE_T2I, \
+                seed = seed, sampler = "DPM++ 2M SDE Karras"
+            )
+            template_images = [np.uint8(template_images)]
+
+    if not sdxl_pipeline_flag:
+        reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
+    else:
+        reload_sd_model_vae(sd_model_checkpoint, "madebyollin-sdxl-vae-fp16-fix.safetensors")
 
     # SD web UI will raise the `Error: A tensor with all NaNs was produced in Unet.`
     # when users do img2img with SDXL currently (v1.6.0). Users should launch SD web UI with `--no-half`
@@ -1123,9 +1192,9 @@ def easyphoto_infer_forward(
 
                         # Diffusion
                         if not sdxl_pipeline_flag:
-                            controlnet_pairs = [["canny", sub_output_image, 1.00], ["color", sub_output_image, 1.00]]
+                            controlnet_pairs = [["canny", sub_output_image, 1.00, 1], ["color", sub_output_image, 1.00, 1]]
                         else:
-                            controlnet_pairs = [["sdxl_canny_mid", sub_output_image, 1.00]]
+                            controlnet_pairs = [["sdxl_canny_mid", sub_output_image, 1.00, 1]]
                         sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
 
                         # Paste the image back to the background 
@@ -1145,9 +1214,9 @@ def easyphoto_infer_forward(
                         output_image    = output_image.resize(new_size, Image.Resampling.LANCZOS)
 
                         if not sdxl_pipeline_flag:
-                            controlnet_pairs = [["canny", output_image, 1.00], ["color", output_image, 1.00]]
+                            controlnet_pairs = [["canny", output_image, 1.00, 1], ["color", output_image, 1.00, 1]]
                         else:
-                            controlnet_pairs = [["sdxl_canny_mid", output_image, 1.00]]
+                            controlnet_pairs = [["sdxl_canny_mid", output_image, 1.00, 1]]
                         output_image = inpaint(output_image, output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
 
             except Exception as e:
@@ -1204,7 +1273,7 @@ def easyphoto_infer_forward(
 @switch_sd_model_vae()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
-    t2v_input_prompt, t2v_resolution, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
+    t2v_input_prompt, t2v_input_width, t2v_input_height, init_image, init_image_prompt, last_image, init_video, additional_prompt, max_frames, max_fps, save_as, before_face_fusion_ratio, after_face_fusion_ratio, \
     first_diffusion_steps, first_denoising_strength, seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, \
     color_shift_middle, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     makeup_transfer, makeup_transfer_ratio, face_shape_match, video_interpolation, video_interpolation_ext, tabs, *user_ids,
@@ -1374,11 +1443,10 @@ def easyphoto_video_infer_forward(
 
     if tabs == 0:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
-        t2v_resolution = eval(str(t2v_resolution))
 
         template_images = txt2img(
             [], input_prompt = t2v_input_prompt, \
-            diffusion_steps=30, width=t2v_resolution[0], height=t2v_resolution[1], \
+            diffusion_steps=30, width=t2v_input_width, height=t2v_input_height, \
             default_positive_prompt=DEFAULT_POSITIVE_AD, \
             default_negative_prompt=DEFAULT_NEGATIVE_AD, \
             seed = seed, sampler = "DPM++ 2M SDE Karras", 
@@ -1552,9 +1620,9 @@ def easyphoto_video_infer_forward(
             # First diffusion, facial reconstruction
             ep_logger.info("Start First diffusion.")
             if not face_shape_match:
-                controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
+                controlnet_pairs = [["canny", input_image, 0.50, 1], ["openpose", replaced_input_image, 0.50, 1], ["color", input_image, 0.85, 1]]
             else:
-                controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
+                controlnet_pairs = [["canny", input_image, 0.50, 1], ["openpose", replaced_input_image, 0.50, 1]]
 
             sum_input_mask = []
             for _input_mask in input_mask:
