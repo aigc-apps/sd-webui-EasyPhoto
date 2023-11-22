@@ -574,8 +574,12 @@ def easyphoto_infer_forward(
                 return "Please use the lora trained by ep.", [], []
             
             # get lora scene prompt
-            last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-            last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            if user_ids[0] != "ip_adapter_control_only":
+                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            else:
+                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, "
+                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, "
 
             # text to image with scene lora 
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
