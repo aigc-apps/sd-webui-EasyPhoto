@@ -84,8 +84,13 @@ def easyphoto_tryon_infer_forward(
                 info = "The user id cannot be empty."
                 print(info)
                 return info, [], []
-
+    
             cloth_uuid = CLOTH_LORA_PREFIX+cloth_uuid+'_'+str(max_train_steps)
+
+            if cloth_uuid in user_ids:
+                info = "The user id cannot be repeat. Please check in the cloth gallery. Or use a new id to mark the new cloth"
+                print(info)
+                return info, [], []
 
     except Exception as e:
         torch.cuda.empty_cache()
@@ -188,7 +193,6 @@ def easyphoto_tryon_infer_forward(
                 f'--train_data_dir={os.path.relpath(user_path, pwd)}',
                 '--caption_column=text',
                 f'--resolution={resolution}',
-                # '--random_flip',
                 f'--train_batch_size={train_batch_size}',
                 f'--gradient_accumulation_steps={gradient_accumulation_steps}',
                 f'--dataloader_num_workers={dataloader_num_workers}',
