@@ -37,7 +37,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      get_controlnet_version)
 from scripts.face_process_utils import (
     Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
-    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image)
+    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image, alignment_photo)
 from scripts.FIRE_utils import FIRE_forward
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
@@ -647,7 +647,7 @@ def easyphoto_infer_forward(
             else:
                 ipa_image = copy.deepcopy(roop_image)
 
-            _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(retinaface_detection, ipa_image, 1, "crop")
+            _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(retinaface_detection, ipa_image, 1.05, "crop")
             if len(_ipa_retinaface_boxes) == 0:
                 ep_logger.error("No face is detected in the uploaded image prompt.")
                 return "Please upload a image prompt with face.", [], []
@@ -878,7 +878,7 @@ def easyphoto_infer_forward(
                     ipa_face_width = ipa_retinaface_box[2] - ipa_retinaface_box[0]
 
                     if not ipa_face_part_only:
-                        ipa_mask = face_skin(ipa_images[index], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+                        ipa_mask, brow_mask = face_skin(ipa_images[index], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [2, 3]])
                         ipa_kernel_size = np.ones((int(ipa_face_width//10), int(ipa_face_width//10)), np.uint8)
                         # Fill small holes with a close operation (w/o cv2.dilate)
                         ipa_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(ipa_mask), cv2.MORPH_CLOSE, ipa_kernel_size)))
@@ -890,6 +890,7 @@ def easyphoto_infer_forward(
                         ipa_retinaface_box[2] = np.clip(np.array(ipa_retinaface_box[2], np.int32) + ipa_face_width * 0.15, 0, w - 1)
                         ipa_mask[ipa_retinaface_box[1]:ipa_retinaface_box[3], ipa_retinaface_box[0]:ipa_retinaface_box[2]] = 255
                         ipa_mask = Image.fromarray(np.uint8(ipa_mask))
+                        brow_mask = None
                     
                     # Since the image encoder of IP-Adapter will crop/resize the image prompt to (224, 224),
                     # we pad the face w.r.t the long side for an aspect ratio of 1.
@@ -897,13 +898,25 @@ def easyphoto_infer_forward(
                     ipa_image_face  = np.ones_like(np.array(ipa_images[index])) * 255 
                     ipa_image_face  = Image.fromarray(np.uint8(np.array(ipa_images[index]) * ipa_mask + ipa_image_face * (1 - ipa_mask)))
                     ipa_image_face  = ipa_image_face.crop(ipa_retinaface_box)
-                    ipa_face_width, ipa_face_height = ipa_image_face.size
-                    if ipa_face_width > ipa_face_height:
-                        padded_size = (ipa_face_width, ipa_face_width)
-                    else:
-                        padded_size = (ipa_face_height, ipa_face_height)
+                    
+                    # Align the ipa face
+                    ipa_retinaface_keypoint[:, 0] -= ipa_retinaface_box[0]
+                    ipa_retinaface_keypoint[:, 1] -= ipa_retinaface_box[1]
+                    ipa_image_face = Image.fromarray(np.uint8(alignment_photo(np.array(ipa_image_face), np.array(ipa_retinaface_keypoint, np.int))[0]))
+                    
+                    # if brow_mask is not None, remove the skin above brows
+                    if brow_mask is not None:
+                        brow_mask = brow_mask.crop(ipa_retinaface_box)
+                        brow_mask = Image.fromarray(np.uint8(alignment_photo(np.array(brow_mask), np.array(ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0))[0]))
+                        y_coords, _, _ = np.where(np.array(brow_mask) > 0)
+                        min_y = max(int(np.min(y_coords)), 1)
+                        ipa_image_face = np.array(ipa_image_face, np.uint8)
+                        ipa_image_face[:min_y, :, :] = 255
+                        ipa_image_face = Image.fromarray(ipa_image_face)
+
+                    padded_size     = (max(ipa_image_face.size), max(ipa_image_face.size))
                     ipa_image_face  = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
-                
+
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
                     fusion_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]

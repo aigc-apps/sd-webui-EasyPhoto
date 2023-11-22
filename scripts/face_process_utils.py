@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 import copy
+import math
 from PIL import Image
 from skimage import transform
 
@@ -247,6 +248,38 @@ def color_transfer(sc, dc):
     np.putmask(img_n, img_n < 0, 0)
     dst = cv2.cvtColor(cv2.convertScaleAbs(img_n), cv2.COLOR_LAB2RGB)
     return dst
+
+def alignment_photo(img, landmark, borderValue=(255, 255, 255)):
+    """
+    Rotate and align the image.
+
+    Args:
+        img: Input image.
+        landmark: Landmark points coordinates.
+        borderValue: Border fill value, default is white (255, 255, 255).
+    
+    Returns:
+        new_img: Rotated and aligned image.
+        new_landmark: Rotated and aligned landmark points coordinates.
+    """
+    x = landmark[0, 0] - landmark[1, 0]
+    y = landmark[0, 1] - landmark[1, 1]
+    angle = 0 if x == 0 else math.atan(y / x) * 180 / math.pi
+
+    center = (img.shape[1] // 2, img.shape[0] // 2)
+    RotationMatrix = cv2.getRotationMatrix2D(center, angle, 1)
+    new_img = cv2.warpAffine(img, RotationMatrix, (img.shape[1], img.shape[0]), borderValue=borderValue)
+
+    RotationMatrix = np.array(RotationMatrix)
+    new_landmark = []
+    for i in range(landmark.shape[0]):
+        pts = []    
+        pts.append(RotationMatrix[0, 0] * landmark[i, 0] + RotationMatrix[0, 1] * landmark[i, 1] + RotationMatrix[0, 2])
+        pts.append(RotationMatrix[1, 0] * landmark[i, 0] + RotationMatrix[1, 1] * landmark[i, 1] + RotationMatrix[1, 2])
+        new_landmark.append(pts)
+    
+    new_landmark = np.array(new_landmark)
+    return new_img, new_landmark
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
