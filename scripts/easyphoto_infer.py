@@ -1370,6 +1370,10 @@ def easyphoto_infer_forward(
                         sub_output_mask = output_mask.crop(
                             [left, top, right, bottom])
 
+                        # record origin width and height
+                        sub_output_image_width = sub_output_image.width
+                        sub_output_image_height = sub_output_image.height
+
                         # get target_short_side base on the ratio of width and height
                         if sub_output_image.width / sub_output_image.height > 1.5 or sub_output_image.height / sub_output_image.width > 1.5:
                             target_short_side = 512
@@ -1393,14 +1397,11 @@ def easyphoto_infer_forward(
                             controlnet_pairs = [["canny", sub_output_image, 1.00, 1], [
                                 "color", sub_output_image, 1.00, 1]]
                         else:
-                            controlnet_pairs = [
-                                ["sdxl_canny_mid", sub_output_image, 1.00, 1]]
-                        sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs,
-                                                   input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
+                            controlnet_pairs = [["sdxl_canny_mid", sub_output_image, 1.00, 1]]
+                        sub_output_image = inpaint(sub_output_image, sub_output_mask, controlnet_pairs, input_prompt_without_lora, 30, denoising_strength=denoising_strength, hr_scale=1, seed=str(seed))
 
-                        # Paste the image back to the background
-                        sub_output_image = sub_output_image.resize(
-                            [long_side, long_side])
+                        # Paste the image back to the background 
+                        sub_output_image = sub_output_image.resize([sub_output_image_width, sub_output_image_height])
                         output_image = np.array(output_image)
                         output_image[top:bottom, left:right] = np.array(
                             sub_output_image)
