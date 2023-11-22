@@ -636,7 +636,8 @@ def easyphoto_infer_forward(
                 ipa_retinaface_masks.append([])
         elif user_id == "ip_adapter_control_only":
             # get prompt
-            input_prompt = f"{validation_prompt}, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            # input_prompt = f"{validation_prompt}, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            input_prompt = f"1person, face, portrait " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
             
             face_id_image = Image.open(ipa_image_path).convert("RGB")
             roop_image = Image.open(ipa_image_path).convert("RGB")
