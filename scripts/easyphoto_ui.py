@@ -641,7 +641,7 @@ def on_ui_tabs():
                                     label="Display Face Similarity Scores",  
                                     value=False
                                 )
-                                ip_adapter_control = gr.Checkbox(
+                                ipa_control = gr.Checkbox(
                                     label="IP-Adapter Control",
                                     value=False
                                 )
@@ -650,13 +650,13 @@ def on_ui_tabs():
                                     value=False
                                 )
 
-                                def ipa_update_score(ip_adapter_control):
-                                    if ip_adapter_control:
+                                def ipa_update_score(ipa_control):
+                                    if ipa_control:
                                         return gr.update(value=True)
                                     return gr.update(visible=True)
                                 
-                                def update_score(ip_adapter_control, ref_mode_choose, display_score):
-                                    if ip_adapter_control or ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+                                def update_score(ipa_control, ref_mode_choose, display_score):
+                                    if ipa_control or ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
                                         return gr.update(value=True)
                                     return gr.update(value=display_score)
                                 
@@ -667,20 +667,20 @@ def on_ui_tabs():
                                 
                                 # We need to make sure that Display Similarity Score is mandatory when the user
                                 # selects IP-Adapter Control. Otherwise, it is not.
-                                ip_adapter_control.change(
+                                ipa_control.change(
                                     ipa_update_score,
-                                    inputs=[ip_adapter_control],
+                                    inputs=[ipa_control],
                                     outputs=[display_score]
                                 )
                                 display_score.change(
                                     update_score,
-                                    inputs=[ip_adapter_control, ref_mode_choose, display_score],
+                                    inputs=[ipa_control, ref_mode_choose, display_score],
                                     outputs=[display_score]
                                 )
                                 ref_mode_choose.change(
                                     use_ipa_only,
                                     inputs=[ref_mode_choose],
-                                    outputs=[display_score, ip_adapter_control, uid_and_refresh, ipa_only_row]
+                                    outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row]
                                 )
 
                             with gr.Row():
@@ -698,7 +698,7 @@ def on_ui_tabs():
                                     step=0.05, label='Makeup Transfer Ratio',
                                     visible=False
                                 )
-                                ip_adapter_weight = gr.Slider(
+                                ipa_weight = gr.Slider(
                                     minimum=0.10, maximum=1.00, value=0.50,
                                     step=0.05, label="IP-Adapter Control Weight",
                                     visible=False
@@ -707,7 +707,7 @@ def on_ui_tabs():
                                 super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
-                                ip_adapter_control.change(lambda x: ip_adapter_weight.update(visible=x), inputs=[ip_adapter_control], outputs=[ip_adapter_weight])
+                                ipa_control.change(lambda x: ipa_weight.update(visible=x), inputs=[ipa_control], outputs=[ipa_weight])
                             
                             ipa_note = gr.Markdown(
                                 value = '''
@@ -719,8 +719,8 @@ def on_ui_tabs():
                             )
                             with gr.Row():
                                 ipa_image_path = gr.Image(label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath", visible=False)
-                            ip_adapter_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_image_path])
-                            ip_adapter_control.change(lambda x: ipa_note.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_note])
+                            ipa_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path])
+                            ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -787,7 +787,7 @@ def on_ui_tabs():
                         first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                         seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                         background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, state_tab, \
-                        ip_adapter_control, ip_adapter_weight, ipa_image_path, ref_mode_choose, ipa_only_image_path, ipa_only_weight, *uuids
+                        ipa_control, ipa_weight, ipa_image_path, ref_mode_choose, ipa_only_weight, ipa_only_image_path, *uuids
                     ],
                     outputs=[infer_progress, output_images, face_id_outputs]
                 )

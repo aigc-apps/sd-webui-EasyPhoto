@@ -54,9 +54,14 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "makeup_transfer_ratio"     : 0.50,
         "face_shape_match"          : False,
         "tabs"                      : 1,
-        "ip_adapter_control"        : False,
-        "ip_adapter_weight"         : 0.5,
-        "ipa_image_path"            : None,
+
+        "ipa_control"               : True,
+        "ipa_weight"                : 0.50,
+        "ipa_image"                 : None,
+
+        "ref_mode_choose"           : "Infer with Pretrained Lora",
+        "ipa_only_weight"           : 0.60,
+        "ipa_only_image"            : None,
     })
     r = requests.post(f'{url}/easyphoto/easyphoto_infer_forward', data=datas, timeout=1500)
     data = r.content.decode('utf-8')
