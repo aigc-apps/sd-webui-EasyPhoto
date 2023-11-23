@@ -119,9 +119,14 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         makeup_transfer_ratio       = datas.get("makeup_transfer_ratio", 0.50)
         face_shape_match            = datas.get("face_shape_match", False)
         tabs                        = datas.get("tabs", 1)
-        ip_adapter_control          = datas.get("ip_adapter_control", False)
-        ip_adapter_weight           = datas.get("ip_adapter_weight", 0.7)
-        ipa_image_path              = datas.get("ipa_image_path", None)
+
+        ipa_control                 = datas.get("ipa_control", False)
+        ipa_weight                  = datas.get("ipa_weight", 0.50)
+        ipa_image                   = datas.get("ipa_image", None)
+
+        ref_mode_choose             = datas.get("ref_mode_choose", "Infer with Pretrained Lora")
+        ipa_only_weight             = datas.get("ipa_only_weight", 0.60)
+        ipa_only_image              = datas.get("ipa_only_image", None)
 
         if type(user_ids) == str:
             user_ids = [user_ids]
@@ -129,6 +134,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         selected_template_images    = [api.decode_base64_to_image(_) for _ in selected_template_images]
         init_image                  = None if init_image is None else api.decode_base64_to_image(init_image)
         uploaded_template_images    = [api.decode_base64_to_image(_) for _ in uploaded_template_images]
+        ipa_image                   = None if ipa_image is None else api.decode_base64_to_image(ipa_image)
+        ipa_only_image              = None if ipa_only_image is None else api.decode_base64_to_image(ipa_only_image)
 
         _selected_template_images = []
         for selected_template_image in selected_template_images:
@@ -144,10 +151,28 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         _uploaded_template_images = []
         for uploaded_template_image in uploaded_template_images:
             hash_value = hashlib.md5(uploaded_template_image.tobytes()).hexdigest()
+            save_path = os.path.join('/tmp', hash_value + '.jpg')
+            uploaded_template_image.save(save_path)
             _uploaded_template_images.append(
                 {"name" : save_path}
             )
         uploaded_template_images = _uploaded_template_images
+
+        if ipa_image is not None:
+            hash_value = hashlib.md5(ipa_image.tobytes()).hexdigest()
+            save_path = os.path.join('/tmp', hash_value + '.jpg')
+            ipa_image.save(save_path)
+            ipa_image_path = save_path
+        else:
+            ipa_image_path = None
+        
+        if ipa_only_image is not None:
+            hash_value = hashlib.md5(ipa_only_image.tobytes()).hexdigest()
+            save_path = os.path.join('/tmp', hash_value + '.jpg')
+            ipa_only_image.save(save_path)
+            ipa_only_image_path = save_path
+        else:
+            ipa_only_image_path = None
 
         tabs = int(tabs)
         try:
@@ -158,7 +183,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                 seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                 background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, \
-                ip_adapter_control, ip_adapter_weight, ipa_image_path, *user_ids
+                ipa_control, ipa_weight, ipa_image_path, ref_mode_choose, ipa_only_weight, ipa_only_image_path, *user_ids
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
             face_id_outputs_base64 = []

@@ -37,7 +37,7 @@ from scripts.easyphoto_utils import (check_files_exists_and_download,
                                      get_controlnet_version)
 from scripts.face_process_utils import (
     Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
-    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image)
+    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image, alignment_photo)
 from scripts.FIRE_utils import FIRE_forward
 from scripts.psgan_utils import PSGAN_Inference
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
@@ -340,7 +340,7 @@ def easyphoto_infer_forward(
     first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
     seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
     background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, tabs, \
-    ip_adapter_control, ip_adapter_weight, ipa_image_path, *user_ids
+    ipa_control, ipa_weight, ipa_image_path, ref_mode_choose, ipa_only_weight, ipa_only_image_path, *user_ids
 ): 
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
@@ -357,6 +357,13 @@ def easyphoto_infer_forward(
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
+    # infer with IPA only
+    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+        ipa_control = True
+        ipa_weight = ipa_only_weight
+        ipa_image_path = ipa_only_image_path
+        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
+
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
         check_files_exists_and_download(check_hash[1], download_mode = "sdxl")
@@ -368,7 +375,7 @@ def easyphoto_infer_forward(
         if check_hash[2]:
             refresh_model_vae()
         check_hash[2] = False
-    if ip_adapter_control:
+    if ipa_control:
         if not sdxl_pipeline_flag:
             check_files_exists_and_download(check_hash[3], download_mode = "add_ipa_base")
             if check_hash[3]:
@@ -382,7 +389,7 @@ def easyphoto_infer_forward(
 
     # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
-        if user_id != "none":
+        if user_id != "none" and user_id != "ipa_control_only":
             # Check if the user_id is valid
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []  
@@ -416,12 +423,12 @@ def easyphoto_infer_forward(
     major, minor, patch = map(int, controlnet_version.split("."))
     if major == 0 and minor == 0 and patch == 0:
         return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", [], []
-    if ip_adapter_control:
+    if ipa_control:
         if major < 1 or minor < 1 or patch < 417:
             return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", [], []
 
     # check the number of controlnets
-    max_control_net_unit_count = 3 if not ip_adapter_control else 4
+    max_control_net_unit_count = 3 if not ipa_control else 4
     control_net_unit_count = shared.opts.data.get("control_net_unit_count", 3)
     ep_logger.info("ControlNet unit number: {}".format(control_net_unit_count))
     if control_net_unit_count < max_control_net_unit_count:
@@ -431,7 +438,7 @@ def easyphoto_infer_forward(
         )
         return error_info, [], []
     
-    if ip_adapter_control:
+    if ipa_control:
         ipa_image_paths = ["none"] * 5  # consistent with user_ids
         ipa_flag = False
         valid_user_id_num, valid_ipa_image_path_num = 0, 0
@@ -446,7 +453,7 @@ def easyphoto_infer_forward(
         if valid_user_id_num > 1:
             ep_logger.error("EasyPhoto does not support IP-Adapter Control with multiple user ids currently.")
             return "EasyPhoto does not support IP-Adapter Control with multiple user ids currently.", [], []
-        if ip_adapter_control and valid_user_id_num != valid_ipa_image_path_num:
+        if ipa_control and valid_user_id_num != valid_ipa_image_path_num:
             ep_logger.warning(
                 "Found {} user id(s), but only {} image prompt(s) for IP-Adapter Control. Use the reference image "
                 "corresponding to the user instead.".format(valid_user_id_num, valid_ipa_image_path_num)
@@ -544,7 +551,7 @@ def easyphoto_infer_forward(
     need_mouth_fix                  = True
     input_mask_face_part_only       = True
 
-    if ip_adapter_control:
+    if ipa_control:
         ipa_images = []
         ipa_retinaface_boxes = []
         ipa_retinaface_keypoints = []
@@ -566,8 +573,12 @@ def easyphoto_infer_forward(
                 return "Please use the lora trained by ep.", [], []
             
             # get lora scene prompt
-            last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-            last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            if user_ids[0] != "ipa_control_only":
+                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, " + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+            else:
+                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, "
+                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, "
 
             # text to image with scene lora 
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
@@ -621,11 +632,45 @@ def easyphoto_infer_forward(
             face_id_retinaface_boxes.append([])
             face_id_retinaface_keypoints.append([])
             face_id_retinaface_masks.append([])
-            if ip_adapter_control:
+            if ipa_control:
                 ipa_images.append('none')
                 ipa_retinaface_boxes.append([])
                 ipa_retinaface_keypoints.append([])
                 ipa_retinaface_masks.append([])
+        elif user_id == "ipa_control_only":
+            # get prompt
+            input_prompt = f"1person, face, portrait, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            
+            face_id_image = Image.open(ipa_image_path).convert("RGB")
+            roop_image = Image.open(ipa_image_path).convert("RGB")
+
+            if ipa_image_paths[index] != "none":
+                ipa_image = Image.open(ipa_image_paths[index])
+                ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
+            else:
+                ipa_image = copy.deepcopy(roop_image)
+
+            _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(retinaface_detection, ipa_image, 1.05, "crop")
+            if len(_ipa_retinaface_boxes) == 0:
+                ep_logger.error("No face is detected in the uploaded image prompt.")
+                return "Please upload a image prompt with face.", [], []
+            if len(_ipa_retinaface_boxes) > 1:
+                ep_logger.warning(
+                    "{} faces are detected in the uploaded image prompt. "
+                    "Only the left one will be used.".format(len(_ipa_retinaface_boxes))
+                )
+
+            input_prompts.append(input_prompt)
+            face_id_images.append('none')
+            roop_images.append(roop_image)
+            face_id_retinaface_boxes.append([])
+            face_id_retinaface_keypoints.append([])
+            face_id_retinaface_masks.append([])
+            if ipa_control:
+                ipa_images.append(ipa_image)
+                ipa_retinaface_boxes.append(_ipa_retinaface_boxes[0])
+                ipa_retinaface_keypoints.append(_ipa_retinaface_keypoints[0])
+                ipa_retinaface_masks.append(_ipa_retinaface_masks[0])
         else:
             # get prompt
             input_prompt            = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
@@ -650,7 +695,7 @@ def easyphoto_infer_forward(
             face_id_image           = Image.open(face_id_image_path).convert("RGB")
             roop_image              = Image.open(roop_image_path).convert("RGB")
 
-            if ip_adapter_control:
+            if ipa_control:
                 if ipa_image_paths[index] != "none":
                     ipa_image = Image.open(ipa_image_paths[index])
                     ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
@@ -679,7 +724,7 @@ def easyphoto_infer_forward(
             face_id_retinaface_boxes.append(_face_id_retinaface_box)
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
-            if ip_adapter_control:
+            if ipa_control:
                 ipa_images.append(ipa_image)
                 ipa_retinaface_boxes.append(_ipa_retinaface_boxes[0])
                 ipa_retinaface_keypoints.append(_ipa_retinaface_keypoints[0])
@@ -714,9 +759,12 @@ def easyphoto_infer_forward(
             makeup_transfer_ratio                   : {str(makeup_transfer_ratio)}
             skin_retouching_bool                    : {str(skin_retouching_bool)}
             face_shape_match                        : {str(face_shape_match)}
-            ip_adapter_control                      : {str(ip_adapter_control)}
-            ip_adapter_weight                       : {str(ip_adapter_weight)}
+            ipa_control                             : {str(ipa_control)}
+            ipa_weight                              : {str(ipa_weight)}
             ipa_image_path                          : {str(ipa_image_path)}
+            ref_mode_choose                         : {str(ref_mode_choose)}
+            ipa_only_weight                         : {str(ipa_only_weight)}
+            ipa_only_image_path                     : {str(ipa_only_image_path)}
         '''
         ep_logger.info(template_idx_info)
         try:
@@ -821,19 +869,22 @@ def easyphoto_infer_forward(
                 origin_input_mask               = copy.deepcopy(input_mask)
                 original_input_template         = copy.deepcopy(input_image)
 
-                # Paste user images onto template images
-                replaced_input_image = crop_and_paste(face_id_images[index], face_id_retinaface_masks[index], input_image, face_id_retinaface_keypoints[index], input_image_retinaface_keypoint, face_id_retinaface_boxes[index])
-                replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
+                if user_ids[index] == "ipa_control_only":
+                    replaced_input_image = None
+                else:
+                    # Paste user images onto template images
+                    replaced_input_image = crop_and_paste(face_id_images[index], face_id_retinaface_masks[index], input_image, face_id_retinaface_keypoints[index], input_image_retinaface_keypoint, face_id_retinaface_boxes[index])
+                    replaced_input_image = Image.fromarray(np.uint8(replaced_input_image))
 
                 # The cropped face area (square) in the reference image will be used in IP-Adapter.
-                if ip_adapter_control:
+                if ipa_control:
                     ipa_retinaface_box = ipa_retinaface_boxes[index]
                     ipa_retinaface_keypoint = ipa_retinaface_keypoints[index]
                     ipa_retinaface_mask = ipa_retinaface_masks[index]
                     ipa_face_width = ipa_retinaface_box[2] - ipa_retinaface_box[0]
 
                     if not ipa_face_part_only:
-                        ipa_mask = face_skin(ipa_images[index], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0]
+                        ipa_mask, brow_mask = face_skin(ipa_images[index], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [2, 3]])
                         ipa_kernel_size = np.ones((int(ipa_face_width//10), int(ipa_face_width//10)), np.uint8)
                         # Fill small holes with a close operation (w/o cv2.dilate)
                         ipa_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(ipa_mask), cv2.MORPH_CLOSE, ipa_kernel_size)))
@@ -845,18 +896,34 @@ def easyphoto_infer_forward(
                         ipa_retinaface_box[2] = np.clip(np.array(ipa_retinaface_box[2], np.int32) + ipa_face_width * 0.15, 0, w - 1)
                         ipa_mask[ipa_retinaface_box[1]:ipa_retinaface_box[3], ipa_retinaface_box[0]:ipa_retinaface_box[2]] = 255
                         ipa_mask = Image.fromarray(np.uint8(ipa_mask))
+                        brow_mask = None
                     
                     # Since the image encoder of IP-Adapter will crop/resize the image prompt to (224, 224),
                     # we pad the face w.r.t the long side for an aspect ratio of 1.
-                    ipa_image_face = ImageChops.multiply(ipa_images[index], ipa_mask)
-                    ipa_image_face = ipa_image_face.crop(ipa_retinaface_box)
-                    ipa_face_width, ipa_face_height = ipa_image_face.size
-                    if ipa_face_width > ipa_face_height:
-                        padded_size = (ipa_face_width, ipa_face_width)
-                    else:
-                        padded_size = (ipa_face_height, ipa_face_height)
-                    ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
-                
+                    ipa_mask        = np.array(ipa_mask, np.uint8) / 255
+                    ipa_image_face  = np.ones_like(np.array(ipa_images[index])) * 255 
+                    ipa_image_face  = Image.fromarray(np.uint8(np.array(ipa_images[index]) * ipa_mask + ipa_image_face * (1 - ipa_mask)))
+                    ipa_image_face  = ipa_image_face.crop(ipa_retinaface_box)
+                    
+                    # Align the ipa face
+                    ipa_retinaface_keypoint[:, 0] -= ipa_retinaface_box[0]
+                    ipa_retinaface_keypoint[:, 1] -= ipa_retinaface_box[1]
+                    ipa_image_face = Image.fromarray(np.uint8(alignment_photo(np.array(ipa_image_face), np.array(ipa_retinaface_keypoint, np.int))[0]))
+                    
+                    # If brow_mask is not None, remove the skin above brows
+                    # Only edit the facial area here, hair is useless
+                    if brow_mask is not None:
+                        brow_mask = brow_mask.crop(ipa_retinaface_box)
+                        brow_mask = Image.fromarray(np.uint8(alignment_photo(np.array(brow_mask), np.array(ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0))[0]))
+                        y_coords, _, _ = np.where(np.array(brow_mask) > 0)
+                        min_y = max(int(np.min(y_coords)), 1)
+                        ipa_image_face = np.array(ipa_image_face, np.uint8)
+                        ipa_image_face[:min_y, :, :] = 255
+                        ipa_image_face = Image.fromarray(ipa_image_face)
+
+                    padded_size     = (max(ipa_image_face.size), max(ipa_image_face.size))
+                    ipa_image_face  = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
+
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
                     fusion_image = image_face_fusion(dict(template=input_image, user=roop_images[index]))[OutputKeys.OUTPUT_IMG]
@@ -900,28 +967,31 @@ def easyphoto_infer_forward(
                 # here we get the retinaface_box, we should use this Input box and face pixel to refine the output face pixel colors
                 template_image_original_face_area = np.array(original_input_template)[input_image_retinaface_box[1]:input_image_retinaface_box[3], input_image_retinaface_box[0]:input_image_retinaface_box[2], :] 
                 
+                if user_ids[index] == "ipa_control_only":
+                    replaced_input_image = input_image
+
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
                 first_inpaint_area = ImageChops.multiply(input_image, input_mask)
                 if not face_shape_match:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50], ["color", input_image, 0.85]]
-                        if ip_adapter_control:
-                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
+                        if ipa_control:
+                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ipa_weight])
                     else:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
-                        if ip_adapter_control:
-                            controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight])
+                        if ipa_control:
+                            controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
                     first_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
                 else:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
-                        if ip_adapter_control:
-                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ip_adapter_weight])
+                        if ipa_control:
+                            controlnet_pairs.append(["ipa_full_face", ipa_image_face, ipa_weight])
                     else:
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
-                        if ip_adapter_control:
-                            controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight])
+                        if ipa_control:
+                            controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
                     first_diffusion_output_image = inpaint(input_image, None, controlnet_pairs, diffusion_steps=first_diffusion_steps, denoising_strength=first_denoising_strength, input_prompt=input_prompts[index], hr_scale=1.0, seed=str(seed))
 
                     # detect face area
@@ -999,12 +1069,12 @@ def easyphoto_infer_forward(
                 ep_logger.info("Start Second diffusion.")
                 if not sdxl_pipeline_flag:
                     controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
-                    if ip_adapter_control:
-                        controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ip_adapter_weight]]
+                    if ipa_control:
+                        controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ipa_weight]]
                 else:
                     controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
-                    if ip_adapter_control:
-                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ip_adapter_weight]]
+                    if ipa_control:
+                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
 
                 second_diffusion_output_image = inpaint(input_image, input_mask, controlnet_pairs, input_prompts[index], diffusion_steps=second_diffusion_steps, denoising_strength=second_denoising_strength, hr_scale=default_hr_scale, seed=str(seed))
 
@@ -1078,7 +1148,7 @@ def easyphoto_infer_forward(
                     roop_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(roop_images[index]))))[OutputKeys.IMG_EMBEDDING]
                     loop_output_image_faceid = np.dot(embedding, np.transpose(roop_image_embedding))[0][0]
                     face_id_outputs.append((roop_images[index], "{:.2f}, {}, the reference image".format(loop_output_image_faceid, user_ids[index])))
-                    if ip_adapter_control:
+                    if ipa_control and user_ids[index] != "ipa_control_only":
                         ipa_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(ipa_images[index]))))[OutputKeys.IMG_EMBEDDING]
                         ipa_image_faceid = np.dot(embedding, np.transpose(ipa_image_embedding))[0][0]
                         face_id_outputs.append((ipa_images[index], "{:.2f}, {}, the image prompt".format(ipa_image_faceid, user_ids[index])))

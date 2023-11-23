@@ -239,7 +239,7 @@ def on_ui_tabs():
                                     value=False
                                 )
                                 skin_retouching_bool = gr.Checkbox(
-                                    label="Skin Retouching",
+                                    label="Train Skin Retouching",
                                     value=True
                                 )
                             
@@ -285,7 +285,7 @@ def on_ui_tabs():
                             - **max train steps** represents the maximum training step.
                             - **Validation** Whether to validate at training time.
                             - **Final training step** = Min(photo_num * max_steps_per_photos, max_train_steps).
-                            - **Skin retouching** Whether to use skin retouching to preprocess training data face
+                            - **Train Skin retouching** Whether to use skin retouching to preprocess training data face
                             '''
                         )
                         scene_train_notes = gr.Markdown(
@@ -308,9 +308,9 @@ def on_ui_tabs():
 
                 with gr.Row():
                     with gr.Column(width=3):
-                        run_button = gr.Button('Start Training')
+                        run_button = gr.Button('Start Training', variant='primary')
                     with gr.Column(width=1):
-                        refresh_button = gr.Button('Refresh Log')
+                        refresh_button = gr.Button('Refresh Log', variant='primary')
 
                 gr.Markdown(
                     '''
@@ -496,7 +496,7 @@ def on_ui_tabs():
                         upload_way.change(generate_tabs, [model_selected_tab, upload_way], state_tab)
                         
                         with gr.Row():
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", interactive=True, visible=True)
+                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use. (Please keep it same with the checkpoint in the upper left corner for faster speed.)", interactive=True, visible=True)
 
                             checkpoint_refresh = ToolButton(value="\U0001f504")
                             checkpoint_refresh.click(
@@ -506,20 +506,9 @@ def on_ui_tabs():
                             )
 
                         with gr.Row():
-                            infer_note = gr.Markdown(
-                                value = "For faster speed, keep the same with Stable Diffusion checkpoint (in the upper left corner).",
-                                visible=True
-                            )
-                        
-                            def update_infer_note(sd_model_checkpoint):
-                                # shared.opts.sd_model_checkpoint has a hash tag like "sd_xl_base_1.0.safetensors [31e35c80fc]".
-                                if shared.opts.sd_model_checkpoint is not None and sd_model_checkpoint == shared.opts.sd_model_checkpoint.split(" ")[0]:
-                                    return gr.Markdown.update(visible=False)
-                                return gr.Markdown.update(visible=True)
-                            
-                            sd_model_checkpoint.change(fn=update_infer_note, inputs=sd_model_checkpoint, outputs=[infer_note])
+                            ref_mode_choose = gr.Radio(["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)"], value="Infer with Pretrained Lora", show_label=False)
 
-                        with gr.Row():
+                        with gr.Row() as uid_and_refresh:
                             def select_function():
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
@@ -563,6 +552,11 @@ def on_ui_tabs():
                                     inputs=[],
                                     outputs=[uuids[i]]
                                 )
+
+                        with gr.Row(visible=False) as ipa_only_row:
+                            with gr.Column():
+                                ipa_only_image_path = gr.Image(label="Image Prompt for IP-Adapter Only", show_label=True, source="upload", type="filepath")
+                                ipa_only_weight = gr.Slider(minimum=0.10, maximum=1.00, value=0.60, step=0.05, label="IP-Adapter Only Control Weight",)
 
                         with gr.Accordion("Advanced Options", open=False):
                             additional_prompt = gr.Textbox(
@@ -631,8 +625,8 @@ def on_ui_tabs():
                                 )
                             with gr.Row():
                                 skin_retouching_bool = gr.Checkbox(
-                                    label="Skin Retouching",  
-                                    value=True
+                                    label="Photo Skin Retouching",  
+                                    value=False
                                 )
                                 background_restore = gr.Checkbox(
                                     label="Background Restore",  
@@ -647,7 +641,7 @@ def on_ui_tabs():
                                     label="Display Face Similarity Scores",  
                                     value=False
                                 )
-                                ip_adapter_control = gr.Checkbox(
+                                ipa_control = gr.Checkbox(
                                     label="IP-Adapter Control",
                                     value=False
                                 )
@@ -656,27 +650,37 @@ def on_ui_tabs():
                                     value=False
                                 )
 
-                                def ipa_update_score(ip_adapter_control, display_score):
-                                    if not display_score and ip_adapter_control:
-                                        return gr.Checkbox.update(value=True)
-                                    return gr.Checkbox.update(value=display_score)
+                                def ipa_update_score(ipa_control):
+                                    if ipa_control:
+                                        return gr.update(value=True)
+                                    return gr.update(visible=True)
                                 
-                                def update_score(ip_adapter_control, display_score):
-                                    if ip_adapter_control:
-                                        return gr.Checkbox.update(value=True)
-                                    return gr.Checkbox.update(value=display_score)
+                                def update_score(ipa_control, ref_mode_choose, display_score):
+                                    if ipa_control or ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+                                        return gr.update(value=True)
+                                    return gr.update(value=display_score)
+                                
+                                def use_ipa_only(ref_mode_choose):
+                                    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+                                        return gr.update(value=True), gr.update(value=False, visible=False), gr.update(visible=False), gr.update(visible=True)
+                                    return gr.update(visible=True), gr.update(value=False, visible=True), gr.update(visible=True), gr.update(visible=False)
                                 
                                 # We need to make sure that Display Similarity Score is mandatory when the user
                                 # selects IP-Adapter Control. Otherwise, it is not.
-                                ip_adapter_control.change(
+                                ipa_control.change(
                                     ipa_update_score,
-                                    inputs=[ip_adapter_control, display_score],
+                                    inputs=[ipa_control],
                                     outputs=[display_score]
                                 )
                                 display_score.change(
                                     update_score,
-                                    inputs=[ip_adapter_control, display_score],
+                                    inputs=[ipa_control, ref_mode_choose, display_score],
                                     outputs=[display_score]
+                                )
+                                ref_mode_choose.change(
+                                    use_ipa_only,
+                                    inputs=[ref_mode_choose],
+                                    outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row]
                                 )
 
                             with gr.Row():
@@ -694,7 +698,7 @@ def on_ui_tabs():
                                     step=0.05, label='Makeup Transfer Ratio',
                                     visible=False
                                 )
-                                ip_adapter_weight = gr.Slider(
+                                ipa_weight = gr.Slider(
                                     minimum=0.10, maximum=1.00, value=0.50,
                                     step=0.05, label="IP-Adapter Control Weight",
                                     visible=False
@@ -703,7 +707,7 @@ def on_ui_tabs():
                                 super_resolution.change(lambda x: super_resolution_method.update(visible=x), inputs=[super_resolution], outputs=[super_resolution_method])
                                 background_restore.change(lambda x: background_restore_denoising_strength.update(visible=x), inputs=[background_restore], outputs=[background_restore_denoising_strength])
                                 makeup_transfer.change(lambda x: makeup_transfer_ratio.update(visible=x), inputs=[makeup_transfer], outputs=[makeup_transfer_ratio])
-                                ip_adapter_control.change(lambda x: ip_adapter_weight.update(visible=x), inputs=[ip_adapter_control], outputs=[ip_adapter_weight])
+                                ipa_control.change(lambda x: ipa_weight.update(visible=x), inputs=[ipa_control], outputs=[ipa_weight])
                             
                             ipa_note = gr.Markdown(
                                 value = '''
@@ -715,8 +719,8 @@ def on_ui_tabs():
                             )
                             with gr.Row():
                                 ipa_image_path = gr.Image(label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath", visible=False)
-                            ip_adapter_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_image_path])
-                            ip_adapter_control.change(lambda x: ipa_note.update(visible=x), inputs=[ip_adapter_control], outputs=[ipa_note])
+                            ipa_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path])
+                            ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
 
                             with gr.Box():
                                 gr.Markdown(
@@ -727,15 +731,14 @@ def on_ui_tabs():
                                     3. **Crop Face Preprocess** represents whether to crop the image before generation, which can adapt to images with smaller faces.  
                                     4. **Apply Face Fusion Before** represents whether to perform the first facial fusion.  
                                     5. **Apply Face Fusion After** represents whether to perform the second facial fusion. 
-                                    6. **Skin Retouching** Whether to use skin retouching to postprocess generate face.
+                                    6. **Photo Skin Retouching** Whether to use skin retouching to postprocess generate face.
                                     7. **Display Face Similarity Scores** represents whether to compute the face similarity score of the generated image with the ID photo.
                                     8. **Background Restore** represents whether to give a different background.
                                     '''
                                 )
                             
-                        display_button = gr.Button('Start Generation')
-
                     with gr.Column():
+
                         gr.Markdown('Generated Results')
 
                         output_images = gr.Gallery(
@@ -757,6 +760,7 @@ def on_ui_tabs():
                                 paste_field_names=[]
                             ))
 
+                        display_button = gr.Button('Start Generation', variant='primary')
 
                         face_id_text    = gr.Markdown("Face Similarity Scores", visible=False)
                         face_id_outputs = gr.Gallery(
@@ -783,7 +787,7 @@ def on_ui_tabs():
                         first_diffusion_steps, first_denoising_strength, second_diffusion_steps, second_denoising_strength, \
                         seed, crop_face_preprocess, apply_face_fusion_before, apply_face_fusion_after, color_shift_middle, color_shift_last, super_resolution, super_resolution_method, skin_retouching_bool, display_score, \
                         background_restore, background_restore_denoising_strength, makeup_transfer, makeup_transfer_ratio, face_shape_match, state_tab, \
-                        ip_adapter_control, ip_adapter_weight, ipa_image_path, *uuids
+                        ipa_control, ipa_weight, ipa_image_path, ref_mode_choose, ipa_only_weight, ipa_only_image_path, *uuids
                     ],
                     outputs=[infer_progress, output_images, face_id_outputs]
                 )
@@ -1055,8 +1059,6 @@ def on_ui_tabs():
                                         '''
                                     )
                                 
-                            display_button = gr.Button('Start Generation')
-
                         with gr.Column():
                             gr.Markdown('Generated Results')
 
@@ -1068,19 +1070,14 @@ def on_ui_tabs():
                                     return [gr.update(visible=True), gr.update(visible=False)]
                                 else:
                                     return [gr.update(visible=False), gr.update(visible=True)]
-                                
                             save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
-                                    
-                            output_images = gr.Gallery(
-                                label='Output Frames',
-                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
-                            infer_progress = gr.Textbox(
-                                label="Generation Progress",
-                                value="No task currently",
-                                interactive=False
-                            )
+                            display_button = gr.Button('Start Generation', variant='primary')
                             with gr.Row():
+                                save = gr.Button('List Recent Conversion Results', elem_id=f'save')
+                                download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+                                download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
+
                                 def save_video():
                                     origin_path = os.path.join(easyphoto_video_outpath_samples, "origin")
                                     crop_path = os.path.join(easyphoto_video_outpath_samples, "crop")
@@ -1106,11 +1103,19 @@ def on_ui_tabs():
                                                 continue
                                     return gr.File.update(value=video_path, visible=True), gr.File.update(value=video_crop_path, visible=True)
 
-                                save = gr.Button('List Recent Conversion Results', elem_id=f'save')
-                                download_origin_files = gr.File(None, label='Download Files For Origin Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
-                                download_crop_files = gr.File(None, label='Download Files For Cropped Video', file_count="multiple", interactive=False, show_label=True, visible=False, elem_id=f'download_files')
                                 save.click(fn=save_video, inputs=None, outputs=[download_origin_files, download_crop_files], show_progress=False)
                         
+                            output_images = gr.Gallery(
+                                label='Output Frames',
+                            ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                            infer_progress = gr.Textbox(
+                                label="Generation Progress",
+                                value="No task currently",
+                                interactive=False
+                            )
+                    
+
                     display_button.click(
                         fn=easyphoto_video_infer_forward,
                         inputs=[sd_model_checkpoint, sd_model_checkpoint_for_animatediff_text2video, sd_model_checkpoint_for_animatediff_image2video, \
