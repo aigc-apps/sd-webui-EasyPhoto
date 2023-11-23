@@ -239,7 +239,7 @@ def on_ui_tabs():
                                     value=False
                                 )
                                 skin_retouching_bool = gr.Checkbox(
-                                    label="Skin Retouching",
+                                    label="Train Skin Retouching",
                                     value=False
                                 )
                             
@@ -625,8 +625,8 @@ def on_ui_tabs():
                                 )
                             with gr.Row():
                                 skin_retouching_bool = gr.Checkbox(
-                                    label="Skin Retouching",  
-                                    value=True
+                                    label="Photo Skin Retouching",  
+                                    value=False
                                 )
                                 background_restore = gr.Checkbox(
                                     label="Background Restore",  
