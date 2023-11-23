@@ -383,7 +383,8 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = [True, True, True, True, True, True]
+# base portrait sdxl add_text2image add_ipa_base add_ipa_sdxl add_video add_tryon
+check_hash = [True, True, True, True, True, True, True, True]
 sdxl_txt2img_flag = False
 
 # this decorate is default to be closed, not every needs this, more for developers
@@ -405,9 +406,11 @@ def easyphoto_infer_forward(
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash[0], download_mode="base")
+    check_files_exists_and_download(check_hash[1], download_mode="portrait")
     if check_hash[0]:
         refresh_model_vae()
     check_hash[0] = False
+    check_hash[1] = False
 
     # check the checkpoint_type of sd_model_checkpoint
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
@@ -417,29 +420,29 @@ def easyphoto_infer_forward(
 
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
-        check_files_exists_and_download(check_hash[1], download_mode="sdxl")
-        if check_hash[1]:
-            refresh_model_vae()
-        check_hash[1] = False
-    if tabs == 3:
-        check_files_exists_and_download(
-            check_hash[2], download_mode="add_text2image")
+        check_files_exists_and_download(check_hash[2], download_mode="sdxl")
         if check_hash[2]:
             refresh_model_vae()
         check_hash[2] = False
+    if tabs == 3:
+        check_files_exists_and_download(
+            check_hash[3], download_mode="add_text2image")
+        if check_hash[3]:
+            refresh_model_vae()
+        check_hash[3] = False
     if ip_adapter_control:
         if not sdxl_pipeline_flag:
             check_files_exists_and_download(
-                check_hash[3], download_mode="add_ipa_base")
-            if check_hash[3]:
-                refresh_model_vae()
-            check_hash[3] = False
-        else:
-            check_files_exists_and_download(
-                check_hash[4], download_mode="add_ipa_sdxl")
+                check_hash[4], download_mode="add_ipa_base")
             if check_hash[4]:
                 refresh_model_vae()
             check_hash[4] = False
+        else:
+            check_files_exists_and_download(
+                check_hash[5], download_mode="add_ipa_sdxl")
+            if check_hash[5]:
+                refresh_model_vae()
+            check_hash[5] = False
 
     # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
@@ -1498,10 +1501,10 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[5], "add_video")
-    if check_hash[5]:
+    check_files_exists_and_download(check_hash[6], "add_video")
+    if check_hash[6]:
         refresh_model_vae()
-    check_hash[5] = False
+    check_hash[6] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     checkpoint_type_text2video = get_checkpoint_type(

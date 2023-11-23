@@ -1446,10 +1446,6 @@ def on_ui_tabs():
                                         label="Refine Boundary",
                                         value=True
                                     )
-                                    pure_image = gr.Checkbox(
-                                        label="Pure Image",
-                                        value=True
-                                    )
 
                             gr.Markdown(
                                 '''
@@ -1550,7 +1546,7 @@ def on_ui_tabs():
                                        inputs=[
                                            sd_model_checkpoint, template_image_tryon, selected_cloth_template_images, main_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength,
                                            lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound,
-                                           pure_image, ref_image_selected_tab, cloth_uuid, max_train_steps
+                                           ref_image_selected_tab, cloth_uuid, max_train_steps
                                        ],
                                        outputs=[infer_progress, tryon_output_images])
 

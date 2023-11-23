@@ -52,33 +52,43 @@ if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_builtin_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
 else:
     controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
 
 download_urls = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
     "base": [
         # base model
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors", 
+
         # controlnets
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
+       
+        # vaes
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt"   
+    ],
+    "portrait":[
+        # controlnet
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
+
         # loras
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
         # controlnet annotator
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
-        # vaes
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
+
         # other models
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
@@ -124,6 +134,14 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
     ],
 
+    "add_tryon": [
+        # controlnets
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/dpt_hybrid-midas-501f0c75.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1p_sd15_depth.pth",
+
+        # sam
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sam_vit_l_0b3195.pth",
+    ],
     # Scene Lora Collection
     "Christmas_1": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors",
@@ -176,23 +194,32 @@ save_filenames = {
     "base": [
         # base model
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
+
+        # controlnets
+        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
+
+        # vaes
+        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),  
+    ],
+    "portrait": [
         # controlnets
         [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
-        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
         [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
         [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
+
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
+        
         # controlnet annotator
         os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
         os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
-        # vaes
-        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
+
         # other models
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
+
         # templates
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
@@ -231,8 +258,12 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
-    ], 
-
+    ],
+    "add_tryon": [
+        os.path.join(controlnet_depth_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
+        os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "sam_vit_l_0b3195.pth"),
+    ],
     # Scene Lora Collection
     "Christmas_1": [
        os.path.join(models_path, f"Lora/Christmas_1.safetensors"),
@@ -339,56 +370,6 @@ def check_files_exists_and_download(check_hash, download_mode="base"):
         ep_logger.info(f"Start Downloading: {url}")
         os.makedirs(os.path.dirname(filename[0]), exist_ok=True)
         urldownload_progressbar(url, filename[0])
-
-
-def check_tryon_files_exists_and_download(check_hash):
-    controlnet_extensions_path          = os.path.join(data_path, "extensions", "sd-webui-controlnet")
-    controlnet_extensions_builtin_path  = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
-    models_annotator_path               = os.path.join(data_path, "models")
-    
-    if os.path.exists(controlnet_extensions_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-    elif os.path.exists(controlnet_extensions_builtin_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-    else:
-        controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-
-    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
-    urls        = [
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/Chilloutmix-Ni-pruned-fp16-fix.safetensors", 
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11p_sd15_canny.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/dpt_hybrid-midas-501f0c75.pt",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11f1p_sd15_depth.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/sam_vit_l_0b3195.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/clip_h.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/ip-adapter_sd15.pth"
-    ]
-
-    filenames = [
-        os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
-        os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
-        os.path.join(controlnet_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
-        os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "sam_vit_l_0b3195.pth"),
-        os.path.join(controlnet_annotator_cache_path_ipa, f"clip_h.pth"),
-        os.path.join(models_path, f"ControlNet/ip-adapter_sd15.pth"),
-    ]
-
-    # This print will introduce some misundertand
-    # print("Start Downloading weights")
-    for url, filename in zip(urls, filenames):
-        if not check_hash:
-            if os.path.exists(filename):
-                continue
-        else:
-            if os.path.exists(filename) and compare_hasd_link_file(url, filename):
-                continue
-        print(f"Start Downloading: {url}")
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        urldownload_progressbar(url, filename)
        
 
 # Calculate the hash value of the download link and downloaded_file by sha256

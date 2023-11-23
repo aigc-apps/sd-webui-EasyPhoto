@@ -24,7 +24,7 @@ from scripts.easyphoto_config import (CLOTH_LORA_PREFIX, cache_log_file_path,
                                       easyphoto_outpath_samples,
                                       validation_tryon_prompt)
 from scripts.easyphoto_infer import inpaint
-from scripts.easyphoto_tryon_process_utils import (align_and_overlay_images,
+from scripts.tryon_process_utils import (align_and_overlay_images,
                                                    apply_mask_to_image,
                                                    compute_rotation_angle,
                                                    copy_white_mask_to_template,
@@ -40,26 +40,29 @@ from scripts.easyphoto_tryon_process_utils import (align_and_overlay_images,
                                                    resize_and_stretch,
                                                    resize_image_with_pad,
                                                    seg_by_box)
-from scripts.easyphoto_utils import check_tryon_files_exists_and_download
+from scripts.easyphoto_utils import check_files_exists_and_download
 from scripts.sdwebui import get_checkpoint_type, switch_sd_model_vae, reload_sd_model_vae
 from segment_anything import SamPredictor, sam_model_registry
 
 python_executable_path = sys.executable
-check_hash = True
+# base portrait sdxl add_text2image add_ipa_base add_ipa_sdxl add_video add_tryon
+check_hash = [True, True, True, True, True, True, True, True]
 
 @switch_sd_model_vae()
 def easyphoto_tryon_infer_forward(
     sd_model_checkpoint, template_image, selected_cloth_template_images, input_ref_img_path, additional_prompt, seed, first_diffusion_steps,
     first_denoising_strength, lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound,
-    pure_image, ref_image_selected_tab, cloth_uuid, max_train_steps
+    ref_image_selected_tab, cloth_uuid, max_train_steps
 ):
     global check_hash
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint,"vae-ft-mse-840000-ema-pruned.ckpt")
 
     # check input
-    check_tryon_files_exists_and_download(check_hash)
-    check_hash = False
+    check_files_exists_and_download(check_hash[0], "base")
+    check_files_exists_and_download(check_hash[7], "add_tryon")
+    check_hash[0] = False
+    check_hash[7] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2 or checkpoint_type == 3:
@@ -340,37 +343,12 @@ def easyphoto_tryon_infer_forward(
         box_template, ratio=expand_ratio, max_box=[0, 0, W, H])
 
     # Step2: prepare background image for paste
-    if pure_image:
-        # main background with most frequent color
-        color = get_background_color(img_ref, mask_ref[:, :, 0])
-        color_img = np.full(
-            (img_template.shape[0], img_template.shape[1], 3), color, dtype=np.uint8)
-        background_img = apply_mask_to_image(
-            color_img, img_template, mask_template)
-    else:
-        # generate background_image with ipa (referenced img_ref)
-        controlnet_pairs = [
-            ["ipa", img_ref, 2.0],
-            ["depth", img_template, 1.0],
-        ]
-
-        background_diffusion_steps = 20
-        background_denoising_strength = 0.8
-        background_img = inpaint(
-            Image.fromarray(np.uint8(img_template)),
-            Image.fromarray(np.uint8(mask_template)),
-            controlnet_pairs,
-            diffusion_steps=background_diffusion_steps,
-            denoising_strength=background_denoising_strength,
-            input_prompt=input_prompt,
-            hr_scale=1.0,
-            seed=str(seed),
-            sd_model_checkpoint=sd_model_checkpoint,
-        )
-
-        background_img = background_img.resize(
-            (img_template.shape[1], img_template.shape[0]), Image.Resampling.LANCZOS)
-        background_img = np.array(background_img)
+    # main background with most frequent color
+    color = get_background_color(img_ref, mask_ref[:, :, 0])
+    color_img = np.full(
+        (img_template.shape[0], img_template.shape[1], 3), color, dtype=np.uint8)
+    background_img = apply_mask_to_image(
+        color_img, img_template, mask_template)
 
     # Step3: optimize match and paste
     if azimuth != 0:
