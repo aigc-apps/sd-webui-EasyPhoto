@@ -639,15 +639,11 @@ def easyphoto_infer_forward(
         elif user_id == "ipa_control_only":
             # get prompt
             input_prompt = f"1person, face, portrait, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+        
+            ipa_image = Image.open(ipa_image_paths[index])
+            ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
             
-            face_id_image = Image.open(ipa_image_path).convert("RGB")
-            roop_image = Image.open(ipa_image_path).convert("RGB")
-
-            if ipa_image_paths[index] != "none":
-                ipa_image = Image.open(ipa_image_paths[index])
-                ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
-            else:
-                ipa_image = copy.deepcopy(roop_image)
+            roop_image = ipa_image
 
             _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(retinaface_detection, ipa_image, 1.05, "crop")
             if len(_ipa_retinaface_boxes) == 0:
