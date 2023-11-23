@@ -1,0 +1,39 @@
+repos:
+  - repo: https://github.com/PyCQA/flake8
+    rev: 3.8.3
+    hooks:
+      - id: flake8
+        exclude: scripts/animatediff/|models/
+
+  - repo: https://github.com/timothycrosley/isort
+    rev: 4.3.21
+    hooks:
+      - id: isort
+        exclude: scripts/animatediff/|models/
+
+  - repo: https://github.com/pre-commit/mirrors-yapf
+    rev: v0.30.0
+    hooks:
+      - id: yapf
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.1.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: scripts/animatediff/|models/
+      - id: check-yaml
+        exclude: scripts/animatediff/|models/
+      - id: end-of-file-fixer
+        exclude: scripts/animatediff/|models/
+      - id: requirements-txt-fixer
+        exclude: scripts/animatediff/|models/
+      - id: double-quote-string-fixer
+        exclude: scripts/animatediff/|models/
+      - id: check-merge-conflict
+        exclude: scripts/animatediff/|models/
+      - id: fix-encoding-pragma
+        exclude: scripts/animatediff/|models/
+        args: ["--remove"]
+      - id: mixed-line-ending
+        exclude: scripts/animatediff/|models/
+        args: ["--fix=lf"]
