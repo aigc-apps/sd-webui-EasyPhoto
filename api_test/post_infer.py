@@ -45,7 +45,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "super_resolution"          : True,
         "super_resolution_method"   : "gpen",
 
-        "skin_retouching_bool"      : True,
+        "skin_retouching_bool"      : False,
 
         "background_restore"        : False,
         "background_restore_denoising_strength" : 0.35,
@@ -55,7 +55,7 @@ def post(encoded_image, user_id=None, url='http://0.0.0.0:7860'):
         "face_shape_match"          : False,
         "tabs"                      : 1,
 
-        "ipa_control"               : True,
+        "ipa_control"               : False,
         "ipa_weight"                : 0.50,
         "ipa_image"                 : None,
 
