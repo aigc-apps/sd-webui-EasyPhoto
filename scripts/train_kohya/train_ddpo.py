@@ -20,12 +20,7 @@ import tqdm
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
-from diffusers import (
-    DDIMScheduler,
-    DDPMScheduler,
-    StableDiffusionPipeline,
-    UNet2DConditionModel,
-)
+from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.utils import is_wandb_available
@@ -75,8 +70,7 @@ def parse_args():
         "--run_name",
         type=str,
         default="",
-        help="The run name (needed to be unique) for wandb logging and checkpoint saving "
-        "if not provided, will be auto-generated based on the datetime.",
+        help="The run name (needed to be unique) for wandb logging and checkpoint saving " "if not provided, will be auto-generated based on the datetime.",
     )
     parser.add_argument("--seed", type=int, default=42, help="A seed for reproducible training.")
     parser.add_argument(
@@ -95,8 +89,7 @@ def parse_args():
         "--num_epochs",
         type=int,
         default=200,
-        help="Number of epochs to train for. Each epoch is one round of sampling from the model "
-        "followed by training on those samples.",
+        help="Number of epochs to train for. Each epoch is one round of sampling from the model " "followed by training on those samples.",
     )
     parser.add_argument("--save_freq", type=int, default=20, help="Number of epochs between saving model checkpoints.")
     parser.add_argument(
@@ -110,27 +103,18 @@ def parse_args():
         type=str,
         default="fp16",
         choices=["no", "fp16", "bf16"],
-        help=(
-            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
-            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
-            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
-        ),
+        help=("Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >=" " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the" " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."),
     )
     parser.add_argument(
         "--allow_tf32",
         action="store_true",
-        help=(
-            "Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see"
-            " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
-        ),
+        help=("Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see" " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"),
     )
     parser.add_argument(
         "--resume_from",
         type=str,
         default="",
-        help="Resume training from a checkpoint. either an exact checkpoint directory (e.g. checkpoint_50), "
-        "or a directory containing checkpoints, in which case the latest one will be used. "
-        "`args.use_lora` must be set to the same value as the run that generated the saved checkpoint.",
+        help="Resume training from a checkpoint. either an exact checkpoint directory (e.g. checkpoint_50), " "or a directory containing checkpoints, in which case the latest one will be used. " "`args.use_lora` must be set to the same value as the run that generated the saved checkpoint.",
     )
 
     # Sampling
@@ -140,9 +124,7 @@ def parse_args():
         default=50,
         help="Number of sampler inference steps.",
     )
-    parser.add_argument(
-        "--sample_guidance_scale", type=int, default=5, help="A guidance_scale during training for sampling."
-    )
+    parser.add_argument("--sample_guidance_scale", type=int, default=5, help="A guidance_scale during training for sampling.")
     parser.add_argument(
         "--sample_eta",
         type=float,
@@ -159,17 +141,11 @@ def parse_args():
         "--sample_num_batches_per_epoch",
         type=int,
         default=2,
-        help="Number of batches to sample per epoch. The total number of samples per epoch is "
-        "`sample_num_batches_per_epoch * sample_batch_size * num_gpus.`",
+        help="Number of batches to sample per epoch. The total number of samples per epoch is " "`sample_num_batches_per_epoch * sample_batch_size * num_gpus.`",
     )
 
+    parser.add_argument("--pretrained_model_name_or_path", type=str, required=True, help="Path to pretrained model or model identifier from huggingface.co/models. (SD base model config.)")
     parser.add_argument(
-        "--pretrained_model_name_or_path",
-        type=str,
-        required=True,
-        help="Path to pretrained model or model identifier from huggingface.co/models. (SD base model config.)"
-    )
-    parser.add_argument( 
         "--pretrained_model_ckpt",
         type=str,
         required=True,
@@ -204,12 +180,9 @@ def parse_args():
         "--train_batch_size",
         type=int,
         default=1,
-        help="Number of epochs to train for. Each epoch is one round of sampling from the model "
-        "followed by training on those samples.",
+        help="Number of epochs to train for. Each epoch is one round of sampling from the model " "followed by training on those samples.",
     )
-    parser.add_argument(
-        "--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes."
-    )
+    parser.add_argument("--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes.")
     parser.add_argument(
         "--learning_rate",
         type=float,
@@ -231,14 +204,12 @@ def parse_args():
         "--num_inner_epochs",
         type=int,
         default=1,
-        help="Number of inner epochs per outer epoch. Each inner epoch is one iteration "
-        "through the data collected during one outer epoch's round of sampling.",
+        help="Number of inner epochs per outer epoch. Each inner epoch is one iteration " "through the data collected during one outer epoch's round of sampling.",
     )
     parser.add_argument(
         "--cfg",
         action="store_true",
-        help="Whether or not to use classifier-free guidance during training. if enabled, the same guidance "
-        "scale used during sampling will be used during training.",
+        help="Whether or not to use classifier-free guidance during training. if enabled, the same guidance " "scale used during sampling will be used during training.",
     )
     parser.add_argument(
         "--adv_clip_max",
@@ -256,8 +227,7 @@ def parse_args():
         "--timestep_fraction",
         type=float,
         default=1.0,
-        help="The fraction of timesteps to train on. If set to less than 1.0, the model will be trained on a subset of the "
-        "timesteps for each sample. this will speed up training but reduce the accuracy of policy gradient estimates.",
+        help="The fraction of timesteps to train on. If set to less than 1.0, the model will be trained on a subset of the " "timesteps for each sample. this will speed up training but reduce the accuracy of policy gradient estimates.",
     )
 
     # Prompt Function and Reward Function
@@ -296,8 +266,7 @@ def parse_args():
         "--per_prompt_stat_tracking_min_count",
         type=int,
         default=16,
-        help="The minimum number of reward values to store in the buffer before using the per-prompt mean and std. "
-        "If the buffer contains fewer than `min_count` values, the mean and std of the entire batch will be used.",
+        help="The minimum number of reward values to store in the buffer before using the per-prompt mean and std. " "If the buffer contains fewer than `min_count` values, the mean and std of the entire batch will be used.",
     )
 
     parser.add_argument(
@@ -305,10 +274,7 @@ def parse_args():
         type=str,
         default="tensorboard",
         choices=["tensorboard", "wandb"],
-        help=(
-            'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
-            ' (default) and `"wandb"`.'
-        ),
+        help=('The integration to report the results and logs to. Supported platforms are `"tensorboard"`' ' (default) and `"wandb"`.'),
     )
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
 
@@ -322,7 +288,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    
+
     unique_id = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
     if not args.run_name:
         args.run_name = unique_id
@@ -369,11 +335,7 @@ def main():
 
     if accelerator.is_main_process:
         if args.report_to == "wandb":
-            accelerator.init_trackers(
-                project_name="EasyPhoto-ddpo-pytorch",
-                config=vars(args),
-                init_kwargs={"wandb": {"dir": args.logdir, "name": args.run_name}}
-            )
+            accelerator.init_trackers(project_name="EasyPhoto-ddpo-pytorch", config=vars(args), init_kwargs={"wandb": {"dir": args.logdir, "name": args.run_name}})
         else:
             accelerator.init_trackers("EasyPhoto-ddpo-pytorch", config=vars(args))
 
@@ -384,7 +346,7 @@ def main():
         level=logging.INFO,
     )
     logger.info(accelerator.state, main_process_only=False)
-    logger.info("\n".join(f'{k}: {v}' for k, v in vars(args).items()))
+    logger.info("\n".join(f"{k}: {v}" for k, v in vars(args).items()))
 
     # set seed (device_specific is very important to get different prompts on different devices)
     set_seed(args.seed, device_specific=True)
@@ -440,9 +402,7 @@ def main():
         # Set correct lora layers
         lora_attn_procs = {}
         for name in pipeline.unet.attn_processors.keys():
-            cross_attention_dim = (
-                None if name.endswith("attn1.processor") else pipeline.unet.config.cross_attention_dim
-            )
+            cross_attention_dim = None if name.endswith("attn1.processor") else pipeline.unet.config.cross_attention_dim
             if name.startswith("mid_block"):
                 hidden_size = pipeline.unet.config.block_out_channels[-1]
             elif name.startswith("up_blocks"):
@@ -452,9 +412,7 @@ def main():
                 block_id = int(name[len("down_blocks.")])
                 hidden_size = pipeline.unet.config.block_out_channels[block_id]
 
-            lora_attn_procs[name] = LoRAAttnProcessor(
-                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=args.rank
-            )
+            lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=args.rank)
         pipeline.unet.set_attn_processor(lora_attn_procs)
         trainable_layers = AttnProcsLayers(pipeline.unet.attn_processors)
     else:
@@ -479,9 +437,7 @@ def main():
         assert len(models) == 1
         if args.use_lora and isinstance(models[0], AttnProcsLayers):
             # pipeline.unet.load_attn_procs(input_dir)
-            tmp_unet = UNet2DConditionModel.from_pretrained(
-                args.pretrained.model, revision=args.pretrained.revision, subfolder="unet", use_safetensors=False
-            )
+            tmp_unet = UNet2DConditionModel.from_pretrained(args.pretrained.model, revision=args.pretrained.revision, subfolder="unet", use_safetensors=False)
             tmp_unet.load_attn_procs(input_dir)
             models[0].load_state_dict(AttnProcsLayers(tmp_unet.attn_processors).state_dict())
             del tmp_unet
@@ -507,9 +463,7 @@ def main():
         try:
             import bitsandbytes as bnb
         except ImportError:
-            raise ImportError(
-                "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
-            )
+            raise ImportError("Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`")
 
         optimizer_cls = bnb.optim.AdamW8bit
     else:
@@ -527,17 +481,11 @@ def main():
     if hasattr(ddpo_pytorch.prompts, args.prompt_fn):
         prompt_fn = getattr(ddpo_pytorch.prompts, args.prompt_fn)
     else:
-        raise ValueError(
-            "Prompt function {} is not defined in {}/ddpo_pytorch/prompts.py."
-            "".format(args.prompt_fn, os.path.abspath(__file__))
-        )
+        raise ValueError("Prompt function {} is not defined in {}/ddpo_pytorch/prompts.py." "".format(args.prompt_fn, os.path.abspath(__file__)))
     if hasattr(ddpo_pytorch.rewards, args.reward_fn):
         reward_fn = getattr(ddpo_pytorch.rewards, args.reward_fn)(target_image_dir=args.target_image_dir)
     else:
-        raise ValueError(
-            "Reward function {} is not defined in {}/ddpo_pytorch/rewards.py"
-            "".format(args.reward_fn, os.path.abspath(__file__))
-        )
+        raise ValueError("Reward function {} is not defined in {}/ddpo_pytorch/rewards.py" "".format(args.reward_fn, os.path.abspath(__file__)))
 
     # generate negative prompt embeddings
     neg_prompt_embed = pipeline.text_encoder(
@@ -591,15 +539,15 @@ def main():
         first_epoch = int(args.resume_from.split("_")[-1]) + 1
     else:
         first_epoch = 0
-    
+
     user_id = os.path.basename(os.path.dirname(args.logdir))
     # check log path
     if accelerator.is_main_process:
-        output_log = open(args.cache_log_file, 'w')
+        output_log = open(args.cache_log_file, "w")
 
     global_step = 0
     for epoch in range(first_epoch, args.num_epochs):
-        #################### SAMPLING ####################
+        # SAMPLING
         pipeline.unet.eval()
         samples = []
         prompts = []
@@ -674,8 +622,7 @@ def main():
             step=global_step,
         )
         time_info = str(time.asctime(time.localtime(time.time())))
-        log_line = "{}: reinforcement learning of {} at step {}. The mean and std of face similarity score " \
-            "is {:.4f} and {:.4f}.\n".format(time_info, user_id, global_step, rewards.mean(), rewards.std())
+        log_line = "{}: reinforcement learning of {} at step {}. The mean and std of face similarity score " "is {:.4f} and {:.4f}.\n".format(time_info, user_id, global_step, rewards.mean(), rewards.std())
         reward_mean_list.append(rewards.mean())
         reward_std_list.append(rewards.std())
         if accelerator.is_main_process:
@@ -692,10 +639,7 @@ def main():
                     pil.save(os.path.join(tmpdir, f"{i}.jpg"))
                 accelerator.log(
                     {
-                        "images": [
-                            wandb.Image(os.path.join(tmpdir, f"{i}.jpg"), caption=f"{prompt} | {reward:.2f}")
-                            for i, (prompt, reward) in enumerate(zip(prompts, rewards))
-                        ],
+                        "images": [wandb.Image(os.path.join(tmpdir, f"{i}.jpg"), caption=f"{prompt} | {reward:.2f}") for i, (prompt, reward) in enumerate(zip(prompts, rewards))],
                     },
                     step=global_step,
                 )
@@ -710,11 +654,7 @@ def main():
             advantages = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
 
         # ungather advantages; we only need to keep the entries corresponding to the samples on this process
-        samples["advantages"] = (
-            torch.as_tensor(advantages)
-            .reshape(accelerator.num_processes, -1)[accelerator.process_index]
-            .to(accelerator.device)
-        )
+        samples["advantages"] = torch.as_tensor(advantages).reshape(accelerator.num_processes, -1)[accelerator.process_index].to(accelerator.device)
 
         del samples["rewards"]
         del samples["prompt_ids"]
@@ -723,16 +663,14 @@ def main():
         assert total_batch_size == args.sample_batch_size * args.sample_num_batches_per_epoch
         assert num_timesteps == args.sample_num_steps
 
-        #################### TRAINING ####################
+        # TRAINING
         for inner_epoch in range(args.num_inner_epochs):
             # shuffle samples along batch dimension
             perm = torch.randperm(total_batch_size, device=accelerator.device)
             samples = {k: v[perm] for k, v in samples.items()}
 
             # shuffle along time dimension independently for each sample
-            perms = torch.stack(
-                [torch.randperm(num_timesteps, device=accelerator.device) for _ in range(total_batch_size)]
-            )
+            perms = torch.stack([torch.randperm(num_timesteps, device=accelerator.device) for _ in range(total_batch_size)])
             for key in ["timesteps", "latents", "next_latents", "log_probs"]:
                 samples[key] = samples[key][torch.arange(total_batch_size, device=accelerator.device)[:, None], perms]
 
@@ -773,13 +711,9 @@ def main():
                                     embeds,
                                 ).sample
                                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                                noise_pred = noise_pred_uncond + args.sample_guidance_scale * (
-                                    noise_pred_text - noise_pred_uncond
-                                )
+                                noise_pred = noise_pred_uncond + args.sample_guidance_scale * (noise_pred_text - noise_pred_uncond)
                             else:
-                                noise_pred = pipeline.unet(
-                                    sample["latents"][:, j], sample["timesteps"][:, j], embeds
-                                ).sample
+                                noise_pred = pipeline.unet(sample["latents"][:, j], sample["timesteps"][:, j], embeds).sample
                             # compute the log prob of next_latents given latents under the current model
                             _, log_prob = ddim_step_with_logprob(
                                 pipeline.scheduler,
@@ -832,18 +766,13 @@ def main():
             if reward_mean_list[-1] >= cur_best_reward_mean[0]:
                 # (reward_mean, -1) => baseline will not be copied to best_outputs.
                 cur_best_reward_mean = (reward_mean_list[-1], accelerator.save_iteration - 1)
-                best_ckpt_src_dir = os.path.join(
-                    args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1)
-                )
+                best_ckpt_src_dir = os.path.join(args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1))
                 if os.path.exists(best_ckpt_src_dir):
                     best_ckpt_dst_dir = os.path.join(args.logdir, "best_outputs")
                     if os.path.exists(best_ckpt_dst_dir):
                         shutil.rmtree(best_ckpt_dst_dir)
                     shutil.copytree(best_ckpt_src_dir, best_ckpt_dst_dir)
-                    print(
-                        "Copy the checkpoint directory: {} with the highest reward {} to best_outputs"
-                        .format(best_ckpt_src_dir, cur_best_reward_mean)
-                    )
+                    print("Copy the checkpoint directory: {} with the highest reward {} to best_outputs".format(best_ckpt_src_dir, cur_best_reward_mean))
             if len(reward_mean_heap) < args.num_checkpoint_limit - 1:
                 if accelerator.save_iteration > 0:
                     heapq.heappush(reward_mean_heap, (reward_mean_list[-1], accelerator.save_iteration - 1))
@@ -851,28 +780,18 @@ def main():
                 reward_save_iteration = (reward_mean_list[-1], accelerator.save_iteration - 1)
                 if reward_mean_list[-1] >= reward_mean_heap[0][0]:
                     reward, save_iteration = heapq.heappushpop(reward_mean_heap, reward_save_iteration)
-                    popped_ckpt_dir = os.path.join(
-                        args.logdir, "checkpoints", "checkpoint_{}".format(save_iteration)
-                    )
+                    popped_ckpt_dir = os.path.join(args.logdir, "checkpoints", "checkpoint_{}".format(save_iteration))
                     if os.path.exists(popped_ckpt_dir):
                         shutil.rmtree(popped_ckpt_dir)
-                        print(
-                            "Delete the checkpoint directory: {} with the smallest reward {} in the heap"
-                            .format(popped_ckpt_dir, reward)
-                        )
+                        print("Delete the checkpoint directory: {} with the smallest reward {} in the heap".format(popped_ckpt_dir, reward))
                 else:
-                    last_ckpt_dir = os.path.join(
-                        args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1)
-                    )
+                    last_ckpt_dir = os.path.join(args.logdir, "checkpoints", "checkpoint_{}".format(accelerator.save_iteration - 1))
                     shutil.rmtree(last_ckpt_dir)
-                    print(
-                        "Delete last checkpoint directory: {} with smaller reward {}"
-                        .format(last_ckpt_dir, reward_mean_list[-1])
-                    )
+                    print("Delete last checkpoint directory: {} with smaller reward {}".format(last_ckpt_dir, reward_mean_list[-1]))
             accelerator.save_state()
             np.savetxt(os.path.join(args.logdir, "reward_mean.txt"), np.array(reward_mean_list), delimiter=",", fmt="%.4f")
             np.savetxt(os.path.join(args.logdir, "reward_std.txt"), np.array(reward_std_list), delimiter=",", fmt="%.4f")
-    
+
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
@@ -882,13 +801,14 @@ def main():
             pass
     accelerator.end_training()
 
+
 if __name__ == "__main__":
     if "MAX_RL_TIME" in os.environ:
         MAX_RL_TIME = int(os.getenv("MAX_RL_TIME"))
         try:
             with time_limit(MAX_RL_TIME):
                 main()
-        except TimeoutException as e:
+        except TimeoutException:
             print("Reinforcement learning timed out after {}!".format(MAX_RL_TIME))
     else:
         main()

@@ -3,14 +3,14 @@ and corresponding prompts returns a batch of rewards each time it is called.
 """
 
 from pathlib import Path
-from typing import Callable, List, Union, Tuple
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import torch
-from PIL import Image
+from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
-from modelscope.outputs import OutputKeys
+from PIL import Image
 
 
 def _convert_images(images: Union[List[Image.Image], np.array, torch.Tensor]) -> List[Image.Image]:
@@ -25,7 +25,7 @@ def _convert_images(images: Union[List[Image.Image], np.array, torch.Tensor]) ->
 
 
 def faceid_SCRFD(target_image_dir: str) -> Callable:
-    """The closure returns the Face ID reward function given a user ID. It uses SCRFD to detect the face and then 
+    """The closure returns the Face ID reward function given a user ID. It uses SCRFD to detect the face and then
     use CurricularFace to extract the face feature. SCRFD requires the extra package mmcv-full.
 
     Args:
@@ -58,15 +58,15 @@ def faceid_SCRFD(target_image_dir: str) -> Callable:
 
 
 def faceid_retina(target_image_dir: str) -> Callable:
-    """The closure returns the Face ID reward function given a user ID. It uses RetinaFace to detect the face and then 
-    use CurricularFace to extract the face feature. As the detection capability of RetinaFace is weaker than SCRFD, 
+    """The closure returns the Face ID reward function given a user ID. It uses RetinaFace to detect the face and then
+    use CurricularFace to extract the face feature. As the detection capability of RetinaFace is weaker than SCRFD,
     many generated side faces cannot be detected.
 
     Args:
         target_image_dir (str): The directory of processed face image files (.jpg) given a user ID.
     """
     # The retinaface detection is built into the face recognition pipeline.
-    face_recognition = pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
+    face_recognition = pipeline("face_recognition", model="bubbliiiing/cv_retinafce_recognition", model_revision="v1.0.3")
     target_image_files = Path(target_image_dir).glob("*.jpg")
     target_images = [Image.open(f).convert("RGB") for f in target_image_files]
 

@@ -6,11 +6,12 @@ import bisect
 import math
 import random
 from typing import Any, Dict, List, Mapping, Optional, Union
-from diffusers import UNet2DConditionModel
+
 import numpy as np
+import torch
+from diffusers import UNet2DConditionModel
 from tqdm import tqdm
 from transformers import CLIPTextModel
-import torch
 
 
 def make_unet_conversion_map() -> Dict[str, str]:
@@ -219,11 +220,7 @@ class LoRAModule(torch.nn.Module):
             weight = self.multiplier * (up_weight @ down_weight) * self.scale
         elif down_weight.size()[2:4] == (1, 1):
             # conv2d 1x1
-            weight = (
-                self.multiplier
-                * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
-                * self.scale
-            )
+            weight = self.multiplier * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3) * self.scale
         else:
             # conv2d 3x3
             conved = torch.nn.functional.conv2d(down_weight.permute(1, 0, 2, 3), up_weight).permute(1, 0, 2, 3)
@@ -233,9 +230,7 @@ class LoRAModule(torch.nn.Module):
 
 
 # Create network from weights for inference, weights are not loaded here
-def create_network_from_weights(
-    text_encoder: Union[CLIPTextModel, List[CLIPTextModel]], unet: UNet2DConditionModel, weights_sd: Dict, multiplier: float = 1.0
-):
+def create_network_from_weights(text_encoder: Union[CLIPTextModel, List[CLIPTextModel]], unet: UNet2DConditionModel, weights_sd: Dict, multiplier: float = 1.0):
     # get dim/alpha mapping
     modules_dim = {}
     modules_alpha = {}
@@ -306,26 +301,14 @@ class LoRANetwork(torch.nn.Module):
             root_module: torch.nn.Module,
             target_replace_modules: List[torch.nn.Module],
         ) -> List[LoRAModule]:
-            prefix = (
-                self.LORA_PREFIX_UNET
-                if is_unet
-                else (
-                    self.LORA_PREFIX_TEXT_ENCODER
-                    if text_encoder_idx is None
-                    else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2)
-                )
-            )
+            prefix = self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2))
             loras = []
             skipped = []
             for name, module in root_module.named_modules():
                 if module.__class__.__name__ in target_replace_modules:
                     for child_name, child_module in module.named_modules():
-                        is_linear = (
-                            child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "LoRACompatibleLinear"
-                        )
-                        is_conv2d = (
-                            child_module.__class__.__name__ == "Conv2d" or child_module.__class__.__name__ == "LoRACompatibleConv"
-                        )
+                        is_linear = child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "LoRACompatibleLinear"
+                        is_conv2d = child_module.__class__.__name__ == "Conv2d" or child_module.__class__.__name__ == "LoRACompatibleConv"
 
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
@@ -409,9 +392,7 @@ class LoRANetwork(torch.nn.Module):
                     converted_count += 1
                 else:
                     not_converted_count += 1
-        assert (
-            converted_count == 0 or not_converted_count == 0
-        ), f"some modules are not converted: {converted_count} converted, {not_converted_count} not converted"
+        assert converted_count == 0 or not_converted_count == 0, f"some modules are not converted: {converted_count} converted, {not_converted_count} not converted"
         return converted_count
 
     def set_multiplier(self, multiplier):
@@ -472,10 +453,11 @@ class LoRANetwork(torch.nn.Module):
 
 if __name__ == "__main__":
     # sample code to use LoRANetwork
-    import os
     import argparse
-    from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
+    import os
+
     import torch
+    from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -42,8 +42,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
-from diffusers import (DDPMScheduler, DPMSolverMultistepScheduler,
-                       StableDiffusionInpaintPipeline)
+from diffusers import DDPMScheduler, DPMSolverMultistepScheduler, StableDiffusionInpaintPipeline
 from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
@@ -55,10 +54,9 @@ from PIL import Image
 from skimage import transform
 from torchvision import transforms
 from tqdm.auto import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer
-
-from utils.model_utils import load_models_from_stable_diffusion_checkpoint
+from transformers import CLIPTokenizer
 from utils.gpu_info import gpu_monitor_decorator
+from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 
 torch.backends.cudnn.benchmark = True
 
@@ -70,9 +68,10 @@ check_min_version("0.18.0")
 
 logger = get_logger(__name__, log_level="INFO")
 
+
 def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torch.float32):
     """Merge state_dict in LoRANetwork to the pipeline in diffusers.
-    
+
     Reference:
     1. https://github.com/huggingface/diffusers/issues/3064#issuecomment-1512429695.
     """
@@ -80,7 +79,7 @@ def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torc
     LORA_PREFIX_TEXT_ENCODER = "lora_te"
     updates = defaultdict(dict)
     for key, value in lora_state_dict.items():
-        layer, elem = key.split('.', 1)
+        layer, elem = key.split(".", 1)
         updates[layer][elem] = value
     for layer, elems in updates.items():
         if "text" in layer:
@@ -99,30 +98,29 @@ def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torc
                     break
             except Exception:
                 if len(layer_infos) == 0:
-                    print('Error loading layer')
+                    print("Error loading layer")
                 if len(temp_name) > 0:
                     temp_name += "_" + layer_infos.pop(0)
                 else:
                     temp_name = layer_infos.pop(0)
-        weight_up = elems['lora_up.weight'].to(dtype)
-        weight_down = elems['lora_down.weight'].to(dtype)
-        if 'alpha' in elems.keys():
-            alpha = elems['alpha'].item() / weight_up.shape[1]
+        weight_up = elems["lora_up.weight"].to(dtype)
+        weight_down = elems["lora_down.weight"].to(dtype)
+        if "alpha" in elems.keys():
+            alpha = elems["alpha"].item() / weight_up.shape[1]
         else:
             alpha = 1.0
         curr_layer.weight.data = curr_layer.weight.data.to(device)
         if len(weight_up.shape) == 4:
-            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2),
-                                                                    weight_down.squeeze(3).squeeze(2)).unsqueeze(
-                2).unsqueeze(3)
+            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2), weight_down.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
         else:
             curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
     return pipeline
 
+
 def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
     """
-    This function, `log_validation`, serves as a validation step during training. 
-    It generates ID photo templates using controlnet if `template_dir` exists, otherwise, it creates random templates based on validation prompts. 
+    This function, `log_validation`, serves as a validation step during training.
+    It generates ID photo templates using controlnet if `template_dir` exists, otherwise, it creates random templates based on validation prompts.
     The resulting images are saved in the validation folder and logged in either TensorBoard or WandB.
 
     Args:
@@ -144,20 +142,12 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
     # When template_dir doesn't exist, generate randomly based on validation prompts.
     text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
 
-    pipeline = StableDiffusionInpaintPipeline(
-        tokenizer=tokenizer,
-        scheduler=noise_scheduler,
-        unet=unet.to(accelerator.device, weight_dtype),
-        text_encoder=text_encoder.to(accelerator.device, weight_dtype),
-        vae=vae.to(accelerator.device, weight_dtype),
-        safety_checker=None,
-        feature_extractor=None
-    )
+    pipeline = StableDiffusionInpaintPipeline(tokenizer=tokenizer, scheduler=noise_scheduler, unet=unet.to(accelerator.device, weight_dtype), text_encoder=text_encoder.to(accelerator.device, weight_dtype), vae=vae.to(accelerator.device, weight_dtype), safety_checker=None, feature_extractor=None)
     pipeline = pipeline.to(accelerator.device)
     pipeline.safety_checker = None
     pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
     pipeline.set_progress_bar_config(disable=True)
-    
+
     merge_lora(pipeline, network.state_dict(), 1, "cuda", torch.float16)
     generator = torch.Generator(device=accelerator.device)
 
@@ -169,10 +159,18 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
     if args.template_dir is not None:
         # Iteratively generate ID photos
         jpgs = os.listdir(args.template_dir)
-        for jpg, read_jpg, shape, read_mask in zip(jpgs, kwargs['input_images'], kwargs['input_images_shape'], kwargs['input_masks']):
+        for jpg, read_jpg, shape, read_mask in zip(jpgs, kwargs["input_images"], kwargs["input_images_shape"], kwargs["input_masks"]):
             image = pipeline(
-                args.validation_prompt, image=read_jpg, mask_image=read_mask, strength=0.65, negative_prompt=args.neg_prompt, 
-                guidance_scale=args.guidance_scale, num_inference_steps=20, generator=generator, height=kwargs['new_size'][1], width=kwargs['new_size'][0],
+                args.validation_prompt,
+                image=read_jpg,
+                mask_image=read_mask,
+                strength=0.65,
+                negative_prompt=args.neg_prompt,
+                guidance_scale=args.guidance_scale,
+                num_inference_steps=20,
+                generator=generator,
+                height=kwargs["new_size"][1],
+                width=kwargs["new_size"][0],
             ).images[0]
 
             images.append(image)
@@ -186,8 +184,15 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
         # Random Generate
         for _ in range(args.num_validation_images):
             images.append(
-                pipeline(args.validation_prompt, negative_prompt=args.neg_prompt, guidance_scale=args.guidance_scale, \
-                        num_inference_steps=50, generator=generator, height=args.resolution, width=args.resolution,).images[0]
+                pipeline(
+                    args.validation_prompt,
+                    negative_prompt=args.neg_prompt,
+                    guidance_scale=args.guidance_scale,
+                    num_inference_steps=50,
+                    generator=generator,
+                    height=args.resolution,
+                    width=args.resolution,
+                ).images[0]
             )
         for index, image in enumerate(images):
             if not os.path.exists(os.path.join(args.output_dir, "validation")):
@@ -200,68 +205,63 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
             for index, image in enumerate(images):
                 tracker.writer.add_images("validation_" + str(index), np.asarray(image), epoch, dataformats="HWC")
         if tracker.name == "wandb":
-            tracker.log(
-                {
-                    "validation": [
-                        wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
-                        for i, image in enumerate(images)
-                    ]
-                }
-            )
+            tracker.log({"validation": [wandb.Image(image, caption=f"{i}: {args.validation_prompt}") for i, image in enumerate(images)]})
 
     del pipeline
     torch.cuda.empty_cache()
     vae.to(accelerator.device, dtype=weight_dtype)
 
+
 def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, mask_type):
-    '''
+    """
     Inputs:
         image                   输入图片；
         retinaface_result       retinaface的检测结果；
         crop_ratio              人脸部分裁剪扩充比例；
         face_seg                人脸分割模型；
         mask_type               人脸分割的方式，一个是crop，一个是skin，人脸分割结果是人脸皮肤或者人脸框
-    
+
     Outputs:
         retinaface_box          扩增后相对于原图的box
         retinaface_keypoints    相对于原图的keypoints
         retinaface_mask_pil     人脸分割结果
-    '''
+    """
     h, w, c = np.shape(image)
-    if len(retinaface_result['boxes']) != 0:
+    if len(retinaface_result["boxes"]) != 0:
         # 获得retinaface的box并且做一手扩增
-        retinaface_box      = np.array(retinaface_result['boxes'][0])
-        face_width          = retinaface_box[2] - retinaface_box[0]
-        face_height         = retinaface_box[3] - retinaface_box[1]
-        retinaface_box[0]   = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
-        retinaface_box[1]   = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0, h - 1)
-        retinaface_box[2]   = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
-        retinaface_box[3]   = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0, h - 1)
-        retinaface_box      = np.array(retinaface_box, np.int32)
+        retinaface_box = np.array(retinaface_result["boxes"][0])
+        face_width = retinaface_box[2] - retinaface_box[0]
+        face_height = retinaface_box[3] - retinaface_box[1]
+        retinaface_box[0] = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
+        retinaface_box[1] = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 2, 0, h - 1)
+        retinaface_box[2] = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
+        retinaface_box[3] = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 2, 0, h - 1)
+        retinaface_box = np.array(retinaface_box, np.int32)
 
         # 检测关键点
-        retinaface_keypoints = np.reshape(retinaface_result['keypoints'][0], [5, 2])
+        retinaface_keypoints = np.reshape(retinaface_result["keypoints"][0], [5, 2])
         retinaface_keypoints = np.array(retinaface_keypoints, np.float32)
 
         # mask部分
-        retinaface_crop     = image.crop(np.int32(retinaface_box))
-        retinaface_mask     = np.zeros_like(np.array(image, np.uint8))
+        retinaface_crop = image.crop(np.int32(retinaface_box))
+        retinaface_mask = np.zeros_like(np.array(image, np.uint8))
         if mask_type == "skin":
             retinaface_sub_mask = face_seg(retinaface_crop)
-            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
+            retinaface_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
         else:
-            retinaface_mask[retinaface_box[1]:retinaface_box[3], retinaface_box[0]:retinaface_box[2]] = 255
+            retinaface_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2]] = 255
         retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
     else:
-        retinaface_box          = np.array([])
-        retinaface_keypoints    = np.array([])
-        retinaface_mask         = np.zeros_like(np.array(image, np.uint8))
-        retinaface_mask_pil     = Image.fromarray(np.uint8(retinaface_mask))
-        
+        retinaface_box = np.array([])
+        retinaface_keypoints = np.array([])
+        retinaface_mask = np.zeros_like(np.array(image, np.uint8))
+        retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
+
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
+
 def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Point, Target_Five_Point, Source_box):
-    '''
+    """
     Inputs:
         Source_image            原图像；
         Source_image_mask       原图像人脸的mask比例；
@@ -269,37 +269,39 @@ def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Po
         Source_Five_Point       原图像五个人脸关键点；
         Target_Five_Point       目标图像五个人脸关键点；
         Source_box              原图像人脸的坐标；
-    
+
     Outputs:
         output                  贴脸后的人像
-    '''
+    """
     Source_Five_Point = np.reshape(Source_Five_Point, [5, 2]) - np.array(Source_box[:2])
     Target_Five_Point = np.reshape(Target_Five_Point, [5, 2])
 
-    Crop_Source_image                       = Source_image.crop(np.int32(Source_box))
-    Crop_Source_image_mask                  = Source_image_mask.crop(np.int32(Source_box))
-    Source_Five_Point, Target_Five_Point    = np.array(Source_Five_Point), np.array(Target_Five_Point)
+    Crop_Source_image = Source_image.crop(np.int32(Source_box))
+    Crop_Source_image_mask = Source_image_mask.crop(np.int32(Source_box))
+    Source_Five_Point, Target_Five_Point = np.array(Source_Five_Point), np.array(Target_Five_Point)
 
     tform = transform.SimilarityTransform()
     # 程序直接估算出转换矩阵M
     tform.estimate(Source_Five_Point, Target_Five_Point)
     M = tform.params[0:2, :]
 
-    warped      = cv2.warpAffine(np.array(Crop_Source_image), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
+    warped = cv2.warpAffine(np.array(Crop_Source_image), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
     warped_mask = cv2.warpAffine(np.array(Crop_Source_image_mask), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
 
-    mask        = np.float32(warped_mask == 0)
-    output      = mask * np.float32(Target_image) + (1 - mask) * np.float32(warped)
+    mask = np.float32(warped_mask == 0)
+    output = mask * np.float32(Target_image) + (1 - mask) * np.float32(warped)
     return output
+
 
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface检测部分
     # 检测人脸框
-    retinaface_result                                           = retinaface_detection(image) 
+    retinaface_result = retinaface_detection(image)
     # 获取mask与关键点
-    retinaface_box, retinaface_keypoints, retinaface_mask_pil   = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
+    retinaface_box, retinaface_keypoints, retinaface_mask_pil = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
+
 
 def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     """
@@ -321,14 +323,14 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     """
     try:
         # embedding
-        face_recognition = modelscope_pipeline("face_recognition", model='bubbliiiing/cv_retinafce_recognition', model_revision='v1.0.3')
-    except:
+        face_recognition = modelscope_pipeline("face_recognition", model="bubbliiiing/cv_retinafce_recognition", model_revision="v1.0.3")
+    except Exception as e:
+        print(f"Load face recognition model failed. {e}")
         return [], [], []
 
     # get ID list
-    face_image_list     = glob(os.path.join(pivot_dir, '*.jpg')) + glob(os.path.join(pivot_dir, '*.JPG')) + \
-                          glob(os.path.join(pivot_dir, '*.png')) + glob(os.path.join(pivot_dir, '*.PNG'))
-    
+    face_image_list = glob(os.path.join(pivot_dir, "*.jpg")) + glob(os.path.join(pivot_dir, "*.JPG")) + glob(os.path.join(pivot_dir, "*.png")) + glob(os.path.join(pivot_dir, "*.PNG"))
+
     #  vstack all embedding
     embedding_list = []
     for img in face_image_list:
@@ -348,27 +350,26 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     try:
         embedding_array = np.vstack(embedding_list)
     except Exception as e:
-        print(f'vstack embedding failed, caused by {str(e)}')
+        print(f"vstack embedding failed, caused by {str(e)}")
         return [], [], []
 
     #  mean, get pivot
-    pivot_feature   = np.mean(embedding_array, axis=0)
-    pivot_feature   = np.reshape(pivot_feature, [512, 1])
+    pivot_feature = np.mean(embedding_array, axis=0)
+    pivot_feature = np.reshape(pivot_feature, [512, 1])
 
     # sort with cosine distance
     embedding_list = [[np.dot(emb, pivot_feature)[0][0], emb] for emb in embedding_list]
-    embedding_list = sorted(embedding_list, key = lambda a : -a[0])
+    embedding_list = sorted(embedding_list, key=lambda a: -a[0])
 
-    top10_embedding         = [emb[1] for emb in embedding_list]
-    top10_embedding_array   = np.vstack(top10_embedding)
+    top10_embedding = [emb[1] for emb in embedding_list]
+    top10_embedding_array = np.vstack(top10_embedding)
     # [512, n]
-    top10_embedding_array   = np.swapaxes(top10_embedding_array, 0, 1)
+    top10_embedding_array = np.swapaxes(top10_embedding_array, 0, 1)
 
     # sort all validation image
     result_list = []
-    if not test_img_dir.endswith('.jpg'):
-        img_list = glob(os.path.join(test_img_dir, '*.jpg')) + glob(os.path.join(test_img_dir, '*.JPG')) + \
-                   glob(os.path.join(test_img_dir, '*.png')) + glob(os.path.join(test_img_dir, '*.PNG'))
+    if not test_img_dir.endswith(".jpg"):
+        img_list = glob(os.path.join(test_img_dir, "*.jpg")) + glob(os.path.join(test_img_dir, "*.JPG")) + glob(os.path.join(test_img_dir, "*.png")) + glob(os.path.join(test_img_dir, "*.PNG"))
         for img in img_list:
             try:
                 # a average above all
@@ -377,24 +378,26 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
 
                 res = np.mean(np.dot(embedding, top10_embedding_array))
                 result_list.append([res, img])
-                result_list = sorted(result_list, key = lambda a : -a[0])
+                result_list = sorted(result_list, key=lambda a: -a[0])
             except Exception as e:
                 print("error at:", str(e))
 
     # pick most similar using faceid
     t_result_list = [i[1] for i in result_list][:top_merge]
-    tlist   = [i[1].split('_')[-2] for i in result_list][:top_merge]
-    scores  = [i[0] for i in result_list][:top_merge]
+    tlist = [i[1].split("_")[-2] for i in result_list][:top_merge]
+    scores = [i[0] for i in result_list][:top_merge]
     return t_result_list, tlist, scores
 
-def merge_from_name_and_index(name, index_list, output_dir='output_dir/'):
-    loras_load_path = [os.path.join(output_dir, f'checkpoint-{i}/pytorch_model.bin') for i in index_list]
-    os.mkdir(os.path.join(output_dir, 'ensemble'))
-    lora_save_path  = os.path.join(output_dir, 'ensemble', f'{name}.bin')
-    for l in loras_load_path:
-        assert os.path.exists(l)==True
+
+def merge_from_name_and_index(name, index_list, output_dir="output_dir/"):
+    loras_load_path = [os.path.join(output_dir, f"checkpoint-{i}/pytorch_model.bin") for i in index_list]
+    os.mkdir(os.path.join(output_dir, "ensemble"))
+    lora_save_path = os.path.join(output_dir, "ensemble", f"{name}.bin")
+    for lora_load_path in loras_load_path:
+        assert os.path.exists(lora_load_path) is True
     merge_different_loras(loras_load_path, lora_save_path)
     return lora_save_path
+
 
 def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
     if ratios is None:
@@ -411,7 +414,8 @@ def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
                 state_dict[key] += weights_sd[key] * ratio
 
         torch.save(state_dict, lora_save_path)
-    return 
+    return
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
@@ -440,11 +444,7 @@ def parse_args():
         "--dataset_name",
         type=str,
         default=None,
-        help=(
-            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-            " or to a folder containing files that 🤗 Datasets can understand."
-        ),
+        help=("The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private," " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem," " or to a folder containing files that 🤗 Datasets can understand."),
     )
     parser.add_argument(
         "--dataset_config_name",
@@ -456,15 +456,9 @@ def parse_args():
         "--train_data_dir",
         type=str,
         default=None,
-        help=(
-            "A folder containing the training data. Folder contents must follow the structure described in"
-            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-        ),
+        help=("A folder containing the training data. Folder contents must follow the structure described in" " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file" " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."),
     )
-    parser.add_argument(
-        "--image_column", type=str, default="image", help="The column of the dataset containing an image."
-    )
+    parser.add_argument("--image_column", type=str, default="image", help="The column of the dataset containing an image.")
     parser.add_argument(
         "--caption_column",
         type=str,
@@ -472,13 +466,11 @@ def parse_args():
         help="The column of the dataset containing a caption or a list of captions.",
     )
     parser.add_argument(
-        "--validation", 
+        "--validation",
         action="store_true",
         help="whether to validation in whole training.",
     )
-    parser.add_argument(
-        "--validation_prompt", type=str, default=None, help="A prompt that is sampled during training for inference."
-    )
+    parser.add_argument("--validation_prompt", type=str, default=None, help="A prompt that is sampled during training for inference.")
     parser.add_argument(
         "--num_validation_images",
         type=int,
@@ -489,35 +481,21 @@ def parse_args():
         "--validation_epochs",
         type=int,
         default=1,
-        help=(
-            "Run fine-tuning validation every X epochs. The validation process consists of running the prompt"
-            " `args.validation_prompt` multiple times: `args.num_validation_images`."
-        ),
+        help=("Run fine-tuning validation every X epochs. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
     )
     parser.add_argument(
         "--validation_steps",
         type=int,
         default=None,
-        help=(
-            "Run fine-tuning validation every X steps. The validation process consists of running the prompt"
-            " `args.validation_prompt` multiple times: `args.num_validation_images`."
-        ),
+        help=("Run fine-tuning validation every X steps. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
     )
-    parser.add_argument(
-        "--neg_prompt", type=str, default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo", 
-        help="A prompt that is neg during training for inference."
-    )
-    parser.add_argument(
-        "--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference."
-    )
+    parser.add_argument("--neg_prompt", type=str, default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo", help="A prompt that is neg during training for inference.")
+    parser.add_argument("--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference.")
     parser.add_argument(
         "--max_train_samples",
         type=int,
         default=None,
-        help=(
-            "For debugging purposes or quicker training, truncate the number of training examples to this "
-            "value if set."
-        ),
+        help=("For debugging purposes or quicker training, truncate the number of training examples to this " "value if set."),
     )
     parser.add_argument(
         "--output_dir",
@@ -536,28 +514,20 @@ def parse_args():
         "--resolution",
         type=int,
         default=512,
-        help=(
-            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
-            " resolution"
-        ),
+        help=("The resolution for input images, all the images in the train/validation dataset will be resized to this" " resolution"),
     )
     parser.add_argument(
         "--center_crop",
         default=False,
         action="store_true",
-        help=(
-            "Whether to center crop the input images to the resolution. If not set, the images will be randomly"
-            " cropped. The images will be resized to the resolution first before cropping."
-        ),
+        help=("Whether to center crop the input images to the resolution. If not set, the images will be randomly" " cropped. The images will be resized to the resolution first before cropping."),
     )
     parser.add_argument(
         "--random_flip",
         action="store_true",
         help="whether to randomly flip images horizontally",
     )
-    parser.add_argument(
-        "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
-    )
+    parser.add_argument("--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader.")
     parser.add_argument("--num_train_epochs", type=int, default=100)
     parser.add_argument(
         "--max_train_steps",
@@ -592,14 +562,9 @@ def parse_args():
         "--lr_scheduler",
         type=str,
         default="constant",
-        help=(
-            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
-            ' "constant", "constant_with_warmup"]'
-        ),
+        help=('The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",' ' "constant", "constant_with_warmup"]'),
     )
-    parser.add_argument(
-        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
-    )
+    parser.add_argument("--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler.")
     parser.add_argument(
         "--train_text_encoder",
         action="store_true",
@@ -609,27 +574,19 @@ def parse_args():
         "--snr_gamma",
         type=float,
         default=None,
-        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. "
-        "More details here: https://arxiv.org/abs/2303.09556.",
+        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. " "More details here: https://arxiv.org/abs/2303.09556.",
     )
-    parser.add_argument(
-        "--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes."
-    )
+    parser.add_argument("--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes.")
     parser.add_argument(
         "--allow_tf32",
         action="store_true",
-        help=(
-            "Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see"
-            " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
-        ),
+        help=("Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see" " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"),
     )
     parser.add_argument(
         "--dataloader_num_workers",
         type=int,
         default=0,
-        help=(
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
-        ),
+        help=("Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."),
     )
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
@@ -653,43 +610,28 @@ def parse_args():
         "--logging_dir",
         type=str,
         default="logs",
-        help=(
-            "[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to"
-            " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
-        ),
+        help=("[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to" " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."),
     )
     parser.add_argument(
         "--mixed_precision",
         type=str,
         default=None,
         choices=["no", "fp16", "bf16"],
-        help=(
-            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
-            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
-            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
-        ),
+        help=("Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >=" " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the" " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."),
     )
     parser.add_argument(
         "--report_to",
         type=str,
         default="tensorboard",
-        help=(
-            'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
-            ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
-        ),
+        help=('The integration to report the results and logs to. Supported platforms are `"tensorboard"`' ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'),
     )
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
-    parser.add_argument(
-        "--save_state", action="store_true", help="Whether or not to save state."
-    )
+    parser.add_argument("--save_state", action="store_true", help="Whether or not to save state.")
     parser.add_argument(
         "--checkpointing_steps",
         type=int,
         default=500,
-        help=(
-            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
-            " training using `--resume_from_checkpoint`."
-        ),
+        help=("Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming" " training using `--resume_from_checkpoint`."),
     )
     parser.add_argument(
         "--checkpoints_total_limit",
@@ -701,14 +643,9 @@ def parse_args():
         "--resume_from_checkpoint",
         type=str,
         default=None,
-        help=(
-            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
-            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
-        ),
+        help=("Whether training should be resumed from a previous checkpoint. Use a path saved by" ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'),
     )
-    parser.add_argument(
-        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
-    )
+    parser.add_argument("--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers.")
     parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
     parser.add_argument(
         "--rank",
@@ -727,65 +664,49 @@ def parse_args():
         "--template_dir",
         type=str,
         default=None,
-        help=(
-            "The dir of template used, to make certificate photos."
-        ),
+        help=("The dir of template used, to make certificate photos."),
     )
     parser.add_argument(
         "--template_mask",
         default=False,
         action="store_true",
-        help=(
-            "To mask certificate photos."
-        ),
+        help=("To mask certificate photos."),
     )
     parser.add_argument(
         "--template_mask_dir",
         type=str,
         default=None,
-        help=(
-            "The dir of template masks used, to make certificate photos."
-        ),
+        help=("The dir of template masks used, to make certificate photos."),
     )
 
     parser.add_argument(
         "--merge_best_lora_based_face_id",
         default=False,
         action="store_true",
-        help=(
-            "Merge the best loras based on face_id."
-        ),
+        help=("Merge the best loras based on face_id."),
     )
     parser.add_argument(
         "--merge_best_lora_name",
         type=str,
         default=None,
-        help=(
-            "The output name for getting best loras."
-        ),
+        help=("The output name for getting best loras."),
     )
     parser.add_argument(
         "--cache_log_file",
         type=str,
-        default='train_kohya_log.txt',
-        help=(
-            "The output log file path"
-        ),
+        default="train_kohya_log.txt",
+        help=("The output log file path"),
     )
     parser.add_argument(
         "--faceid_post_url",
         type=str,
         default=None,
-        help=(
-            "The post url to get faceid."
-        ),
+        help=("The post url to get faceid."),
     )
     parser.add_argument(
         "--train_scene_lora_bool",
         action="store_true",
-        help=(
-            "Whether to train scene lora"
-        ),
+        help=("Whether to train scene lora"),
     )
 
     args = parser.parse_args()
@@ -799,9 +720,11 @@ def parse_args():
 
     return args
 
+
 DATASET_NAME_MAPPING = {
     "lambdalabs/pokemon-blip-captions": ("image", "text"),
 }
+
 
 def unet_attn_processors_state_dict(unet) -> Dict[str, torch.tensor]:
     r"""
@@ -817,6 +740,7 @@ def unet_attn_processors_state_dict(unet) -> Dict[str, torch.tensor]:
             attn_processors_state_dict[f"{attn_processor_key}.{parameter_key}"] = parameter
 
     return attn_processors_state_dict
+
 
 @gpu_monitor_decorator()
 def main():
@@ -862,9 +786,7 @@ def main():
 
     # Load scheduler, tokenizer and models.
     noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
-    tokenizer = CLIPTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
-    )
+    tokenizer = CLIPTokenizer.from_pretrained(args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision)
     text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
@@ -896,16 +818,14 @@ def main():
     )
     network.apply_to(text_encoder, unet, args.train_text_encoder, True)
     trainable_params = network.prepare_optimizer_params(args.learning_rate / 2, args.learning_rate, args.learning_rate)
-    
+
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
             import xformers
 
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
-                logger.warn(
-                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
-                )
+                logger.warn("xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details.")
             unet.enable_xformers_memory_efficient_attention()
 
     def compute_snr(timesteps):
@@ -934,34 +854,29 @@ def main():
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32 or os.environ.get('ENABLE_TF32') :
+    if args.allow_tf32 or os.environ.get("ENABLE_TF32"):
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.scale_lr:
-        args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
-        )
+        args.learning_rate = args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
 
     # Use 8-bit Adam for lower memory usage or to fine-tune the model in 16GB GPUs
     if args.use_8bit_adam:
         try:
             import bitsandbytes as bnb
         except ImportError:
-            raise ImportError(
-                "To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
-            )
+            raise ImportError("To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`.")
 
         optimizer_class = bnb.optim.AdamW8bit
     else:
-        if os.environ.get('ENABLE_APEX_OPT'):
+        if os.environ.get("ENABLE_APEX_OPT"):
             try:
                 import apex
-                optimizer_class=apex.optimizers.FusedAdam
+
+                optimizer_class = apex.optimizers.FusedAdam
             except ImportError:
-                logger.warn(
-                    "To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex."
-                )
-                optimizer_class=torch.optim.AdamW
+                logger.warn("To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex.")
+                optimizer_class = torch.optim.AdamW
         else:
             optimizer_class = torch.optim.AdamW
 
@@ -1009,17 +924,13 @@ def main():
     else:
         image_column = args.image_column
         if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
+            raise ValueError(f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}")
     if args.caption_column is None:
         caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
     else:
         caption_column = args.caption_column
         if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
+            raise ValueError(f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}")
 
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
@@ -1032,12 +943,8 @@ def main():
                 # take a random caption if there are multiple
                 captions.append(random.choice(caption) if is_train else caption[0])
             else:
-                raise ValueError(
-                    f"Caption column `{caption_column}` should contain either strings or lists of strings."
-                )
-        inputs = tokenizer(
-            captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
-        )
+                raise ValueError(f"Caption column `{caption_column}` should contain either strings or lists of strings.")
+        inputs = tokenizer(captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt")
         return inputs.input_ids
 
     # Preprocessing the datasets.
@@ -1098,17 +1005,16 @@ def main():
 
     # Prepare everything with our `accelerator`.
     if args.train_text_encoder:
-        unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-                    unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler)
+        unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler)
     else:
-        unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-                    unet, network, optimizer, train_dataloader, lr_scheduler)
-        
+        unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, network, optimizer, train_dataloader, lr_scheduler)
+
     def transform_models_if_DDP(models):
         from torch.nn.parallel import DistributedDataParallel as DDP
 
         # Transform text_encoder, unet and network from DistributedDataParallel
         return [model.module if type(model) == DDP else model for model in models if model is not None]
+
     # transform DDP after prepare (train_network here only)
     text_encoder = transform_models_if_DDP([text_encoder])[0]
     unet, network = transform_models_if_DDP([unet, network])
@@ -1150,9 +1056,7 @@ def main():
             path = dirs[-1] if len(dirs) > 0 else None
 
         if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
+            accelerator.print(f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run.")
             args.resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
@@ -1169,28 +1073,28 @@ def main():
     progress_bar.set_description("Steps")
 
     if args.template_dir is not None:
-        input_images        = []
-        input_images_shape  = []
-        control_images      = []
-        input_masks         = []
+        input_images = []
+        input_images_shape = []
+        control_images = []
+        input_masks = []
         if args.template_mask_dir is None:
-            retinaface_detection = modelscope_pipeline(Tasks.face_detection, 'damo/cv_resnet50_face-detection_retinaface')
-        jpgs                = os.listdir(args.template_dir)[:4]
+            retinaface_detection = modelscope_pipeline(Tasks.face_detection, "damo/cv_resnet50_face-detection_retinaface")
+        jpgs = os.listdir(args.template_dir)[:4]
         for jpg in jpgs:
-            if not jpg.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
+            if not jpg.lower().endswith((".bmp", ".dib", ".png", ".jpg", ".jpeg", ".pbm", ".pgm", ".ppm", ".tif", ".tiff")):
                 continue
-            read_jpg        = os.path.join(args.template_dir, jpg)
-            read_jpg        = Image.open(read_jpg)
-            shape           = np.shape(read_jpg)
+            read_jpg = os.path.join(args.template_dir, jpg)
+            read_jpg = Image.open(read_jpg)
+            shape = np.shape(read_jpg)
 
-            short_side  = min(read_jpg.width, read_jpg.height)
-            resize      = float(short_side / 512.0)
-            new_size    = (int(read_jpg.width//resize) // 64 * 64, int(read_jpg.height//resize) // 64 * 64)
-            read_jpg    = read_jpg.resize(new_size)
+            short_side = min(read_jpg.width, read_jpg.height)
+            resize = float(short_side / 512.0)
+            new_size = (int(read_jpg.width // resize) // 64 * 64, int(read_jpg.height // resize) // 64 * 64)
+            read_jpg = read_jpg.resize(new_size)
 
             if args.template_mask:
                 if args.template_mask_dir is not None:
-                    input_mask      = Image.open(os.path.join(args.template_mask_dir, jpg))
+                    input_mask = Image.open(os.path.join(args.template_mask_dir, jpg))
                 else:
                     _, _, input_mask = call_face_crop(retinaface_detection, read_jpg, crop_ratio=1.3)
 
@@ -1222,7 +1126,7 @@ def main():
     user_id = os.path.basename(os.path.dirname(args.output_dir))
     # check log path
     if accelerator.is_main_process:
-        output_log = open(args.cache_log_file, 'w')
+        output_log = open(args.cache_log_file, "w")
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -1243,9 +1147,7 @@ def main():
                 noise = torch.randn_like(latents)
                 if args.noise_offset:
                     # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-                    noise += args.noise_offset * torch.randn(
-                        (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
-                    )
+                    noise += args.noise_offset * torch.randn((latents.shape[0], latents.shape[1], 1, 1), device=latents.device)
 
                 bsz = latents.shape[0]
                 # Sample a random timestep for each image
@@ -1281,9 +1183,7 @@ def main():
                     # Since we predict the noise instead of x_0, the original formulation is slightly changed.
                     # This is discussed in Section 4.2 of the same paper.
                     snr = compute_snr(timesteps)
-                    mse_loss_weights = (
-                        torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
-                    )
+                    mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
                     # We first calculate the original loss. Then we mean over the non-batch dimensions and
                     # rebalance the sample-wise losses with their respective loss weights.
                     # Finally, we take the mean of the rebalanced loss.
@@ -1294,7 +1194,7 @@ def main():
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
-                
+
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
@@ -1330,17 +1230,15 @@ def main():
                                 num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
                                 removing_checkpoints = checkpoints[0:num_to_remove]
 
-                                logger.info(
-                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
-                                )
+                                logger.info(f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints")
                                 logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
                                 for removing_checkpoint in removing_checkpoints:
                                     removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
                                     shutil.rmtree(removing_checkpoint)
 
-                        safetensor_save_path    = os.path.join(args.output_dir, f"checkpoint-{global_step}.safetensors")
-                        accelerator_save_path   = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        safetensor_save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}.safetensors")
+                        accelerator_save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         save_model(safetensor_save_path, accelerator.unwrap_model(network))
                         if args.save_state:
                             accelerator.save_state(accelerator_save_path)
@@ -1356,105 +1254,48 @@ def main():
             if accelerator.sync_gradients:
                 if accelerator.is_main_process:
                     if args.validation_steps is not None and args.validation_prompt is not None and global_step % args.validation_steps == 0 and args.validation:
-                        logger.info(
-                            f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
-                            f" {args.validation_prompt}."
-                        )
-                        log_validation(
-                            network,
-                            noise_scheduler,
-                            vae,
-                            text_encoder,
-                            tokenizer,
-                            unet,
-                            args,
-                            accelerator,
-                            weight_dtype,
-                            epoch,
-                            global_step,
-                            input_images=input_images, 
-                            input_images_shape=input_images_shape, 
-                            control_images=control_images, 
-                            input_masks=input_masks,
-                            new_size=new_size
-                        )
+                        logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
+                        log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
 
         if accelerator.is_main_process:
             if args.validation_steps is None and args.validation_prompt is not None and global_step % args.validation_epochs == 0 and args.validation:
-                logger.info(
-                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
-                    f" {args.validation_prompt}."
-                )
-                log_validation(
-                    network,
-                    noise_scheduler,
-                    vae,
-                    text_encoder,
-                    tokenizer,
-                    unet,
-                    args,
-                    accelerator,
-                    weight_dtype,
-                    epoch,
-                    global_step,
-                    input_images=input_images, 
-                    input_images_shape=input_images_shape, 
-                    control_images=control_images, 
-                    input_masks=input_masks,
-                    new_size=new_size
-                )
+                logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
+                log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        safetensor_save_path    = os.path.join(args.output_dir, f"pytorch_lora_weights.safetensors")
-        accelerator_save_path   = os.path.join(args.output_dir, f"pytorch_lora_weights")
+        safetensor_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights.safetensors")
+        accelerator_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights")
         save_model(safetensor_save_path, accelerator.unwrap_model(network))
         if args.save_state:
             accelerator.save_state(accelerator_save_path)
 
         if args.validation:
-            log_validation(
-                network,
-                noise_scheduler,
-                vae,
-                text_encoder,
-                tokenizer,
-                unet,
-                args,
-                accelerator,
-                weight_dtype,
-                epoch,
-                global_step,
-                input_images=input_images, 
-                input_images_shape=input_images_shape, 
-                control_images=control_images, 
-                input_masks=input_masks,
-                new_size=new_size
-            )
+            log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
         if args.merge_best_lora_based_face_id and args.validation:
-            pivot_dir = os.path.join(args.train_data_dir, 'train')
+            pivot_dir = os.path.join(args.train_data_dir, "train")
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
             t_result_list, tlist, scores = eval_jpg_with_faceid(pivot_dir, os.path.join(args.output_dir, "validation"))
 
             for index, line in enumerate(zip(tlist, scores)):
                 print(f"Top-{str(index)}: {str(line)}")
                 logger.info(f"Top-{str(index)}: {str(line)}")
-            
+
             best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
             os.makedirs(best_outputs_dir, exist_ok=True)
-            
+
             # If all training images cannot detect faces, Lora fusion will not be performed
             # Otherwise, the face ID score will be calculated based on the training images and the validated images for Lora fusion.
             if len(t_result_list) == 0:
                 print("Dectect no face in training data, move last weights and validation image to best_outputs")
-                test_img_dir    = os.path.join(args.output_dir, "validation")
-                img_list        = glob(os.path.join(test_img_dir, '*.jpg')) + glob(os.path.join(test_img_dir, '*.JPG')) + glob(os.path.join(test_img_dir, '*.png')) + glob(os.path.join(test_img_dir, '*.PNG'))
-                
+                test_img_dir = os.path.join(args.output_dir, "validation")
+                img_list = glob(os.path.join(test_img_dir, "*.jpg")) + glob(os.path.join(test_img_dir, "*.JPG")) + glob(os.path.join(test_img_dir, "*.png")) + glob(os.path.join(test_img_dir, "*.PNG"))
+
                 t_result_list = []
                 for img in img_list:
                     res = int(img.split("_")[-2])
                     t_result_list.append([res, img])
-                    t_result_list = sorted(t_result_list, key = lambda a : -a[0])
+                    t_result_list = sorted(t_result_list, key=lambda a: -a[0])
 
                 copyfile(t_result_list[0][1], os.path.join(best_outputs_dir, os.path.basename(t_result_list[0][1])))
                 copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
@@ -1472,7 +1313,7 @@ def main():
             copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
 
         # we will remove cache_log_file after train
-        f = open(args.cache_log_file, 'w')
+        open(args.cache_log_file, "w")
 
     accelerator.end_training()
 
