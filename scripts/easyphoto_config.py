@@ -4,6 +4,7 @@ from modules.paths import data_path, models_path
 # save_dirs
 data_dir                        = data_path
 models_path                     = models_path
+easyphoto_models_path           = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models")
 easyphoto_img2img_samples       = os.path.join(data_dir, 'outputs/img2img-images')
 easyphoto_txt2img_samples       = os.path.join(data_dir, 'outputs/txt2img-images')
 easyphoto_outpath_samples       = os.path.join(data_dir, 'outputs/easyphoto-outputs')

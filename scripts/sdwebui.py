@@ -16,18 +16,23 @@ from modules.paths import models_path
 from modules.processing import (Processed, StableDiffusionProcessing,
                                 StableDiffusionProcessingImg2Img,
                                 StableDiffusionProcessingTxt2Img)
-from modules.sd_models import get_closet_checkpoint_match, load_model, list_models
+from modules.sd_models import (get_closet_checkpoint_match, list_models,
+                               load_model)
 from modules.sd_vae import find_vae_near_checkpoint, refresh_vae_list
 from modules.shared import opts, state
 from modules.timer import Timer
-from scripts.animatediff_utils import AnimateDiffProcess
-from scripts.easyphoto_utils import ep_logger
+from scripts.easyphoto_utils import (AnimateDiffControl, AnimateDiffInfV2V,
+                                     AnimateDiffLora, AnimateDiffMM,
+                                     AnimateDiffOutput, AnimateDiffProcess,
+                                     AnimateDiffPromptSchedule,
+                                     AnimateDiffUiGroup, animatediff_i2ibatch,
+                                     ep_logger, motion_module, update_infotext,
+                                     video_visible)
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 
 InputImage = Union[np.ndarray, str]
 InputImage = Union[Dict[str, InputImage], Tuple[InputImage, InputImage], InputImage]
-
 
 class unload_sd(ContextDecorator):
     """Context-manager that unloads SD checkpoint to free VRAM."""
@@ -218,6 +223,56 @@ def init_default_script_args(script_runner):
                     ui_default_values.append(elem.value)
                 script_args[script.args_from:script.args_to] = ui_default_values
     return script_args
+
+class AnimateDiffScript(scripts.Script):
+    def __init__(self):
+        self.lora_hacker = None
+        self.cfg_hacker = None
+        self.cn_hacker = None
+        self.prompt_scheduler = None
+        self.name = self.title()
+        print("AnimateDiffScript init")
+
+    def title(self):
+        return "animatediff_easyphoto"
+
+    def show(self, is_img2img):
+        return scripts.AlwaysVisible
+    
+    def ui(self, is_img2img):
+        return (AnimateDiffUiGroup().render(), )
+
+    def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
+        if isinstance(params, dict): params = AnimateDiffProcess(**params)
+        if params.enable:
+            ep_logger.info("AnimateDiff process start.")
+            params.set_p(p)
+            motion_module.inject(p.sd_model, params.model)
+            self.prompt_scheduler = AnimateDiffPromptSchedule()
+            self.lora_hacker = AnimateDiffLora(motion_module.mm.is_v2)
+            self.lora_hacker.hack()
+            self.cfg_hacker = AnimateDiffInfV2V(p, self.prompt_scheduler)
+            self.cfg_hacker.hack(params)
+            self.cn_hacker = AnimateDiffControl(p, self.prompt_scheduler)
+            self.cn_hacker.hack(params)
+            update_infotext(p, params)
+
+    def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
+        if isinstance(params, dict): params = AnimateDiffProcess(**params)
+        if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
+            AnimateDiffI2VLatent().randomize(p, params)
+
+    def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
+        if isinstance(params, dict): params = AnimateDiffProcess(**params)
+        if params.enable:
+            self.prompt_scheduler.save_infotext_txt(res)
+            self.cn_hacker.restore()
+            self.cfg_hacker.restore()
+            self.lora_hacker.restore()
+            motion_module.restore(p.sd_model)
+            AnimateDiffOutput().output(p, res, params)
+            motion_module.remove()
+            ep_logger.info("AnimateDiff process end.")
 
 def reload_sd_model_vae(sd_model, vae):
     """Reload sd model and vae

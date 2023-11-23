@@ -7,8 +7,8 @@ import modules.generation_parameters_copypaste as parameters_copypaste
 import requests
 from modules import script_callbacks, shared
 from modules.ui_components import ToolButton as ToolButton_webui
-from scripts.animatediff_utils import video_visible
 from scripts.easyphoto_config import (DEFAULT_SCENE_LORA, cache_log_file_path,
+                                      easyphoto_models_path,
                                       easyphoto_outpath_samples,
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples)
@@ -16,7 +16,8 @@ from scripts.easyphoto_infer import (easyphoto_infer_forward,
                                      easyphoto_video_infer_forward)
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import (check_files_exists_and_download,
-                                     check_id_valid, check_scene_valid)
+                                     check_id_valid, check_scene_valid,
+                                     video_visible)
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
@@ -344,8 +345,8 @@ def on_ui_tabs():
                                 
         with gr.TabItem('Photo Inference'):
             dummy_component = gr.Label(visible=False)
-            training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
-            infer_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates/*.jpg'))
+            training_templates = glob.glob(os.path.join(easyphoto_models_path, 'training_templates/*.jpg'))
+            infer_templates = glob.glob(os.path.join(easyphoto_models_path, 'infer_templates/*.jpg'))
             preset_template = list(training_templates) + list(infer_templates)
 
             with gr.Blocks() as demo:

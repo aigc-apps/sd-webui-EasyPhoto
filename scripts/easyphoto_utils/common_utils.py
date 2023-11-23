@@ -1,12 +1,10 @@
-import datetime
 import gc
 import hashlib
 import logging
 import os
-import traceback
 import re
+import traceback
 from contextlib import ContextDecorator
-from glob import glob
 
 import cv2
 import numpy as np
@@ -15,10 +13,8 @@ import scripts.easyphoto_infer
 import torch
 import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
-from modules.paths import models_path
 from modules.paths_internal import extensions_dir, script_path
-from PIL import Image
-from scripts.easyphoto_config import data_path
+from scripts.easyphoto_config import data_path, models_path, easyphoto_models_path
 from tqdm import tqdm
 
 # Ms logger set
@@ -190,33 +186,33 @@ save_filenames = {
         # vaes
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         # other models
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth"),
+        os.path.join(easyphoto_models_path, "face_skin.pth"),
+        os.path.join(easyphoto_models_path, "face_landmarks.pth"),
+        os.path.join(easyphoto_models_path, "makeup_transfer.pth"),
         # templates
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "1.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "2.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "3.jpg"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates", "4.jpg"),
+        os.path.join(easyphoto_models_path, "training_templates", "1.jpg"),
+        os.path.join(easyphoto_models_path, "training_templates", "2.jpg"),
+        os.path.join(easyphoto_models_path, "training_templates", "3.jpg"),
+        os.path.join(easyphoto_models_path, "training_templates", "4.jpg"),
     ],
     "sdxl": [
         [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix"), "diffusion_pytorch_model.safetensors"),
+        os.path.join(easyphoto_models_path, "stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors"),
         os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
     ],
     "add_text2image": [
         # sdxl for text2image
         os.path.join(models_path, f"Stable-diffusion/LZ-16K+Optics.safetensors"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "001.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "002.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "003.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "004.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "005.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "006.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "007.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "008.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "009.png"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "pose_templates", "010.png")
+        os.path.join(easyphoto_models_path, "pose_templates", "001.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "002.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "003.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "004.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "005.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "006.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "007.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "008.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "009.png"),
+        os.path.join(easyphoto_models_path, "pose_templates", "010.png")
     ],
     "add_ipa_base": [
         [os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
@@ -227,10 +223,10 @@ save_filenames = {
         os.path.join(controlnet_clip_annotator_cache_path, f"clip_g.pth"),
     ],
     "add_video": [
-        # new backbone for video
+        # new backbone for video  
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "mm_sd_v15_v2.ckpt"),
-        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"),
+        os.path.join(easyphoto_models_path, "mm_sd_v15_v2.ckpt"),
+        os.path.join(easyphoto_models_path, "flownet.pkl"),
     ], 
 
     # Scene Lora Collection
@@ -330,7 +326,7 @@ def check_files_exists_and_download(check_hash, download_mode="base"):
                     exist_flag = True
                     break
             else:
-                if os.path.exists(_filename) and compare_hasd_link_file(url, _filename):
+                if os.path.exists(_filename) and compare_hash_link_file(url, _filename):
                     exist_flag = True
                     break
         if exist_flag:
@@ -341,7 +337,7 @@ def check_files_exists_and_download(check_hash, download_mode="base"):
         urldownload_progressbar(url, filename[0])
 
 # Calculate the hash value of the download link and downloaded_file by sha256
-def compare_hasd_link_file(url, file_path):
+def compare_hash_link_file(url, file_path):
     r           = requests.head(url)
     total_size  = int(r.headers['Content-Length'])
     

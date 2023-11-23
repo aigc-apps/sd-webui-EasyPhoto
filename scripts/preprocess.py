@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import cv2
 import numpy as np
 import torch
-from face_process_utils import call_face_crop
+from easyphoto_utils import call_face_crop
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks

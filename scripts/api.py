@@ -1,13 +1,15 @@
 import base64
+import hashlib
+import os
+
 import gradio as gr
+import numpy as np
+import torch
 from fastapi import FastAPI
 from modules.api import api
 from modules.api.models import *
-from scripts.easyphoto_infer import *
-from scripts.easyphoto_train import *
-import hashlib
-from PIL import Image
-import os
+from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_train import easyphoto_train_forward
 
 
 def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):

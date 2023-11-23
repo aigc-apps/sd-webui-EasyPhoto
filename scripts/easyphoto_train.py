@@ -3,14 +3,13 @@ import os
 import platform
 import subprocess
 import sys
-import threading
-import time
 from glob import glob
 from shutil import copyfile
 
 from modules.sd_models_config import config_sdxl
 from PIL import Image, ImageOps
 from scripts.easyphoto_config import (cache_log_file_path,
+                                      easyphoto_models_path,
                                       easyphoto_outpath_samples, models_path,
                                       scene_id_outpath_samples,
                                       user_id_outpath_samples,
@@ -99,7 +98,7 @@ def easyphoto_train_forward(
             return "To save training time and VRAM, please turn off validation in SDXL training."
 
     # Template address
-    training_templates_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "training_templates")
+    training_templates_path = os.path.join(easyphoto_models_path, "training_templates")
     # Raw data backup
     original_backup_path    = os.path.join(cache_outpath_samples, user_id, "original_backup")
     # Reference backup of face
@@ -117,7 +116,7 @@ def easyphoto_train_forward(
     weights_save_path       = os.path.join(cache_outpath_samples, user_id, "user_weights")
     webui_save_path         = os.path.join(models_path, f"Lora/{user_id}.safetensors")
     webui_load_path         = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
-    sd_save_path          = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "stable-diffusion-v1-5")
+    sd_save_path          = os.path.join(easyphoto_models_path, "stable-diffusion-v1-5")
     if sdxl_pipeline_flag:
         sd_save_path = sd_save_path.replace("stable-diffusion-v1-5", "stable-diffusion-xl/stabilityai_stable_diffusion_xl_base_1.0")
     if enable_rl and not train_scene_lora_bool:

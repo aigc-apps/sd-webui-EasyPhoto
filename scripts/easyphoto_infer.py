@@ -2,8 +2,8 @@ import copy
 import glob
 import math
 import os
-import traceback
 import re
+import traceback
 from typing import Any, Dict, List, Optional, Union
 
 import cv2
@@ -14,7 +14,6 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from modules import sd_models, sd_vae, shared
 from modules.images import save_image
-from modules.paths import models_path
 from modules.shared import opts, state
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_AD,
@@ -22,24 +21,24 @@ from scripts.easyphoto_config import (DEFAULT_NEGATIVE, DEFAULT_NEGATIVE_AD,
                                       DEFAULT_POSITIVE_AD,
                                       DEFAULT_POSITIVE_T2I, SDXL_MODEL_NAME,
                                       easyphoto_img2img_samples,
+                                      easyphoto_models_path,
                                       easyphoto_outpath_samples,
                                       easyphoto_txt2img_samples,
                                       easyphoto_video_outpath_samples,
                                       models_path, user_id_outpath_samples,
                                       validation_prompt,
                                       validation_prompt_scene)
-from scripts.easyphoto_utils import (check_files_exists_and_download,
-                                     check_id_valid, convert_to_video,
-                                     ep_logger, get_mov_all_images,
+from scripts.easyphoto_utils import (Face_Skin, FIRE_forward, PSGAN_Inference,
+                                     alignment_photo, call_face_crop,
+                                     call_face_crop_templates,
+                                     check_files_exists_and_download,
+                                     check_id_valid, color_transfer,
+                                     convert_to_video, crop_and_paste,
+                                     ep_logger, get_controlnet_version,
+                                     get_mov_all_images,
                                      modelscope_models_to_cpu,
                                      modelscope_models_to_gpu,
-                                     switch_ms_model_cpu, unload_models,
-                                     get_controlnet_version)
-from scripts.face_process_utils import (
-    Face_Skin, call_face_crop, call_face_crop_templates, color_transfer,
-    crop_and_paste, safe_get_box_mask_keypoints_and_padding_image, alignment_photo)
-from scripts.FIRE_utils import FIRE_forward
-from scripts.psgan_utils import PSGAN_Inference
+                                     switch_ms_model_cpu, unload_models)
 from scripts.sdwebui import (ControlNetUnit, get_checkpoint_type,
                              get_lora_type, get_scene_prompt, i2i_inpaint_call,
                              refresh_model_vae, reload_sd_model_vae,
@@ -496,7 +495,7 @@ def easyphoto_infer_forward(
     if image_face_fusion is None:
         image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo', model_revision='v1.3')
     if face_skin is None:
-        face_skin               = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
+        face_skin               = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
     if skin_retouching is None:
         try:
             skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
@@ -523,8 +522,8 @@ def easyphoto_infer_forward(
     # psgan for transfer makeup
     if makeup_transfer and psgan_inference is None:
         try: 
-            makeup_transfer_model_path  = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth")
-            face_landmarks_model_path   = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth")
+            makeup_transfer_model_path  = os.path.join(easyphoto_models_path, "makeup_transfer.pth")
+            face_landmarks_model_path   = os.path.join(easyphoto_models_path, "face_landmarks.pth")
             psgan_inference = PSGAN_Inference("cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path)
         except Exception as e:
             torch.cuda.empty_cache()
@@ -582,8 +581,8 @@ def easyphoto_infer_forward(
 
             # text to image with scene lora 
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-            pose_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.jpg')) + \
-                            glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'pose_templates/*.png'))
+            pose_templates = glob.glob(os.path.join(easyphoto_models_path, 'pose_templates/*.jpg')) + \
+                            glob.glob(os.path.join(easyphoto_models_path, 'pose_templates/*.png'))
             
             pose_template = Image.open(np.random.choice(pose_templates))
             template_images = txt2img(
@@ -1311,7 +1310,12 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[5], "add_video")
+    check_files_exists_and_download(check_hash[0], download_mode = "base")
+    if check_hash[0]:
+        refresh_model_vae()
+    check_hash[0] = False
+
+    check_files_exists_and_download(check_hash[5], download_mode = "add_video")
     if check_hash[5]:
         refresh_model_vae()
     check_hash[5] = False
@@ -1373,7 +1377,7 @@ def easyphoto_video_infer_forward(
     if image_face_fusion is None:
         image_face_fusion       = pipeline(Tasks.image_face_fusion, model='damo/cv_unet-image-face-fusion_damo', model_revision='v1.3')
     if face_skin is None:
-        face_skin               = Face_Skin(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_skin.pth"))
+        face_skin               = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
     if skin_retouching is None:
         try:
             skin_retouching     = pipeline('skin-retouching-torch', model='damo/cv_unet_skin_retouching_torch', model_revision='v1.0.2')
@@ -1396,8 +1400,8 @@ def easyphoto_video_infer_forward(
     # psgan for transfer makeup
     if makeup_transfer and psgan_inference is None:
         try: 
-            makeup_transfer_model_path  = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "makeup_transfer.pth")
-            face_landmarks_model_path   = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "face_landmarks.pth")
+            makeup_transfer_model_path  = os.path.join(easyphoto_models_path, "makeup_transfer.pth")
+            face_landmarks_model_path   = os.path.join(easyphoto_models_path, "face_landmarks.pth")
             psgan_inference = PSGAN_Inference("cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path)
         except Exception as e:
             torch.cuda.empty_cache()
@@ -1786,7 +1790,7 @@ def easyphoto_video_infer_forward(
                 modelscope_models_to_cpu()
                 _outputs = [np.array(_output, np.uint8) for _output in _outputs]
                 _outputs, actual_fps = FIRE_forward(
-                    _outputs, actual_fps, os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "flownet.pkl"), 
+                    _outputs, actual_fps, os.path.join(easyphoto_models_path, "flownet.pkl"), 
                     video_interpolation_ext, 1, fp16 = False
                 )
                 _outputs = [Image.fromarray(np.uint8(_output)) for _output in _outputs]

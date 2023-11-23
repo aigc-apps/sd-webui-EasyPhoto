@@ -30,29 +30,35 @@ from modules.processing import (Processed, StableDiffusionProcessing,
 from modules.sd_vae import find_vae_near_checkpoint
 from modules.shared import opts, state
 from PIL import Image, PngImagePlugin
+from scripts.easyphoto_config import easyphoto_models_path
 
 try:
-    from scripts.animatediff.animatediff_i2ibatch import animatediff_i2ibatch
-    from scripts.animatediff.animatediff_infotext import update_infotext
-    from scripts.animatediff.animatediff_infv2v import AnimateDiffInfV2V
-    from scripts.animatediff.animatediff_logger import logger_animatediff as logger
-    from scripts.animatediff.animatediff_lora import AnimateDiffLora
-    from scripts.animatediff.animatediff_mm import AnimateDiffMM
-    from scripts.animatediff.animatediff_output import AnimateDiffOutput
-    from scripts.animatediff.animatediff_prompt import AnimateDiffPromptSchedule
-    from scripts.animatediff.animatediff_ui import (AnimateDiffProcess,
-                                                    AnimateDiffUiGroup)
-    from modules.sd_samplers_common import (approximation_indexes,
-                                            images_tensor_to_samples)
+    from .animatediff.animatediff_i2ibatch import animatediff_i2ibatch
+    from .animatediff.animatediff_infotext import update_infotext
+    from .animatediff.animatediff_infv2v import AnimateDiffInfV2V
+    from .animatediff.animatediff_logger import logger_animatediff as logger
+    from .animatediff.animatediff_lora import AnimateDiffLora
+    from .animatediff.animatediff_mm import AnimateDiffMM
+    from .animatediff.animatediff_output import AnimateDiffOutput
+    from .animatediff.animatediff_prompt import AnimateDiffPromptSchedule
+    from .animatediff.animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
+    from modules.sd_samplers_common import approximation_indexes, images_tensor_to_samples
     video_visible = True
 except Exception as e:
     print(f"Animatediff is not Support when stable-diffusion webui is under v1.6.0. Animatediff import error detailed is follow: {e}")
+    animatediff_i2ibatch = None
+    update_infotext = None
+    AnimateDiffInfV2V = None
+    AnimateDiffLora = None
+    AnimateDiffMM = None
+    AnimateDiffOutput = None
+    AnimateDiffPromptSchedule = None
     AnimateDiffProcess = None
+    AnimateDiffUiGroup = None
     video_visible = False
 
 if video_visible:
     class AnimateDiffControl:
-
         def __init__(self, p: StableDiffusionProcessing, prompt_scheduler: AnimateDiffPromptSchedule):
             self.original_processing_process_images_hijack = None
             self.original_controlnet_main_entry = None
@@ -63,7 +69,6 @@ if video_visible:
             except:
                 self.cn_script = None
             self.prompt_scheduler = prompt_scheduler
-
 
         def hack_batchhijack(self, params: AnimateDiffProcess):
             cn_script = self.cn_script
@@ -102,14 +107,12 @@ if video_visible:
             self.original_processing_process_images_hijack = BatchHijack.processing_process_images_hijack
             BatchHijack.processing_process_images_hijack = hacked_processing_process_images_hijack
             processing.process_images_inner = instance.processing_process_images_hijack
-        
 
         def restore_batchhijack(self):
             from scripts.batch_hijack import BatchHijack, instance
             BatchHijack.processing_process_images_hijack = self.original_processing_process_images_hijack
             self.original_processing_process_images_hijack = None
             processing.process_images_inner = instance.processing_process_images_hijack
-
 
         def hack_cn(self):
             cn_script = self.cn_script
@@ -572,13 +575,11 @@ if video_visible:
             self.cn_script.controlnet_main_entry = MethodType(hacked_main_entry, self.cn_script)
             self.cn_script.postprocess_batch = MethodType(hacked_postprocess_batch, self.cn_script)
 
-
         def restore_cn(self):
             self.cn_script.controlnet_main_entry = self.original_controlnet_main_entry
             self.original_controlnet_main_entry = None
             self.cn_script.postprocess_batch = self.original_postprocess_batch
             self.original_postprocess_batch = None
-
 
         def hack(self, params: AnimateDiffProcess):
             if self.cn_script is not None:
@@ -586,13 +587,11 @@ if video_visible:
                 self.hack_batchhijack(params)
                 self.hack_cn()
 
-
         def restore(self):
             if self.cn_script is not None:
                 logger.info(f"Restoring ControlNet.")
                 self.restore_batchhijack()
                 self.restore_cn()
-
 
     class AnimateDiffOutput(AnimateDiffOutput):
         def output(
@@ -744,10 +743,9 @@ if video_visible:
                     logger.warn("WebP animation in Pillow requires system WebP library v0.5.0 or later")
             return video_paths
 
-
     class AnimateDiffMM_Remake(AnimateDiffMM):
         def _load(self, model_name):
-            from scripts.animatediff.motion_module import (MotionModuleType,
+            from .animatediff.motion_module import (MotionModuleType,
                                                         MotionWrapper)
             model_path = os.path.join(self.script_dir, model_name)
             if not os.path.isfile(model_path):
@@ -765,10 +763,8 @@ if video_visible:
             if not shared.cmd_opts.no_half:
                 self.mm.half()
 
-
     motion_module = AnimateDiffMM_Remake()
-    motion_module.set_script_dir(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"))
-
+    motion_module.set_script_dir(easyphoto_models_path)
 
     class AnimateDiffUiGroup:
         txt2img_submit_button = None
@@ -781,9 +777,7 @@ if video_visible:
         def render(self):
             return gr.State(value=AnimateDiffProcess)
 
-
     class AnimateDiffProcess:
-
         def __init__(
             self,
             model="mm_sd_v15_v2.ckpt",
@@ -828,7 +822,6 @@ if video_visible:
             self.latent_scale_last = latent_scale_last
             self.i2i_reserve_scale = i2i_reserve_scale
 
-
         def get_list(self, is_img2img: bool):
             list_var = list(vars(self).values())
             if is_img2img:
@@ -836,7 +829,6 @@ if video_visible:
             else:
                 list_var = list_var[:-5]
             return list_var
-
 
         def get_dict(self, is_img2img: bool):
             infotext = {
@@ -864,7 +856,6 @@ if video_visible:
             infotext_str = ', '.join(f"{k}: {v}" for k, v in infotext.items())
             return infotext_str
 
-
         def _check(self):
             assert (
                 self.video_length >= 0 and self.fps > 0
@@ -872,7 +863,6 @@ if video_visible:
             assert not set(["GIF", "MP4", "PNG", "WEBP"]).isdisjoint(
                 self.format
             ), "At least one saving format should be selected."
-
 
         def set_p(self, p: StableDiffusionProcessing):
             self._check()
@@ -889,7 +879,6 @@ if video_visible:
                 self.overlap = self.batch_size // 4
             if "PNG" not in self.format or shared.opts.data.get("animatediff_save_to_custom", False):
                 p.do_not_save_samples = True
-
 
     class AnimateDiffI2VLatent:
         def randomize(
@@ -975,57 +964,3 @@ if video_visible:
                 )
             else:
                 p.init_latent = p.init_latent * reserve_scale + p.rng.next() * (1 - reserve_scale)
-
-
-    class AnimateDiffScript_Remake(scripts.Script):
-
-        def __init__(self):
-            self.lora_hacker = None
-            self.cfg_hacker = None
-            self.cn_hacker = None
-            self.prompt_scheduler = None
-            self.name = self.title()
-            print("AnimateDiffScript init")
-
-        def title(self):
-            return "animatediff_easyphoto"
-
-        def show(self, is_img2img):
-            return scripts.AlwaysVisible
-        
-        def ui(self, is_img2img):
-            return (AnimateDiffUiGroup().render(), )
-
-        def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable:
-                logger.info("AnimateDiff process start.")
-                params.set_p(p)
-                motion_module.inject(p.sd_model, params.model)
-                self.prompt_scheduler = AnimateDiffPromptSchedule()
-                self.lora_hacker = AnimateDiffLora(motion_module.mm.is_v2)
-                self.lora_hacker.hack()
-                self.cfg_hacker = AnimateDiffInfV2V(p, self.prompt_scheduler)
-                self.cfg_hacker.hack(params)
-                self.cn_hacker = AnimateDiffControl(p, self.prompt_scheduler)
-                self.cn_hacker.hack(params)
-                update_infotext(p, params)
-
-
-        def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, '_animatediff_i2i_batch'):
-                AnimateDiffI2VLatent().randomize(p, params)
-
-
-        def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
-            if isinstance(params, dict): params = AnimateDiffProcess(**params)
-            if params.enable:
-                self.prompt_scheduler.save_infotext_txt(res)
-                self.cn_hacker.restore()
-                self.cfg_hacker.restore()
-                self.lora_hacker.restore()
-                motion_module.restore(p.sd_model)
-                AnimateDiffOutput().output(p, res, params)
-                motion_module.remove()
-                logger.info("AnimateDiff process end.")
