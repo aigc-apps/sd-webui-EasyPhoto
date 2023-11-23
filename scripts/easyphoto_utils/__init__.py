@@ -1,9 +1,9 @@
-from .animatediff_utils import (AnimateDiffControl, AnimateDiffInfV2V,
-                                AnimateDiffLora, AnimateDiffMM,
-                                AnimateDiffOutput, AnimateDiffProcess,
-                                AnimateDiffPromptSchedule, AnimateDiffUiGroup,
-                                animatediff_i2ibatch, motion_module,
-                                update_infotext, video_visible)
+from .animatediff_utils import (AnimateDiffControl, AnimateDiffI2VLatent,
+                                AnimateDiffInfV2V, AnimateDiffLora,
+                                AnimateDiffMM, AnimateDiffOutput,
+                                AnimateDiffProcess, AnimateDiffPromptSchedule,
+                                AnimateDiffUiGroup, animatediff_i2ibatch,
+                                motion_module, update_infotext, video_visible)
 from .common_utils import (check_files_exists_and_download, check_id_valid,
                            check_scene_valid, convert_to_video, ep_logger,
                            get_controlnet_version, get_mov_all_images,
