@@ -910,7 +910,8 @@ def easyphoto_infer_forward(
                     ipa_retinaface_keypoint[:, 1] -= ipa_retinaface_box[1]
                     ipa_image_face = Image.fromarray(np.uint8(alignment_photo(np.array(ipa_image_face), np.array(ipa_retinaface_keypoint, np.int))[0]))
                     
-                    # if brow_mask is not None, remove the skin above brows
+                    # If brow_mask is not None, remove the skin above brows
+                    # Only edit the facial area here, hair is useless
                     if brow_mask is not None:
                         brow_mask = brow_mask.crop(ipa_retinaface_box)
                         brow_mask = Image.fromarray(np.uint8(alignment_photo(np.array(brow_mask), np.array(ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0))[0]))
