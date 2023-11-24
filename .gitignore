@@ -169,4 +169,5 @@ cython_debug/
 *.png
 
 models/stable-diffusion-xl/version.txt
+models/pose_templates
 scripts/thirdparty

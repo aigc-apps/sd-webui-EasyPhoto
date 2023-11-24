@@ -29,6 +29,7 @@ repos:
             "--remove-all-unused-imports",
             "--remove-unused-variable",
             "--ignore-init-module-imports",
+            "--exclude=__init__.py"
           ]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
