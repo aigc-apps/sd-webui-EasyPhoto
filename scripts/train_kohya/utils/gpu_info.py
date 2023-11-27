@@ -111,13 +111,31 @@ def plot_data(prefix):
         tick_spacing = 1
 
     try:
-        plot_graph(time_stamps, used_memory, "Used Memory (GB)", "Time", "Used Memory (GB)", "Used Memory Over Time", tick_spacing, f"{prefix}_memory.png")
+        plot_graph(
+            time_stamps,
+            used_memory,
+            "Used Memory (GB)",
+            "Time",
+            "Used Memory (GB)",
+            "Used Memory Over Time",
+            tick_spacing,
+            f"{prefix}_memory.png",
+        )
     except Exception as e:
         message = f"plot_graph of Memory error, error info:{str(e)}"
         print(message)
 
     try:
-        plot_graph(time_stamps, gpu_utilization, "GPU Utilization (%)", "Time", "GPU Utilization (%)", "GPU Utilization Over Time", tick_spacing, f"{prefix}_utilization.png")
+        plot_graph(
+            time_stamps,
+            gpu_utilization,
+            "GPU Utilization (%)",
+            "Time",
+            "GPU Utilization (%)",
+            "GPU Utilization Over Time",
+            tick_spacing,
+            f"{prefix}_utilization.png",
+        )
     except Exception as e:
         message = f"plot_graph of Utilization error, error info:{str(e)}"
         print(message)

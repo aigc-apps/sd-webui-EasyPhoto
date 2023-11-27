@@ -96,7 +96,14 @@ if __name__ == "__main__":
                         reference = [os.path.abspath(t) for t in reference]
 
                     if os.path.exists(file_path2) and reference is not None:
-                        data_item = {"id": len(result_data), "method1": method_a, "img1": file_path, "method2": method_b, "img2": file_path2, "reference_imgs": reference}
+                        data_item = {
+                            "id": len(result_data),
+                            "method1": method_a,
+                            "img1": file_path,
+                            "method2": method_b,
+                            "img2": file_path2,
+                            "reference_imgs": reference,
+                        }
 
                         result_data.append(data_item)
                     else:

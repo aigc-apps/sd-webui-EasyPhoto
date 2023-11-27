@@ -16,7 +16,20 @@ from modules.sd_vae import refresh_vae_list
 from modules.shared import opts
 from modules.timer import Timer
 
-from scripts.easyphoto_utils import AnimateDiffControl, AnimateDiffI2VLatent, AnimateDiffInfV2V, AnimateDiffLora, AnimateDiffOutput, AnimateDiffProcess, AnimateDiffPromptSchedule, AnimateDiffUiGroup, ep_logger, motion_module, update_infotext, video_visible
+from scripts.easyphoto_utils import (
+    AnimateDiffControl,
+    AnimateDiffI2VLatent,
+    AnimateDiffInfV2V,
+    AnimateDiffLora,
+    AnimateDiffOutput,
+    AnimateDiffProcess,
+    AnimateDiffPromptSchedule,
+    AnimateDiffUiGroup,
+    ep_logger,
+    motion_module,
+    update_infotext,
+    video_visible,
+)
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
 

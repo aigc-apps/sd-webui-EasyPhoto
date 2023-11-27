@@ -75,7 +75,17 @@ def next_item(ids, ids_list, id2data, results):
 
     item = id2data[id]
 
-    return item["id"], [(x, "") for x in item["reference_imgs"]], left_img, right_img, draw_results(results, ids_list), ids, ids_list, id2data, results
+    return (
+        item["id"],
+        [(x, "") for x in item["reference_imgs"]],
+        left_img,
+        right_img,
+        draw_results(results, ids_list),
+        ids,
+        ids_list,
+        id2data,
+        results,
+    )
 
 
 def draw_results(results, ids_list):
@@ -109,12 +119,27 @@ def draw_results(results, ids_list):
         method2_win += [sum(method2_win) / len(method2_win)]
 
         results_for_drawing["Questions"] = (questions + ["Average"]) * 3
-        results_for_drawing["Win Rate"] = [x / len(results) * 100 for x in method1_win] + [x / len(results) * 100 for x in tie] + [x / len(results) * 100 for x in method2_win]
+        results_for_drawing["Win Rate"] = (
+            [x / len(results) * 100 for x in method1_win]
+            + [x / len(results) * 100 for x in tie]
+            + [x / len(results) * 100 for x in method2_win]
+        )
 
-        results_for_drawing["Winner"] = [data[0]["method1"]] * (num_questions + 1) + ["Tie"] * (num_questions + 1) + [data[0]["method2"]] * (num_questions + 1)
+        results_for_drawing["Winner"] = (
+            [data[0]["method1"]] * (num_questions + 1) + ["Tie"] * (num_questions + 1) + [data[0]["method2"]] * (num_questions + 1)
+        )
         results_for_drawing = pd.DataFrame(results_for_drawing)
 
-        return gr.BarPlot(results_for_drawing, x="Questions", y="Win Rate", color="Winner", title="Human Evaluation Result", vertical=False, width=450, height=300)
+        return gr.BarPlot(
+            results_for_drawing,
+            x="Questions",
+            y="Win Rate",
+            color="Winner",
+            title="Human Evaluation Result",
+            vertical=False,
+            width=450,
+            height=300,
+        )
 
 
 def init_start(ids, ids_list, id2data, results):
@@ -141,7 +166,6 @@ if not os.path.exists(args.template_file):
 template = read_json(args.template_file)
 data = read_json(args.data_path)
 
-
 with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
 
     id = gr.State()
@@ -161,7 +185,9 @@ with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
 
         with gr.Row():
             with gr.Column(scale=3):
-                reference_imgs = gr.Gallery([], columns=3, rows=1, label="人物参考图片", show_label=True, elem_id="reference-imgs", visible=template["show_references"])
+                reference_imgs = gr.Gallery(
+                    [], columns=3, rows=1, label="人物参考图片", show_label=True, elem_id="reference-imgs", visible=template["show_references"]
+                )
             with gr.Column(scale=1):
                 pass
 
@@ -188,7 +214,11 @@ with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
                 with gr.Column(scale=1):
                     pass
 
-    start_btn.click(init_start, inputs=[ids, ids_list, id2data, results], outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results]).then(
+    start_btn.click(
+        init_start,
+        inputs=[ids, ids_list, id2data, results],
+        outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results],
+    ).then(
         fn=None,
         _js="\
         () => {\
@@ -200,9 +230,16 @@ with gr.Blocks(title="EasyPhoto双盲评测", css="style.css") as app:
         outputs=[],
     )
 
-    submit.click(save_result, inputs=[id, submit_cnt, ids, ids_list, id2data, results] + eval_results, outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results, submit_cnt])
-    next_btn.click(next_item, inputs=[ids, ids_list, id2data, results], outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results])
-
+    submit.click(
+        save_result,
+        inputs=[id, submit_cnt, ids, ids_list, id2data, results] + eval_results,
+        outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results, submit_cnt],
+    )
+    next_btn.click(
+        next_item,
+        inputs=[ids, ids_list, id2data, results],
+        outputs=[id, reference_imgs, left_img, right_img, plot, ids, ids_list, id2data, results],
+    )
 
 if __name__ == "__main__":
 

@@ -172,10 +172,22 @@ save_filenames = {
         # base model
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         # controlnets
-        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth")],
-        [os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"), os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth")],
-        [os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"), os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth")],
-        [os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"), os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth")],
+        [
+            os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth"),
+        ],
+        [
+            os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth"),
+        ],
+        [
+            os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth"),
+        ],
+        [
+            os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth"),
+        ],
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         # controlnet annotator
@@ -195,7 +207,10 @@ save_filenames = {
         os.path.join(easyphoto_models_path, "training_templates", "4.jpg"),
     ],
     "sdxl": [
-        [os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"), os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors")],
+        [
+            os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"),
+            os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors"),
+        ],
         os.path.join(easyphoto_models_path, "stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors"),
         os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
     ],
@@ -214,11 +229,17 @@ save_filenames = {
         os.path.join(easyphoto_models_path, "pose_templates", "010.png"),
     ],
     "add_ipa_base": [
-        [os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"), os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth")],
+        [
+            os.path.join(models_path, f"ControlNet/ip-adapter-full-face_sd15.pth"),
+            os.path.join(controlnet_cache_path, f"models/ip-adapter-full-face_sd15.pth"),
+        ],
         os.path.join(controlnet_clip_annotator_cache_path, f"clip_h.pth"),
     ],
     "add_ipa_sdxl": [
-        [os.path.join(models_path, f"ControlNet/ip-adapter-plus-face_sdxl_vit-h.safetensors"), os.path.join(controlnet_cache_path, f"models/ip-adapter-plus-face_sdxl_vit-h.safetensors")],
+        [
+            os.path.join(models_path, f"ControlNet/ip-adapter-plus-face_sdxl_vit-h.safetensors"),
+            os.path.join(controlnet_cache_path, f"models/ip-adapter-plus-face_sdxl_vit-h.safetensors"),
+        ],
         os.path.join(controlnet_clip_annotator_cache_path, f"clip_g.pth"),
     ],
     "add_video": [
@@ -453,7 +474,12 @@ def convert_to_video(path, frames, fps, prefix=None, mode="gif"):
             codec="gif",
             out_pixel_format="pal8",
             filter_graph=(
-                {"split": ("split", ""), "palgen": ("palettegen", ""), "paluse": ("paletteuse", ""), "scale": ("scale", f"{frames[0].width}:{frames[0].height}")},
+                {
+                    "split": ("split", ""),
+                    "palgen": ("palettegen", ""),
+                    "paluse": ("paletteuse", ""),
+                    "scale": ("scale", f"{frames[0].width}:{frames[0].height}"),
+                },
                 [
                     ("video_in", "scale", 0, 0),
                     ("scale", "split", 0, 0),

@@ -111,13 +111,17 @@ def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torc
             alpha = 1.0
         curr_layer.weight.data = curr_layer.weight.data.to(device)
         if len(weight_up.shape) == 4:
-            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2), weight_down.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+            curr_layer.weight.data += (
+                multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2), weight_down.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+            )
         else:
             curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
     return pipeline
 
 
-def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs):
+def log_validation(
+    network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, **kwargs
+):
     """
     This function, `log_validation`, serves as a validation step during training.
     It generates ID photo templates using controlnet if `template_dir` exists, otherwise, it creates random templates based on validation prompts.
@@ -142,7 +146,15 @@ def log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet,
     # When template_dir doesn't exist, generate randomly based on validation prompts.
     text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
 
-    pipeline = StableDiffusionInpaintPipeline(tokenizer=tokenizer, scheduler=noise_scheduler, unet=unet.to(accelerator.device, weight_dtype), text_encoder=text_encoder.to(accelerator.device, weight_dtype), vae=vae.to(accelerator.device, weight_dtype), safety_checker=None, feature_extractor=None)
+    pipeline = StableDiffusionInpaintPipeline(
+        tokenizer=tokenizer,
+        scheduler=noise_scheduler,
+        unet=unet.to(accelerator.device, weight_dtype),
+        text_encoder=text_encoder.to(accelerator.device, weight_dtype),
+        vae=vae.to(accelerator.device, weight_dtype),
+        safety_checker=None,
+        feature_extractor=None,
+    )
     pipeline = pipeline.to(accelerator.device)
     pipeline.safety_checker = None
     pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
@@ -247,7 +259,9 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
         retinaface_mask = np.zeros_like(np.array(image, np.uint8))
         if mask_type == "skin":
             retinaface_sub_mask = face_seg(retinaface_crop)
-            retinaface_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2]] = np.expand_dims(retinaface_sub_mask, -1)
+            retinaface_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2]] = np.expand_dims(
+                retinaface_sub_mask, -1
+            )
         else:
             retinaface_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2]] = 255
         retinaface_mask_pil = Image.fromarray(np.uint8(retinaface_mask))
@@ -298,7 +312,9 @@ def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # 检测人脸框
     retinaface_result = retinaface_detection(image)
     # 获取mask与关键点
-    retinaface_box, retinaface_keypoints, retinaface_mask_pil = safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, None, "crop")
+    retinaface_box, retinaface_keypoints, retinaface_mask_pil = safe_get_box_mask_keypoints(
+        image, retinaface_result, crop_ratio, None, "crop"
+    )
 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
@@ -329,7 +345,12 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
         return [], [], []
 
     # get ID list
-    face_image_list = glob(os.path.join(pivot_dir, "*.jpg")) + glob(os.path.join(pivot_dir, "*.JPG")) + glob(os.path.join(pivot_dir, "*.png")) + glob(os.path.join(pivot_dir, "*.PNG"))
+    face_image_list = (
+        glob(os.path.join(pivot_dir, "*.jpg"))
+        + glob(os.path.join(pivot_dir, "*.JPG"))
+        + glob(os.path.join(pivot_dir, "*.png"))
+        + glob(os.path.join(pivot_dir, "*.PNG"))
+    )
 
     #  vstack all embedding
     embedding_list = []
@@ -369,7 +390,12 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     # sort all validation image
     result_list = []
     if not test_img_dir.endswith(".jpg"):
-        img_list = glob(os.path.join(test_img_dir, "*.jpg")) + glob(os.path.join(test_img_dir, "*.JPG")) + glob(os.path.join(test_img_dir, "*.png")) + glob(os.path.join(test_img_dir, "*.PNG"))
+        img_list = (
+            glob(os.path.join(test_img_dir, "*.jpg"))
+            + glob(os.path.join(test_img_dir, "*.JPG"))
+            + glob(os.path.join(test_img_dir, "*.png"))
+            + glob(os.path.join(test_img_dir, "*.PNG"))
+        )
         for img in img_list:
             try:
                 # a average above all
@@ -444,7 +470,11 @@ def parse_args():
         "--dataset_name",
         type=str,
         default=None,
-        help=("The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private," " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem," " or to a folder containing files that 🤗 Datasets can understand."),
+        help=(
+            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
+            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
+            " or to a folder containing files that 🤗 Datasets can understand."
+        ),
     )
     parser.add_argument(
         "--dataset_config_name",
@@ -456,7 +486,11 @@ def parse_args():
         "--train_data_dir",
         type=str,
         default=None,
-        help=("A folder containing the training data. Folder contents must follow the structure described in" " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file" " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."),
+        help=(
+            "A folder containing the training data. Folder contents must follow the structure described in"
+            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
+            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
+        ),
     )
     parser.add_argument("--image_column", type=str, default="image", help="The column of the dataset containing an image.")
     parser.add_argument(
@@ -481,15 +515,26 @@ def parse_args():
         "--validation_epochs",
         type=int,
         default=1,
-        help=("Run fine-tuning validation every X epochs. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
+        help=(
+            "Run fine-tuning validation every X epochs. The validation process consists of running the prompt"
+            " `args.validation_prompt` multiple times: `args.num_validation_images`."
+        ),
     )
     parser.add_argument(
         "--validation_steps",
         type=int,
         default=None,
-        help=("Run fine-tuning validation every X steps. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
+        help=(
+            "Run fine-tuning validation every X steps. The validation process consists of running the prompt"
+            " `args.validation_prompt` multiple times: `args.num_validation_images`."
+        ),
     )
-    parser.add_argument("--neg_prompt", type=str, default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo", help="A prompt that is neg during training for inference.")
+    parser.add_argument(
+        "--neg_prompt",
+        type=str,
+        default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo",
+        help="A prompt that is neg during training for inference.",
+    )
     parser.add_argument("--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference.")
     parser.add_argument(
         "--max_train_samples",
@@ -520,7 +565,10 @@ def parse_args():
         "--center_crop",
         default=False,
         action="store_true",
-        help=("Whether to center crop the input images to the resolution. If not set, the images will be randomly" " cropped. The images will be resized to the resolution first before cropping."),
+        help=(
+            "Whether to center crop the input images to the resolution. If not set, the images will be randomly"
+            " cropped. The images will be resized to the resolution first before cropping."
+        ),
     )
     parser.add_argument(
         "--random_flip",
@@ -562,7 +610,10 @@ def parse_args():
         "--lr_scheduler",
         type=str,
         default="constant",
-        help=('The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",' ' "constant", "constant_with_warmup"]'),
+        help=(
+            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
+            ' "constant", "constant_with_warmup"]'
+        ),
     )
     parser.add_argument("--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler.")
     parser.add_argument(
@@ -574,13 +625,17 @@ def parse_args():
         "--snr_gamma",
         type=float,
         default=None,
-        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. " "More details here: https://arxiv.org/abs/2303.09556.",
+        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. "
+        "More details here: https://arxiv.org/abs/2303.09556.",
     )
     parser.add_argument("--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes.")
     parser.add_argument(
         "--allow_tf32",
         action="store_true",
-        help=("Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see" " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"),
+        help=(
+            "Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see"
+            " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
+        ),
     )
     parser.add_argument(
         "--dataloader_num_workers",
@@ -610,20 +665,30 @@ def parse_args():
         "--logging_dir",
         type=str,
         default="logs",
-        help=("[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to" " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."),
+        help=(
+            "[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to"
+            " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
+        ),
     )
     parser.add_argument(
         "--mixed_precision",
         type=str,
         default=None,
         choices=["no", "fp16", "bf16"],
-        help=("Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >=" " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the" " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."),
+        help=(
+            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
+            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
+            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
+        ),
     )
     parser.add_argument(
         "--report_to",
         type=str,
         default="tensorboard",
-        help=('The integration to report the results and logs to. Supported platforms are `"tensorboard"`' ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'),
+        help=(
+            'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
+            ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
+        ),
     )
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument("--save_state", action="store_true", help="Whether or not to save state.")
@@ -631,7 +696,10 @@ def parse_args():
         "--checkpointing_steps",
         type=int,
         default=500,
-        help=("Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming" " training using `--resume_from_checkpoint`."),
+        help=(
+            "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
+            " training using `--resume_from_checkpoint`."
+        ),
     )
     parser.add_argument(
         "--checkpoints_total_limit",
@@ -643,7 +711,10 @@ def parse_args():
         "--resume_from_checkpoint",
         type=str,
         default=None,
-        help=("Whether training should be resumed from a previous checkpoint. Use a path saved by" ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'),
+        help=(
+            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
+            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
+        ),
     )
     parser.add_argument("--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers.")
     parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
@@ -825,7 +896,9 @@ def main():
 
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
-                logger.warn("xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details.")
+                logger.warn(
+                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
+                )
             unet.enable_xformers_memory_efficient_attention()
 
     def compute_snr(timesteps):
@@ -1005,9 +1078,13 @@ def main():
 
     # Prepare everything with our `accelerator`.
     if args.train_text_encoder:
-        unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler)
+        unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+            unet, text_encoder, network, optimizer, train_dataloader, lr_scheduler
+        )
     else:
-        unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, network, optimizer, train_dataloader, lr_scheduler)
+        unet, network, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+            unet, network, optimizer, train_dataloader, lr_scheduler
+        )
 
     def transform_models_if_DDP(models):
         from torch.nn.parallel import DistributedDataParallel as DDP
@@ -1230,7 +1307,9 @@ def main():
                                 num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
                                 removing_checkpoints = checkpoints[0:num_to_remove]
 
-                                logger.info(f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints")
+                                logger.info(
+                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+                                )
                                 logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
                                 for removing_checkpoint in removing_checkpoints:
@@ -1253,14 +1332,63 @@ def main():
 
             if accelerator.sync_gradients:
                 if accelerator.is_main_process:
-                    if args.validation_steps is not None and args.validation_prompt is not None and global_step % args.validation_steps == 0 and args.validation:
-                        logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
-                        log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
+                    if (
+                        args.validation_steps is not None
+                        and args.validation_prompt is not None
+                        and global_step % args.validation_steps == 0
+                        and args.validation
+                    ):
+                        logger.info(
+                            f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
+                            f" {args.validation_prompt}."
+                        )
+                        log_validation(
+                            network,
+                            noise_scheduler,
+                            vae,
+                            text_encoder,
+                            tokenizer,
+                            unet,
+                            args,
+                            accelerator,
+                            weight_dtype,
+                            epoch,
+                            global_step,
+                            input_images=input_images,
+                            input_images_shape=input_images_shape,
+                            control_images=control_images,
+                            input_masks=input_masks,
+                            new_size=new_size,
+                        )
 
         if accelerator.is_main_process:
-            if args.validation_steps is None and args.validation_prompt is not None and global_step % args.validation_epochs == 0 and args.validation:
-                logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
-                log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
+            if (
+                args.validation_steps is None
+                and args.validation_prompt is not None
+                and global_step % args.validation_epochs == 0
+                and args.validation
+            ):
+                logger.info(
+                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}."
+                )
+                log_validation(
+                    network,
+                    noise_scheduler,
+                    vae,
+                    text_encoder,
+                    tokenizer,
+                    unet,
+                    args,
+                    accelerator,
+                    weight_dtype,
+                    epoch,
+                    global_step,
+                    input_images=input_images,
+                    input_images_shape=input_images_shape,
+                    control_images=control_images,
+                    input_masks=input_masks,
+                    new_size=new_size,
+                )
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
@@ -1271,7 +1399,24 @@ def main():
             accelerator.save_state(accelerator_save_path)
 
         if args.validation:
-            log_validation(network, noise_scheduler, vae, text_encoder, tokenizer, unet, args, accelerator, weight_dtype, epoch, global_step, input_images=input_images, input_images_shape=input_images_shape, control_images=control_images, input_masks=input_masks, new_size=new_size)
+            log_validation(
+                network,
+                noise_scheduler,
+                vae,
+                text_encoder,
+                tokenizer,
+                unet,
+                args,
+                accelerator,
+                weight_dtype,
+                epoch,
+                global_step,
+                input_images=input_images,
+                input_images_shape=input_images_shape,
+                control_images=control_images,
+                input_masks=input_masks,
+                new_size=new_size,
+            )
         if args.merge_best_lora_based_face_id and args.validation:
             pivot_dir = os.path.join(args.train_data_dir, "train")
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
@@ -1289,7 +1434,12 @@ def main():
             if len(t_result_list) == 0:
                 print("Dectect no face in training data, move last weights and validation image to best_outputs")
                 test_img_dir = os.path.join(args.output_dir, "validation")
-                img_list = glob(os.path.join(test_img_dir, "*.jpg")) + glob(os.path.join(test_img_dir, "*.JPG")) + glob(os.path.join(test_img_dir, "*.png")) + glob(os.path.join(test_img_dir, "*.PNG"))
+                img_list = (
+                    glob(os.path.join(test_img_dir, "*.jpg"))
+                    + glob(os.path.join(test_img_dir, "*.JPG"))
+                    + glob(os.path.join(test_img_dir, "*.png"))
+                    + glob(os.path.join(test_img_dir, "*.PNG"))
+                )
 
                 t_result_list = []
                 for img in img_list:
@@ -1298,7 +1448,10 @@ def main():
                     t_result_list = sorted(t_result_list, key=lambda a: -a[0])
 
                 copyfile(t_result_list[0][1], os.path.join(best_outputs_dir, os.path.basename(t_result_list[0][1])))
-                copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
+                copyfile(
+                    os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"),
+                    os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"),
+                )
             else:
                 lora_save_path = network_module.merge_from_name_and_index(merge_best_lora_name, tlist, output_dir=args.output_dir)
                 logger.info(f"Save Best Merged Loras To:{lora_save_path}.")
@@ -1310,7 +1463,10 @@ def main():
             best_outputs_dir = os.path.join(args.output_dir, "best_outputs")
             os.makedirs(best_outputs_dir, exist_ok=True)
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
-            copyfile(os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"), os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"))
+            copyfile(
+                os.path.join(args.output_dir, "pytorch_lora_weights.safetensors"),
+                os.path.join(best_outputs_dir, merge_best_lora_name + ".safetensors"),
+            )
 
         # we will remove cache_log_file after train
         open(args.cache_log_file, "w")

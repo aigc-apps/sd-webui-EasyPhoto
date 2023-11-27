@@ -59,7 +59,22 @@ logger = get_logger(__name__)
 
 def log_validation(args, accelerator, weight_dtype, network, global_step):
     pipeline = download_from_original_stable_diffusion_ckpt(
-        args.pretrained_model_ckpt, original_config_file=args.original_config, pipeline_class=StableDiffusionXLPipeline, model_type=None, stable_unclip=None, controlnet=False, from_safetensors=True, extract_ema=False, image_size=None, scheduler_type="pndm", num_in_channels=None, upcast_attention=None, load_safety_checker=True, prediction_type=None, text_encoder=None, tokenizer=None
+        args.pretrained_model_ckpt,
+        original_config_file=args.original_config,
+        pipeline_class=StableDiffusionXLPipeline,
+        model_type=None,
+        stable_unclip=None,
+        controlnet=False,
+        from_safetensors=True,
+        extract_ema=False,
+        image_size=None,
+        scheduler_type="pndm",
+        num_in_channels=None,
+        upcast_attention=None,
+        load_safety_checker=True,
+        prediction_type=None,
+        text_encoder=None,
+        tokenizer=None,
     )
     network.to("cpu")
     merge_lora_weights(pipeline, network.state_dict())
@@ -75,7 +90,17 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
     images = []
     # Random Generate
     for _ in range(args.num_validation_images):
-        images.append(pipeline(args.validation_prompt, negative_prompt=args.neg_prompt, guidance_scale=args.guidance_scale, num_inference_steps=50, generator=generator, height=args.resolution, width=args.resolution).images[0])
+        images.append(
+            pipeline(
+                args.validation_prompt,
+                negative_prompt=args.neg_prompt,
+                guidance_scale=args.guidance_scale,
+                num_inference_steps=50,
+                generator=generator,
+                height=args.resolution,
+                width=args.resolution,
+            ).images[0]
+        )
     for index, image in enumerate(images):
         if not os.path.exists(os.path.join(args.output_dir, "validation")):
             os.makedirs(os.path.join(args.output_dir, "validation"))
@@ -87,8 +112,13 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
             tracker.writer.add_images("validation", np_images, global_step, dataformats="NHWC")
         if tracker.name == "wandb":
             # this is a hack to force wandb to log the images as JPEGs instead of PNGs.
-            image_path_list = [os.path.join(args.output_dir, "validation/global_step_{}_{}.jpg".format(global_step, i)) for i in range(len(images))]
-            accelerator.log({"images": [wandb.Image(image_path_list[i], caption=f"{i}: {args.validation_prompt}") for i in range(len(images))]}, step=global_step)
+            image_path_list = [
+                os.path.join(args.output_dir, "validation/global_step_{}_{}.jpg".format(global_step, i)) for i in range(len(images))
+            ]
+            accelerator.log(
+                {"images": [wandb.Image(image_path_list[i], caption=f"{i}: {args.validation_prompt}") for i in range(len(images))]},
+                step=global_step,
+            )
 
     network.to(accelerator.device)
     del pipeline
@@ -137,13 +167,21 @@ def parse_args():
         "--dataset_name",
         type=str,
         default=None,
-        help=("The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private," " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem," " or to a folder containing files that 🤗 Datasets can understand."),
+        help=(
+            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
+            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
+            " or to a folder containing files that 🤗 Datasets can understand."
+        ),
     )
     parser.add_argument(
         "--train_data_dir",
         type=str,
         default=None,
-        help=("A folder containing the training data. Folder contents must follow the structure described in" " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file" " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."),
+        help=(
+            "A folder containing the training data. Folder contents must follow the structure described in"
+            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
+            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
+        ),
     )
     parser.add_argument("--image_column", type=str, default="image", help="The column of the dataset containing an image.")
     parser.add_argument(
@@ -173,13 +211,19 @@ def parse_args():
         "--validation_epochs",
         type=int,
         default=1,
-        help=("Run fine-tuning validation every X epochs. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
+        help=(
+            "Run fine-tuning validation every X epochs. The validation process consists of running the prompt"
+            " `args.validation_prompt` multiple times: `args.num_validation_images`."
+        ),
     )
     parser.add_argument(
         "--validation_steps",
         type=int,
         default=None,
-        help=("Run fine-tuning validation every X steps. The validation process consists of running the prompt" " `args.validation_prompt` multiple times: `args.num_validation_images`."),
+        help=(
+            "Run fine-tuning validation every X steps. The validation process consists of running the prompt"
+            " `args.validation_prompt` multiple times: `args.num_validation_images`."
+        ),
     )
     parser.add_argument(
         "--output_dir",
@@ -210,7 +254,10 @@ def parse_args():
         "--center_crop",
         default=False,
         action="store_true",
-        help=("Whether to center crop the input images to the resolution. If not set, the images will be randomly" " cropped. The images will be resized to the resolution first before cropping."),
+        help=(
+            "Whether to center crop the input images to the resolution. If not set, the images will be randomly"
+            " cropped. The images will be resized to the resolution first before cropping."
+        ),
     )
     parser.add_argument(
         "--train_text_encoder",
@@ -229,7 +276,11 @@ def parse_args():
         "--checkpointing_steps",
         type=int,
         default=500,
-        help=("Save a checkpoint of the training state every X updates. These checkpoints can be used both as final" " checkpoints in case they are better than the last checkpoint, and are also suitable for resuming" " training using `--resume_from_checkpoint`."),
+        help=(
+            "Save a checkpoint of the training state every X updates. These checkpoints can be used both as final"
+            " checkpoints in case they are better than the last checkpoint, and are also suitable for resuming"
+            " training using `--resume_from_checkpoint`."
+        ),
     )
     parser.add_argument(
         "--checkpoints_total_limit",
@@ -241,7 +292,10 @@ def parse_args():
         "--resume_from_checkpoint",
         type=str,
         default=None,
-        help=("Whether training should be resumed from a previous checkpoint. Use a path saved by" ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'),
+        help=(
+            "Whether training should be resumed from a previous checkpoint. Use a path saved by"
+            ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
+        ),
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -270,7 +324,10 @@ def parse_args():
         "--lr_scheduler",
         type=str,
         default="constant",
-        help=('The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",' ' "constant", "constant_with_warmup"]'),
+        help=(
+            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
+            ' "constant", "constant_with_warmup"]'
+        ),
     )
     parser.add_argument("--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler.")
     parser.add_argument(
@@ -284,7 +341,10 @@ def parse_args():
     parser.add_argument(
         "--allow_tf32",
         action="store_true",
-        help=("Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see" " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"),
+        help=(
+            "Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see"
+            " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
+        ),
     )
     parser.add_argument(
         "--dataloader_num_workers",
@@ -301,25 +361,40 @@ def parse_args():
         "--logging_dir",
         type=str,
         default="logs",
-        help=("[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to" " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."),
+        help=(
+            "[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to"
+            " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
+        ),
     )
     parser.add_argument(
         "--report_to",
         type=str,
         default="tensorboard",
-        help=('The integration to report the results and logs to. Supported platforms are `"tensorboard"`' ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'),
+        help=(
+            'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
+            ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
+        ),
     )
     parser.add_argument(
         "--mixed_precision",
         type=str,
         default=None,
         choices=["no", "fp16", "bf16"],
-        help=("Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >=" " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the" " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."),
+        help=(
+            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
+            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
+            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
+        ),
     )
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument("--save_state", action="store_true", help="Whether or not to save state.")
     parser.add_argument("--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers.")
-    parser.add_argument("--neg_prompt", type=str, default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo", help="A prompt that is neg during training for inference.")
+    parser.add_argument(
+        "--neg_prompt",
+        type=str,
+        default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo",
+        help="A prompt that is neg during training for inference.",
+    )
     parser.add_argument("--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference.")
     parser.add_argument(
         "--cache_dir",
@@ -561,7 +636,9 @@ def main():
 
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
-                logger.warn("xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details.")
+                logger.warn(
+                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
+                )
             unet.enable_xformers_memory_efficient_attention()
         else:
             logger.warn("xformers is not available. Make sure it is installed correctly")
@@ -702,14 +779,24 @@ def main():
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         # [print(example["input_ids"]) for example in examples]
-        input_ids = [torch.stack([example["input_ids_0"] for example in examples]), torch.stack([example["input_ids_1"] for example in examples])]
+        input_ids = [
+            torch.stack([example["input_ids_0"] for example in examples]),
+            torch.stack([example["input_ids_1"] for example in examples]),
+        ]
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
     persistent_workers = True
     if args.dataloader_num_workers == 0:
         persistent_workers = False
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, shuffle=True, collate_fn=collate_fn, batch_size=args.train_batch_size, num_workers=args.dataloader_num_workers, persistent_workers=persistent_workers)
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        shuffle=True,
+        collate_fn=collate_fn,
+        batch_size=args.train_batch_size,
+        num_workers=args.dataloader_num_workers,
+        persistent_workers=persistent_workers,
+    )
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -729,7 +816,9 @@ def main():
 
     # Prepare everything with our `accelerator`.
     if args.train_text_encoder:
-        unet, text_encoder_one, text_encoder_two, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, text_encoder_one, text_encoder_two, optimizer, train_dataloader, lr_scheduler)
+        unet, text_encoder_one, text_encoder_two, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+            unet, text_encoder_one, text_encoder_two, optimizer, train_dataloader, lr_scheduler
+        )
     else:
         unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, optimizer, train_dataloader, lr_scheduler)
 
@@ -884,7 +973,9 @@ def main():
             if accelerator.sync_gradients:
                 if global_step % 10 == 0:
                     time_info = str(time.asctime(time.localtime(time.time())))
-                    log_line = "{}: training (SDXL) lora of {} at step {} / {}\n" "".format(time_info, user_id, global_step, args.max_train_steps)
+                    log_line = "{}: training (SDXL) lora of {} at step {} / {}\n" "".format(
+                        time_info, user_id, global_step, args.max_train_steps
+                    )
                     if accelerator.is_main_process:
                         output_log.write(log_line)
                         output_log.flush()
@@ -907,7 +998,9 @@ def main():
                                 num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
                                 removing_checkpoints = checkpoints[0:num_to_remove]
 
-                                logger.info(f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints")
+                                logger.info(
+                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+                                )
                                 logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
                                 for removing_checkpoint in removing_checkpoints:
@@ -930,14 +1023,29 @@ def main():
 
             # Step-level validation.
             if accelerator.sync_gradients and accelerator.is_main_process:
-                if args.validation_steps is not None and args.validation_prompt is not None and global_step % args.validation_steps == 0 and args.validation:
-                    logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
+                if (
+                    args.validation_steps is not None
+                    and args.validation_prompt is not None
+                    and global_step % args.validation_steps == 0
+                    and args.validation
+                ):
+                    logger.info(
+                        f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
+                        f" {args.validation_prompt}."
+                    )
                     log_validation(args, accelerator, weight_dtype, network, global_step)
 
         # Epoch-level validation.
         if accelerator.is_main_process:
-            if args.validation_steps is None and args.validation_prompt is not None and epoch % args.validation_epochs == 0 and args.validation:
-                logger.info(f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}.")
+            if (
+                args.validation_steps is None
+                and args.validation_prompt is not None
+                and epoch % args.validation_epochs == 0
+                and args.validation
+            ):
+                logger.info(
+                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}."
+                )
                 log_validation(args, accelerator, weight_dtype, network, global_step)
 
     # Save the lora layers

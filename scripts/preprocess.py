@@ -119,7 +119,9 @@ if __name__ == "__main__":
         logging.info(f"Skin Retouching model load error, but pass. Error info {e}")
     # portrait enhancement
     try:
-        portrait_enhancement = pipeline(Tasks.image_portrait_enhancement, model="damo/cv_gpen_image-portrait-enhancement", model_revision="v1.0.0")
+        portrait_enhancement = pipeline(
+            Tasks.image_portrait_enhancement, model="damo/cv_gpen_image-portrait-enhancement", model_revision="v1.0.0"
+        )
     except Exception as e:
         portrait_enhancement = None
         logging.info(f"Portrait Enhancement model load error, but pass. Error info {e}")

@@ -54,7 +54,29 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
 
         try:
             message = easyphoto_train_forward(
-                sd_model_checkpoint, id_task, user_id, train_mode_choose, resolution, val_and_checkpointing_steps, max_train_steps, steps_per_photos, train_batch_size, gradient_accumulation_steps, dataloader_num_workers, learning_rate, rank, network_alpha, validation, instance_images, enable_rl, max_rl_time, timestep_fraction, skin_retouching_bool, training_prefix_prompt, crop_ratio, *args
+                sd_model_checkpoint,
+                id_task,
+                user_id,
+                train_mode_choose,
+                resolution,
+                val_and_checkpointing_steps,
+                max_train_steps,
+                steps_per_photos,
+                train_batch_size,
+                gradient_accumulation_steps,
+                dataloader_num_workers,
+                learning_rate,
+                rank,
+                network_alpha,
+                validation,
+                instance_images,
+                enable_rl,
+                max_rl_time,
+                timestep_fraction,
+                skin_retouching_bool,
+                training_prefix_prompt,
+                crop_ratio,
+                *args,
             )
         except Exception as e:
             torch.cuda.empty_cache()
@@ -74,7 +96,10 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         init_image = datas.get("init_image", None)
         uploaded_template_images = datas.get("uploaded_template_images", [])
 
-        text_to_image_input_prompt = datas.get("text_to_image_input_prompt", "upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32")
+        text_to_image_input_prompt = datas.get(
+            "text_to_image_input_prompt",
+            "upper-body, look at viewer, one twenty years old girl, wear white dress, standing, in the garden with flowers, in the winter, daytime, snow, f32",
+        )
         text_to_image_width = datas.get("text_to_image_width", 624)
         text_to_image_height = datas.get("text_to_image_height", 832)
         scene_id = datas.get("scene_id", "none")

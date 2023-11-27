@@ -213,7 +213,12 @@ class LoRAInfModule(LoRAModule):
             weight = weight + self.multiplier * (up_weight @ down_weight) * self.scale
         elif down_weight.size()[2:4] == (1, 1):
             # conv2d 1x1
-            weight = weight + self.multiplier * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3) * self.scale
+            weight = (
+                weight
+                + self.multiplier
+                * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+                * self.scale
+            )
         else:
             # conv2d 3x3
             conved = torch.nn.functional.conv2d(down_weight.permute(1, 0, 2, 3), up_weight).permute(1, 0, 2, 3)
@@ -238,7 +243,11 @@ class LoRAInfModule(LoRAModule):
             weight = self.multiplier * (up_weight @ down_weight) * self.scale
         elif down_weight.size()[2:4] == (1, 1):
             # conv2d 1x1
-            weight = self.multiplier * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3) * self.scale
+            weight = (
+                self.multiplier
+                * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+                * self.scale
+            )
         else:
             # conv2d 3x3
             conved = torch.nn.functional.conv2d(down_weight.permute(1, 0, 2, 3), up_weight).permute(1, 0, 2, 3)
@@ -426,7 +435,9 @@ def parse_block_lr_kwargs(nw_kwargs):
         if "," in up_lr_weight:
             up_lr_weight = [(float(s) if s else 0.0) for s in up_lr_weight.split(",")]
 
-    down_lr_weight, mid_lr_weight, up_lr_weight = get_block_lr_weight(down_lr_weight, mid_lr_weight, up_lr_weight, float(nw_kwargs.get("block_lr_zero_threshold", 0.0)))
+    down_lr_weight, mid_lr_weight, up_lr_weight = get_block_lr_weight(
+        down_lr_weight, mid_lr_weight, up_lr_weight, float(nw_kwargs.get("block_lr_zero_threshold", 0.0))
+    )
 
     return down_lr_weight, mid_lr_weight, up_lr_weight
 
@@ -465,10 +476,14 @@ def create_network(
         conv_block_dims = kwargs.get("conv_block_dims", None)
         conv_block_alphas = kwargs.get("conv_block_alphas", None)
 
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha)
+        block_dims, block_alphas, conv_block_dims, conv_block_alphas = get_block_dims_and_alphas(
+            block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
+        )
 
         # remove block dim/alpha without learning rate
-        block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight)
+        block_dims, block_alphas, conv_block_dims, conv_block_alphas = remove_block_dims_and_alphas(
+            block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
+        )
 
     else:
         block_alphas = None
@@ -507,7 +522,9 @@ def create_network(
     return network
 
 
-def get_block_dims_and_alphas(block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha):
+def get_block_dims_and_alphas(
+    block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
+):
     num_total_blocks = LoRANetwork.NUM_OF_BLOCKS * 2 + 1
 
     def parse_ints(s):
@@ -518,33 +535,47 @@ def get_block_dims_and_alphas(block_dims, block_alphas, network_dim, network_alp
 
     if block_dims is not None:
         block_dims = parse_ints(block_dims)
-        assert len(block_dims) == num_total_blocks, f"block_dims must have {num_total_blocks} elements / block_dimsは{num_total_blocks}個指定してください"
+        assert (
+            len(block_dims) == num_total_blocks
+        ), f"block_dims must have {num_total_blocks} elements / block_dimsは{num_total_blocks}個指定してください"
     else:
         print(f"block_dims is not specified. all dims are set to {network_dim} / block_dimsが指定されていません。すべてのdimは{network_dim}になります")
         block_dims = [network_dim] * num_total_blocks
 
     if block_alphas is not None:
         block_alphas = parse_floats(block_alphas)
-        assert len(block_alphas) == num_total_blocks, f"block_alphas must have {num_total_blocks} elements / block_alphasは{num_total_blocks}個指定してください"
+        assert (
+            len(block_alphas) == num_total_blocks
+        ), f"block_alphas must have {num_total_blocks} elements / block_alphasは{num_total_blocks}個指定してください"
     else:
-        print(f"block_alphas is not specified. all alphas are set to {network_alpha} / block_alphasが指定されていません。すべてのalphaは{network_alpha}になります")
+        print(
+            f"block_alphas is not specified. all alphas are set to {network_alpha} / block_alphasが指定されていません。すべてのalphaは{network_alpha}になります"
+        )
         block_alphas = [network_alpha] * num_total_blocks
 
     if conv_block_dims is not None:
         conv_block_dims = parse_ints(conv_block_dims)
-        assert len(conv_block_dims) == num_total_blocks, f"conv_block_dims must have {num_total_blocks} elements / conv_block_dimsは{num_total_blocks}個指定してください"
+        assert (
+            len(conv_block_dims) == num_total_blocks
+        ), f"conv_block_dims must have {num_total_blocks} elements / conv_block_dimsは{num_total_blocks}個指定してください"
 
         if conv_block_alphas is not None:
             conv_block_alphas = parse_floats(conv_block_alphas)
-            assert len(conv_block_alphas) == num_total_blocks, f"conv_block_alphas must have {num_total_blocks} elements / conv_block_alphasは{num_total_blocks}個指定してください"
+            assert (
+                len(conv_block_alphas) == num_total_blocks
+            ), f"conv_block_alphas must have {num_total_blocks} elements / conv_block_alphasは{num_total_blocks}個指定してください"
         else:
             if conv_alpha is None:
                 conv_alpha = 1.0
-            print(f"conv_block_alphas is not specified. all alphas are set to {conv_alpha} / conv_block_alphasが指定されていません。すべてのalphaは{conv_alpha}になります")
+            print(
+                f"conv_block_alphas is not specified. all alphas are set to {conv_alpha} / conv_block_alphasが指定されていません。すべてのalphaは{conv_alpha}になります"
+            )
             conv_block_alphas = [conv_alpha] * num_total_blocks
     else:
         if conv_dim is not None:
-            print(f"conv_dim/alpha for all blocks are set to {conv_dim} and {conv_alpha} / すべてのブロックのconv_dimとalphaは{conv_dim}および{conv_alpha}になります")
+            print(
+                f"conv_dim/alpha for all blocks are set to {conv_dim} and {conv_alpha} / すべてのブロックのconv_dimとalphaは{conv_dim}および{conv_alpha}になります"
+            )
             conv_block_dims = [conv_dim] * num_total_blocks
             conv_block_alphas = [conv_alpha] * num_total_blocks
         else:
@@ -578,7 +609,10 @@ def get_block_lr_weight(down_lr_weight, mid_lr_weight, up_lr_weight, zero_thresh
         elif name == "zeros":
             return [0.0 + base_lr] * max_len
         else:
-            print("Unknown lr_weight argument %s is used. Valid arguments:  / 不明なlr_weightの引数 %s が使われました。有効な引数:\n\tcosine, sine, linear, reverse_linear, zeros" % (name))
+            print(
+                "Unknown lr_weight argument %s is used. Valid arguments:  / 不明なlr_weightの引数 %s が使われました。有効な引数:\n\tcosine, sine, linear, reverse_linear, zeros"
+                % (name)
+            )
             return None
 
     if type(down_lr_weight) == str:
@@ -705,7 +739,9 @@ def create_network_from_weights(multiplier, file, vae, text_encoder, unet, weigh
 
     module_class = LoRAInfModule if for_inference else LoRAModule
 
-    network = LoRANetwork(text_encoder, unet, multiplier=multiplier, modules_dim=modules_dim, modules_alpha=modules_alpha, module_class=module_class)
+    network = LoRANetwork(
+        text_encoder, unet, multiplier=multiplier, modules_dim=modules_dim, modules_alpha=modules_alpha, module_class=module_class
+    )
 
     # block lr
     down_lr_weight, mid_lr_weight, up_lr_weight = parse_block_lr_kwargs(kwargs)
@@ -783,7 +819,15 @@ class LoRANetwork(torch.nn.Module):
             root_module: torch.nn.Module,
             target_replace_modules: List[torch.nn.Module],
         ) -> List[LoRAModule]:
-            prefix = self.LORA_PREFIX_UNET if is_unet else (self.LORA_PREFIX_TEXT_ENCODER if text_encoder_idx is None else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2))
+            prefix = (
+                self.LORA_PREFIX_UNET
+                if is_unet
+                else (
+                    self.LORA_PREFIX_TEXT_ENCODER
+                    if text_encoder_idx is None
+                    else (self.LORA_PREFIX_TEXT_ENCODER1 if text_encoder_idx == 1 else self.LORA_PREFIX_TEXT_ENCODER2)
+                )
+            )
             loras = []
             skipped = []
             for name, module in root_module.named_modules():
@@ -865,7 +909,9 @@ class LoRANetwork(torch.nn.Module):
 
         skipped = skipped_te + skipped_un
         if varbose and len(skipped) > 0:
-            print(f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:")
+            print(
+                f"because block_lr_weight is 0 or dim (rank) is 0, {len(skipped)} LoRA modules are skipped / block_lr_weightまたはdim (rank)が0の為、次の{len(skipped)}個のLoRAモジュールはスキップされます:"
+            )
             for name in skipped:
                 print(f"\t{name}")
 

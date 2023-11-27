@@ -16,22 +16,39 @@ backwarp_tenGrid = {}
 def warp(tenInput, tenFlow):
     k = (str(tenFlow.device), str(tenFlow.size()))
     if k not in backwarp_tenGrid:
-        tenHorizontal = torch.linspace(-1.0, 1.0, tenFlow.shape[3], device=device).view(1, 1, 1, tenFlow.shape[3]).expand(tenFlow.shape[0], -1, tenFlow.shape[2], -1)
-        tenVertical = torch.linspace(-1.0, 1.0, tenFlow.shape[2], device=device).view(1, 1, tenFlow.shape[2], 1).expand(tenFlow.shape[0], -1, -1, tenFlow.shape[3])
+        tenHorizontal = (
+            torch.linspace(-1.0, 1.0, tenFlow.shape[3], device=device)
+            .view(1, 1, 1, tenFlow.shape[3])
+            .expand(tenFlow.shape[0], -1, tenFlow.shape[2], -1)
+        )
+        tenVertical = (
+            torch.linspace(-1.0, 1.0, tenFlow.shape[2], device=device)
+            .view(1, 1, tenFlow.shape[2], 1)
+            .expand(tenFlow.shape[0], -1, -1, tenFlow.shape[3])
+        )
         backwarp_tenGrid[k] = torch.cat([tenHorizontal, tenVertical], 1).to(device)
 
-    tenFlow = torch.cat([tenFlow[:, 0:1, :, :] / ((tenInput.shape[3] - 1.0) / 2.0), tenFlow[:, 1:2, :, :] / ((tenInput.shape[2] - 1.0) / 2.0)], 1)
+    tenFlow = torch.cat(
+        [tenFlow[:, 0:1, :, :] / ((tenInput.shape[3] - 1.0) / 2.0), tenFlow[:, 1:2, :, :] / ((tenInput.shape[2] - 1.0) / 2.0)], 1
+    )
 
     g = (backwarp_tenGrid[k] + tenFlow).permute(0, 2, 3, 1)
     return torch.nn.functional.grid_sample(input=tenInput, grid=g, mode="bilinear", padding_mode="border", align_corners=True)
 
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
-    return nn.Sequential(nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=True), nn.PReLU(out_planes))
+    return nn.Sequential(
+        nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=True),
+        nn.PReLU(out_planes),
+    )
 
 
 def conv_bn(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
-    return nn.Sequential(nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=False), nn.BatchNorm2d(out_planes), nn.PReLU(out_planes))
+    return nn.Sequential(
+        nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=False),
+        nn.BatchNorm2d(out_planes),
+        nn.PReLU(out_planes),
+    )
 
 
 class IFBlock(nn.Module):
@@ -58,7 +75,9 @@ class IFBlock(nn.Module):
 
     def forward(self, x, flow, scale=1):
         x = F.interpolate(x, scale_factor=1.0 / scale, mode="bilinear", align_corners=False, recompute_scale_factor=False)
-        flow = F.interpolate(flow, scale_factor=1.0 / scale, mode="bilinear", align_corners=False, recompute_scale_factor=False) * 1.0 / scale
+        flow = (
+            F.interpolate(flow, scale_factor=1.0 / scale, mode="bilinear", align_corners=False, recompute_scale_factor=False) * 1.0 / scale
+        )
         feat = self.conv0(torch.cat((x, flow), 1))
         feat = self.convblock0(feat) + feat
         feat = self.convblock1(feat) + feat
@@ -96,7 +115,11 @@ class IFNet(nn.Module):
         block = [self.block0, self.block1, self.block2]
         for i in range(3):
             f0, m0 = block[i](torch.cat((warped_img0[:, :3], warped_img1[:, :3], mask), 1), flow, scale=scale_list[i])
-            f1, m1 = block[i](torch.cat((warped_img1[:, :3], warped_img0[:, :3], -mask), 1), torch.cat((flow[:, 2:4], flow[:, :2]), 1), scale=scale_list[i])
+            f1, m1 = block[i](
+                torch.cat((warped_img1[:, :3], warped_img0[:, :3], -mask), 1),
+                torch.cat((flow[:, 2:4], flow[:, :2]), 1),
+                scale=scale_list[i],
+            )
             flow = flow + (f0 + torch.cat((f1[:, 2:4], f1[:, :2]), 1)) / 2
             mask = mask + (m0 + (-m1)) / 2
             mask_list.append(mask)

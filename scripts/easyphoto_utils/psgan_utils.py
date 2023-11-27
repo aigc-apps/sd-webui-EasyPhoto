@@ -27,7 +27,12 @@ def to_var(x, requires_grad=True):
 
 
 def copy_area(tar, src, lms):
-    rect = [int(min(lms[:, 1])) - PreProcess.eye_margin, int(min(lms[:, 0])) - PreProcess.eye_margin, int(max(lms[:, 1])) + PreProcess.eye_margin + 1, int(max(lms[:, 0])) + PreProcess.eye_margin + 1]
+    rect = [
+        int(min(lms[:, 1])) - PreProcess.eye_margin,
+        int(min(lms[:, 0])) - PreProcess.eye_margin,
+        int(max(lms[:, 1])) + PreProcess.eye_margin + 1,
+        int(max(lms[:, 0])) + PreProcess.eye_margin + 1,
+    ]
     tar[:, :, rect[1] : rect[3], rect[0] : rect[2]] = src[:, :, rect[1] : rect[3], rect[0] : rect[2]]
     src[:, :, rect[1] : rect[3], rect[0] : rect[2]] = 0
 
@@ -142,7 +147,9 @@ class WingLoss(nn.Module):
 
     def forward(self, targets, predictions, euler_angle_weights=None):
         abs_error = torch.abs(targets - predictions)
-        loss = torch.where(torch.le(abs_error, self.wing_w), self.wing_w * torch.log(1.0 + abs_error / self.wing_epsilon), abs_error - self.wing_c)
+        loss = torch.where(
+            torch.le(abs_error, self.wing_w), self.wing_w * torch.log(1.0 + abs_error / self.wing_epsilon), abs_error - self.wing_c
+        )
         loss_sum = torch.sum(loss, 1)
         if euler_angle_weights is not None:
             loss_sum *= euler_angle_weights
@@ -157,7 +164,9 @@ class LinearBottleneck(nn.Module):
         self.conv1 = nn.Conv2d(input_channels, self.expansion_channels, stride=1, kernel_size=1)
         self.bn1 = nn.BatchNorm2d(self.expansion_channels)
 
-        self.depth_conv2 = nn.Conv2d(self.expansion_channels, self.expansion_channels, stride=stride, kernel_size=3, groups=self.expansion_channels, padding=1)
+        self.depth_conv2 = nn.Conv2d(
+            self.expansion_channels, self.expansion_channels, stride=stride, kernel_size=3, groups=self.expansion_channels, padding=1
+        )
         self.bn2 = nn.BatchNorm2d(self.expansion_channels)
 
         self.conv3 = nn.Conv2d(self.expansion_channels, out_channels, stride=1, kernel_size=1)
@@ -257,14 +266,22 @@ class MobileNetV2(nn.Module):
         self.conv1 = nn.Conv2d(input_channels, self.num_of_channels[0], kernel_size=3, stride=2, padding=1)
         self.bn1 = nn.BatchNorm2d(self.num_of_channels[0])
 
-        self.depth_conv2 = nn.Conv2d(self.num_of_channels[0], self.num_of_channels[0], kernel_size=3, stride=1, padding=1, groups=self.num_of_channels[0])
+        self.depth_conv2 = nn.Conv2d(
+            self.num_of_channels[0], self.num_of_channels[0], kernel_size=3, stride=1, padding=1, groups=self.num_of_channels[0]
+        )
         self.bn2 = nn.BatchNorm2d(self.num_of_channels[0])
 
-        self.stage0 = self.make_stage(self.num_of_channels[0], self.num_of_channels[0], stride=2, stage=0, times=5, expansion=2, activation=activation)
+        self.stage0 = self.make_stage(
+            self.num_of_channels[0], self.num_of_channels[0], stride=2, stage=0, times=5, expansion=2, activation=activation
+        )
 
-        self.stage1 = self.make_stage(self.num_of_channels[0], self.num_of_channels[1], stride=2, stage=1, times=7, expansion=4, activation=activation)
+        self.stage1 = self.make_stage(
+            self.num_of_channels[0], self.num_of_channels[1], stride=2, stage=1, times=7, expansion=4, activation=activation
+        )
 
-        self.linear_bottleneck_end = nn.Sequential(LinearBottleneck(self.num_of_channels[1], self.num_of_channels[2], expansion=2, stride=1, activation=activation))
+        self.linear_bottleneck_end = nn.Sequential(
+            LinearBottleneck(self.num_of_channels[1], self.num_of_channels[2], expansion=2, stride=1, activation=activation)
+        )
 
         self.conv3 = nn.Conv2d(self.num_of_channels[2], self.num_of_channels[3], kernel_size=3, stride=2, padding=1)
         self.bn3 = nn.BatchNorm2d(self.num_of_channels[3])
@@ -372,7 +389,9 @@ class PreProcess:
         return lms * self.img_size
 
     def process(self, mask, lms, device="cpu"):
-        diff = to_var((self.fix.double() - torch.tensor(lms.transpose((1, 0)).reshape(-1, 1, 1)).to(self.device)).unsqueeze(0), requires_grad=False).to(self.device)
+        diff = to_var(
+            (self.fix.double() - torch.tensor(lms.transpose((1, 0)).reshape(-1, 1, 1)).to(self.device)).unsqueeze(0), requires_grad=False
+        ).to(self.device)
 
         lms_eye_left = lms[42:48]
         lms_eye_right = lms[36:42]
@@ -533,7 +552,13 @@ class ResidualBlock(nn.Module):
         elif net_mode == "t":
             use_affine = False
         super(ResidualBlock, self).__init__()
-        self.main = nn.Sequential(nn.Conv2d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False), nn.InstanceNorm2d(dim_out, affine=use_affine), nn.ReLU(inplace=True), nn.Conv2d(dim_out, dim_out, kernel_size=3, stride=1, padding=1, bias=False), nn.InstanceNorm2d(dim_out, affine=use_affine))
+        self.main = nn.Sequential(
+            nn.Conv2d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.InstanceNorm2d(dim_out, affine=use_affine),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(dim_out, dim_out, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.InstanceNorm2d(dim_out, affine=use_affine),
+        )
 
     def forward(self, x):
         return x + self.main(x)
@@ -579,7 +604,9 @@ class Generator(nn.Module):
 
         # -------------------------- PNet(MDNet) for obtaining makeup matrices --------------------------
 
-        layers = nn.Sequential(nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3, bias=False), nn.InstanceNorm2d(64, affine=True), nn.ReLU(inplace=True))
+        layers = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3, bias=False), nn.InstanceNorm2d(64, affine=True), nn.ReLU(inplace=True)
+        )
         self.pnet_in = layers
 
         # Down-Sampling
@@ -622,7 +649,9 @@ class Generator(nn.Module):
 
         # Up-Sampling
         for i in range(2):
-            setattr(self, f"tnet_up_conv_{i+1}", nn.ConvTranspose2d(curr_dim, curr_dim // 2, kernel_size=4, stride=2, padding=1, bias=False))
+            setattr(
+                self, f"tnet_up_conv_{i+1}", nn.ConvTranspose2d(curr_dim, curr_dim // 2, kernel_size=4, stride=2, padding=1, bias=False)
+            )
             setattr(self, f"tnet_up_spade_{i+1}", nn.InstanceNorm2d(curr_dim // 2, affine=False))
             setattr(self, f"tnet_up_relu_{i+1}", nn.ReLU(inplace=True))
             curr_dim = curr_dim // 2
@@ -765,7 +794,9 @@ class Solver:
         self.G = self.G.to(device).eval()
         return
 
-    def generate(self, org_A, ref_B, lms_A=None, lms_B=None, mask_A=None, mask_B=None, diff_A=None, diff_B=None, gamma=None, beta=None, ret=False):
+    def generate(
+        self, org_A, ref_B, lms_A=None, lms_B=None, mask_A=None, mask_B=None, diff_A=None, diff_B=None, gamma=None, beta=None, ret=False
+    ):
         """org_A is content, ref_B is style"""
         res = self.G(org_A, ref_B, mask_A, mask_B, diff_A, diff_B, gamma, beta, ret)
         return res

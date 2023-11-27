@@ -8,7 +8,15 @@ from shutil import copyfile
 from modules.sd_models_config import config_sdxl
 from PIL import Image, ImageOps
 
-from scripts.easyphoto_config import cache_log_file_path, easyphoto_models_path, models_path, scene_id_outpath_samples, user_id_outpath_samples, validation_prompt, validation_prompt_scene
+from scripts.easyphoto_config import (
+    cache_log_file_path,
+    easyphoto_models_path,
+    models_path,
+    scene_id_outpath_samples,
+    user_id_outpath_samples,
+    validation_prompt,
+    validation_prompt_scene,
+)
 from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, check_scene_valid, unload_models
 from scripts.sdwebui import get_checkpoint_type, unload_sd
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
@@ -139,7 +147,16 @@ def easyphoto_train_forward(
     local_validation_prompt = validation_prompt if not train_scene_lora_bool else training_prefix_prompt + ", " + validation_prompt_scene
     # preprocess
     preprocess_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preprocess.py")
-    command = [f"{python_executable_path}", f"{preprocess_path}", f"--images_save_path={images_save_path}", f"--json_save_path={json_save_path}", f"--validation_prompt={local_validation_prompt}", f"--inputs_dir={original_backup_path}", f"--ref_image_path={ref_image_path}", f"--crop_ratio={crop_ratio}"]
+    command = [
+        f"{python_executable_path}",
+        f"{preprocess_path}",
+        f"--images_save_path={images_save_path}",
+        f"--json_save_path={json_save_path}",
+        f"--validation_prompt={local_validation_prompt}",
+        f"--inputs_dir={original_backup_path}",
+        f"--ref_image_path={ref_image_path}",
+        f"--crop_ratio={crop_ratio}",
+    ]
     if skin_retouching_bool:
         command += ["--skin_retouching_bool"]
     if train_scene_lora_bool:
@@ -179,7 +196,11 @@ def easyphoto_train_forward(
         # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
         # We provide them in extensions/sd-webui-EasyPhoto/models. Thus, we need set some environment variables for transformers.
         # if we pass `env` in subprocess.run, the environment variables in the child process will be reset and different from Web UI.
-        env = {"TRANSFORMERS_OFFLINE": "1", "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"), **os.environ.copy()}
+        env = {
+            "TRANSFORMERS_OFFLINE": "1",
+            "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"),
+            **os.environ.copy(),
+        }
     unload_models()
     if platform.system() == "Windows":
         pwd = os.getcwd()

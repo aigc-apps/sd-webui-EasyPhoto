@@ -1,22 +1,16 @@
 repos:
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
-        args: ["--line-length=399"]
   - repo: https://github.com/psf/black
     rev: 22.3.0
     hooks:
       - id: black
         exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
-        args: ["--line-length=399"]
+        args: ["--line-length=140"]
   - repo: https://github.com/PyCQA/flake8
     rev: 3.9.2
     hooks:
       - id: flake8
         exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
-        args: ["--max-line-length=399", "--ignore=E303,E731,W191,W504,E402,E203,F541,W605", "--exclude=__init__.py"]
+        args: ["--max-line-length=140", "--ignore=E303,E731,W191,W504,E402,E203,F541,W605,W503,E501", "--exclude=__init__.py"]
   - repo: https://github.com/myint/autoflake
     rev: v1.4
     hooks:

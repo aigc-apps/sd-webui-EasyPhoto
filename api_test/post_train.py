@@ -35,7 +35,6 @@ def post_train(encoded_images, url="http://0.0.0.0:7860"):
 
 
 if __name__ == "__main__":
-
     """
     There are two ways to test:
         The first: make sure the directory is full of readable images
