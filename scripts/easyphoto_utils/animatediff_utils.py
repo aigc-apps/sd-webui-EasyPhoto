@@ -49,6 +49,9 @@ except Exception as e:
     AnimateDiffPromptSchedule = None
     AnimateDiffProcess = None
     AnimateDiffUiGroup = None
+    AnimateDiffControl = None
+    AnimateDiffI2VLatent = None
+    motion_module = None
     video_visible = False
 
 if video_visible:
