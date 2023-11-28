@@ -196,11 +196,10 @@ def easyphoto_train_forward(
         # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
         # We provide them in extensions/sd-webui-EasyPhoto/models. Thus, we need set some environment variables for transformers.
         # if we pass `env` in subprocess.run, the environment variables in the child process will be reset and different from Web UI.
-        env = {
-            "TRANSFORMERS_OFFLINE": "1",
-            "TRANSFORMERS_CACHE": os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl"),
-            **os.environ.copy(),
-        }
+        env = os.environ.copy()
+        env["TRANSFORMERS_OFFLINE"] = "1"
+        env["TRANSFORMERS_CACHE"] = sdxl_model_dir
+
     unload_models()
     if platform.system() == "Windows":
         pwd = os.getcwd()
