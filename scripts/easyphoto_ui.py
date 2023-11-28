@@ -167,7 +167,9 @@ def on_ui_tabs():
                                     sd_model_checkpoint = gr.Dropdown(
                                         value="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
                                         scale=3,
-                                        choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)),
+                                        choices=list(
+                                            set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
+                                        ),
                                         label="The base checkpoint you use.",
                                         visible=True,
                                     )
@@ -405,10 +407,14 @@ def on_ui_tabs():
                                         )
 
                                     with gr.Column(visible=False) as batch_images_upload:
-                                        uploaded_template_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
+                                        uploaded_template_images = gr.Gallery().style(
+                                            columns=[4], rows=[2], object_fit="contain", height="auto"
+                                        )
 
                                         with gr.Row():
-                                            upload_dir_button = gr.UploadButton("Upload Photos", file_types=["image"], file_count="multiple")
+                                            upload_dir_button = gr.UploadButton(
+                                                "Upload Photos", file_types=["image"], file_count="multiple"
+                                            )
                                             clear_dir_button = gr.Button("Clear Photos")
                                         clear_dir_button.click(fn=lambda: [], inputs=None, outputs=uploaded_template_images)
 
@@ -427,7 +433,9 @@ def on_ui_tabs():
                                         else:
                                             return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
 
-                                    upload_way.change(upload_way_change, upload_way, [template_gallery, single_image_upload, batch_images_upload])
+                                    upload_way.change(
+                                        upload_way_change, upload_way, [template_gallery, single_image_upload, batch_images_upload]
+                                    )
 
                                 with gr.TabItem("Text2Photo") as text2photo_tab:
                                     with gr.Column():
@@ -450,7 +458,9 @@ def on_ui_tabs():
                                                     if scene_id in DEFAULT_SCENE_LORA:
                                                         check_files_exists_and_download(False, download_mode=scene_id)
                                                     if not os.path.exists(lora_model_path):
-                                                        return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
+                                                        return gr.update(value="Please check scene lora is exist or not."), gr.update(
+                                                            value="none"
+                                                        )
                                                     is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
 
                                                     return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
@@ -472,7 +482,9 @@ def on_ui_tabs():
                                                         if check_scene_valid(_scene, models_path):
                                                             if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
                                                                 continue
-                                                            ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+                                                            ref_image = os.path.join(
+                                                                models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg"
+                                                            )
                                                             if not os.path.exists(ref_image):
                                                                 ref_image = os.path.join(
                                                                     os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
@@ -644,7 +656,9 @@ def on_ui_tabs():
                                             ids.append(_id)
                                     ids = sorted(ids)
 
-                                num_of_faceid = gr.Dropdown(value=str(1), elem_id="dropdown", choices=[1, 2, 3, 4, 5], label=f"Num of Faceid")
+                                num_of_faceid = gr.Dropdown(
+                                    value=str(1), elem_id="dropdown", choices=[1, 2, 3, 4, 5], label=f"Num of Faceid"
+                                )
 
                                 uuids = []
                                 visibles = [True, False, False, False, False]
@@ -703,12 +717,16 @@ def on_ui_tabs():
                                     )
 
                                 with gr.Row():
-                                    first_diffusion_steps = gr.Slider(minimum=15, maximum=50, value=50, step=1, label="First Diffusion steps")
+                                    first_diffusion_steps = gr.Slider(
+                                        minimum=15, maximum=50, value=50, step=1, label="First Diffusion steps"
+                                    )
                                     first_denoising_strength = gr.Slider(
                                         minimum=0.30, maximum=0.60, value=0.45, step=0.05, label="First Diffusion denoising strength"
                                     )
                                 with gr.Row():
-                                    second_diffusion_steps = gr.Slider(minimum=15, maximum=50, value=20, step=1, label="Second Diffusion steps")
+                                    second_diffusion_steps = gr.Slider(
+                                        minimum=15, maximum=50, value=20, step=1, label="Second Diffusion steps"
+                                    )
                                     second_denoising_strength = gr.Slider(
                                         minimum=0.20, maximum=0.40, value=0.30, step=0.05, label="Second Diffusion denoising strength"
                                     )
@@ -821,7 +839,9 @@ def on_ui_tabs():
                                         type="filepath",
                                         visible=False,
                                     )
-                                ipa_control.change(lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path])
+                                ipa_control.change(
+                                    lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path]
+                                )
                                 ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
 
                                 with gr.Box():
@@ -893,7 +913,9 @@ def on_ui_tabs():
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
                             # Display Face Similarity Scores if the user intend to do it.
                             display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
-                            display_score.change(lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs])
+                            display_score.change(
+                                lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs]
+                            )
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
 
@@ -989,7 +1011,9 @@ def on_ui_tabs():
 
                                         checkpoint_refresh = ToolButton(value="\U0001f504")
                                         checkpoint_refresh.click(
-                                            fn=checkpoint_refresh_function, inputs=[], outputs=[sd_model_checkpoint_for_animatediff_text2video]
+                                            fn=checkpoint_refresh_function,
+                                            inputs=[],
+                                            outputs=[sd_model_checkpoint_for_animatediff_text2video],
                                         )
 
                                     gr.Markdown(
@@ -1061,7 +1085,9 @@ def on_ui_tabs():
 
                                         checkpoint_refresh = ToolButton(value="\U0001f504")
                                         checkpoint_refresh.click(
-                                            fn=checkpoint_refresh_function, inputs=[], outputs=[sd_model_checkpoint_for_animatediff_image2video]
+                                            fn=checkpoint_refresh_function,
+                                            inputs=[],
+                                            outputs=[sd_model_checkpoint_for_animatediff_image2video],
                                         )
                                     gr.Markdown(
                                         value="""
@@ -1085,7 +1111,9 @@ def on_ui_tabs():
                                 with gr.Row():
                                     sd_model_checkpoint = gr.Dropdown(
                                         value="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
-                                        choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)),
+                                        choices=list(
+                                            set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
+                                        ),
                                         label="The base checkpoint you use.",
                                         visible=True,
                                     )
@@ -1183,7 +1211,11 @@ def on_ui_tabs():
                                             minimum=15, maximum=50, value=50, step=1, label="Video First Diffusion steps"
                                         )
                                         first_denoising_strength = gr.Slider(
-                                            minimum=0.30, maximum=0.60, value=0.45, step=0.05, label="Video First Diffusion denoising strength"
+                                            minimum=0.30,
+                                            maximum=0.60,
+                                            value=0.45,
+                                            step=0.05,
+                                            label="Video First Diffusion denoising strength",
                                         )
                                     with gr.Row():
                                         crop_face_preprocess = gr.Checkbox(label="Video Crop Face Preprocess", value=True)
@@ -1317,7 +1349,10 @@ def on_ui_tabs():
                                         )
 
                                     save.click(
-                                        fn=save_video, inputs=None, outputs=[download_origin_files, download_crop_files], show_progress=False
+                                        fn=save_video,
+                                        inputs=None,
+                                        outputs=[download_origin_files, download_crop_files],
+                                        show_progress=False,
                                     )
 
                                 output_images = gr.Gallery(
