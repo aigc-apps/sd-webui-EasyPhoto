@@ -7,12 +7,12 @@ import platform
 import sys
 from shutil import copyfile
 
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), "easyphoto_utils"))
 
 import cv2
 import numpy as np
 import torch
-from easyphoto_utils import call_face_crop
+from face_process_utils import call_face_crop
 from modelscope.outputs import OutputKeys
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
