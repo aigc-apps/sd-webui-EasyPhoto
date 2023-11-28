@@ -44,8 +44,8 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from utils.lora_diffusers import merge_lora_weights
 import utils.lora_utils as network_module
+from utils.lora_diffusers import merge_lora_weights
 
 torch.backends.cudnn.benchmark = True
 
@@ -74,7 +74,7 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
         load_safety_checker=True,
         prediction_type=None,
         text_encoder=None,
-        tokenizer=None
+        tokenizer=None,
     )
     network.to("cpu")
     merge_lora_weights(pipeline, network.state_dict())
@@ -86,7 +86,7 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
     generator = torch.Generator(device=accelerator.device)
     if args.seed is not None:
         generator = generator.manual_seed(args.seed)
-    
+
     images = []
     # Random Generate
     for _ in range(args.num_validation_images):
@@ -98,14 +98,14 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
                 num_inference_steps=50,
                 generator=generator,
                 height=args.resolution,
-                width=args.resolution
+                width=args.resolution,
             ).images[0]
         )
     for index, image in enumerate(images):
         if not os.path.exists(os.path.join(args.output_dir, "validation")):
             os.makedirs(os.path.join(args.output_dir, "validation"))
         image.save(os.path.join(args.output_dir, "validation", f"global_step_{global_step}_" + str(index) + ".jpg"))
-    
+
     for tracker in accelerator.trackers:
         if tracker.name == "tensorboard":
             np_images = np.stack([np.asarray(img) for img in images])
@@ -113,18 +113,13 @@ def log_validation(args, accelerator, weight_dtype, network, global_step):
         if tracker.name == "wandb":
             # this is a hack to force wandb to log the images as JPEGs instead of PNGs.
             image_path_list = [
-                os.path.join(args.output_dir, "validation/global_step_{}_{}.jpg".format(global_step, i))
-                for i in range(len(images))
+                os.path.join(args.output_dir, "validation/global_step_{}_{}.jpg".format(global_step, i)) for i in range(len(images))
             ]
             accelerator.log(
-                {
-                    "images": [
-                        wandb.Image(image_path_list[i], caption=f"{i}: {args.validation_prompt}") for i in range(len(images))
-                    ]
-                },
-                step=global_step
+                {"images": [wandb.Image(image_path_list[i], caption=f"{i}: {args.validation_prompt}") for i in range(len(images))]},
+                step=global_step,
             )
-    
+
     network.to(accelerator.device)
     del pipeline
     torch.cuda.empty_cache()
@@ -188,9 +183,7 @@ def parse_args():
             " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
         ),
     )
-    parser.add_argument(
-        "--image_column", type=str, default="image", help="The column of the dataset containing an image."
-    )
+    parser.add_argument("--image_column", type=str, default="image", help="The column of the dataset containing an image.")
     parser.add_argument(
         "--caption_column",
         type=str,
@@ -198,7 +191,7 @@ def parse_args():
         help="The column of the dataset containing a caption or a list of captions.",
     )
     parser.add_argument(
-        "--validation", 
+        "--validation",
         action="store_true",
         help="whether to validation in whole training.",
     )
@@ -243,10 +236,7 @@ def parse_args():
         "--resolution",
         type=int,
         default=512,
-        help=(
-            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
-            " resolution"
-        ),
+        help=("The resolution for input images, all the images in the train/validation dataset will be resized to this" " resolution"),
     )
     parser.add_argument(
         "--crops_coords_top_left_h",
@@ -274,9 +264,7 @@ def parse_args():
         action="store_true",
         help="Whether to train the text encoder. If set, the text encoder should be float32 precision.",
     )
-    parser.add_argument(
-        "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
-    )
+    parser.add_argument("--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader.")
     parser.add_argument("--num_train_epochs", type=int, default=1)
     parser.add_argument(
         "--max_train_steps",
@@ -341,9 +329,7 @@ def parse_args():
             ' "constant", "constant_with_warmup"]'
         ),
     )
-    parser.add_argument(
-        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
-    )
+    parser.add_argument("--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler.")
     parser.add_argument(
         "--lr_num_cycles",
         type=int,
@@ -351,9 +337,7 @@ def parse_args():
         help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
     )
     parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
-    parser.add_argument(
-        "--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes."
-    )
+    parser.add_argument("--use_8bit_adam", action="store_true", help="Whether or not to use 8-bit Adam from bitsandbytes.")
     parser.add_argument(
         "--allow_tf32",
         action="store_true",
@@ -366,9 +350,7 @@ def parse_args():
         "--dataloader_num_workers",
         type=int,
         default=0,
-        help=(
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
-        ),
+        help=("Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."),
     )
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
@@ -405,19 +387,15 @@ def parse_args():
         ),
     )
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
+    parser.add_argument("--save_state", action="store_true", help="Whether or not to save state.")
+    parser.add_argument("--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers.")
     parser.add_argument(
-        "--save_state", action="store_true", help="Whether or not to save state."
+        "--neg_prompt",
+        type=str,
+        default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo",
+        help="A prompt that is neg during training for inference.",
     )
-    parser.add_argument(
-        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
-    )
-    parser.add_argument(
-        "--neg_prompt", type=str, default="sketch, low quality, worst quality, low quality shadow, lowres, inaccurate eyes, huge eyes, longbody, bad anatomy, cropped, worst face, strange mouth, bad anatomy, inaccurate limb, bad composition, ugly, noface, disfigured, duplicate, ugly, text, logo", 
-        help="A prompt that is neg during training for inference."
-    )
-    parser.add_argument(
-        "--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference."
-    )
+    parser.add_argument("--guidance_scale", type=int, default=9, help="A guidance_scale during training for inference.")
     parser.add_argument(
         "--cache_dir",
         type=str,
@@ -441,56 +419,44 @@ def parse_args():
         "--template_dir",
         type=str,
         default=None,
-        help=(
-            "The dir of template used, to make certificate photos."
-        ),
+        help=("The dir of template used, to make certificate photos."),
     )
     parser.add_argument(
         "--template_mask",
         default=False,
         action="store_true",
-        help=(
-            "To mask certificate photos."
-        ),
+        help=("To mask certificate photos."),
     )
     parser.add_argument(
         "--template_mask_dir",
         type=str,
         default=None,
-        help=(
-            "The dir of template masks used, to make certificate photos."
-        ),
+        help=("The dir of template masks used, to make certificate photos."),
     )
     parser.add_argument(
         "--merge_best_lora_based_face_id",
         default=False,
         action="store_true",
-        help=(
-            "Merge the best loras based on face_id."
-        ),
+        help=("Merge the best loras based on face_id."),
     )
     parser.add_argument(
         "--merge_best_lora_name",
         type=str,
         default=None,
-        help=(
-            "The output name for getting best loras."
-        ),
+        help=("The output name for getting best loras."),
     )
     parser.add_argument(
         "--cache_log_file",
         type=str,
-        default='train_kohya_log.txt',
-        help=(
-            "The output log file path."
-        ),
+        default="train_kohya_log.txt",
+        help=("The output log file path."),
     )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
-    
+
     # Sanity checks
     if args.dataset_name is None and args.train_data_dir is None:
         raise ValueError("Need either a dataset name or a training folder.")
@@ -538,9 +504,11 @@ def encode_prompt(text_encoders, tokenizers, prompt, text_input_ids_list=None):
     pooled_prompt_embeds = pooled_prompt_embeds.view(bs_embed, -1)
     return prompt_embeds, pooled_prompt_embeds
 
+
 DATASET_NAME_MAPPING = {
     "lambdalabs/pokemon-blip-captions": ("image", "text"),
 }
+
 
 def unet_attn_processors_state_dict(unet) -> Dict[str, torch.tensor]:
     """
@@ -677,34 +645,29 @@ def main():
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32 or os.environ.get('ENABLE_TF32'):
+    if args.allow_tf32 or os.environ.get("ENABLE_TF32"):
         torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.scale_lr:
-        args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
-        )
+        args.learning_rate = args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
 
     # Use 8-bit Adam for lower memory usage or to fine-tune the model in 16GB GPUs
     if args.use_8bit_adam:
         try:
             import bitsandbytes as bnb
         except ImportError:
-            raise ImportError(
-                "To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
-            )
+            raise ImportError("To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`.")
 
         optimizer_class = bnb.optim.AdamW8bit
     else:
-        if os.environ.get('ENABLE_APEX_OPT'):
+        if os.environ.get("ENABLE_APEX_OPT"):
             try:
                 import apex
-                optimizer_class=apex.optimizers.FusedAdam
+
+                optimizer_class = apex.optimizers.FusedAdam
             except ImportError:
-                logger.warn(
-                    "To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex."
-                )
-                optimizer_class=torch.optim.AdamW
+                logger.warn("To use apex FusedAdam, please install fusedAdam,https://github.com/NVIDIA/apex.")
+                optimizer_class = torch.optim.AdamW
         else:
             optimizer_class = torch.optim.AdamW
 
@@ -752,17 +715,13 @@ def main():
     else:
         image_column = args.image_column
         if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
+            raise ValueError(f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}")
     if args.caption_column is None:
         caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
     else:
         caption_column = args.caption_column
         if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
+            raise ValueError(f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}")
 
     def compute_time_ids():
         # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
@@ -789,10 +748,8 @@ def main():
                 # take a random caption if there are multiple
                 captions.append(random.choice(caption) if is_train else caption[0])
             else:
-                raise ValueError(
-                    f"Caption column `{caption_column}` should contain either strings or lists of strings."
-                )
-        
+                raise ValueError(f"Caption column `{caption_column}` should contain either strings or lists of strings.")
+
         tokens_one = tokenize_prompt(tokenizer_one, captions)
         tokens_two = tokenize_prompt(tokenizer_two, captions)
         return tokens_one, tokens_two
@@ -822,7 +779,10 @@ def main():
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         # [print(example["input_ids"]) for example in examples]
-        input_ids = [torch.stack([example["input_ids_0"] for example in examples]), torch.stack([example["input_ids_1"] for example in examples])]
+        input_ids = [
+            torch.stack([example["input_ids_0"] for example in examples]),
+            torch.stack([example["input_ids_1"] for example in examples]),
+        ]
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
@@ -835,7 +795,7 @@ def main():
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
-        persistent_workers=persistent_workers
+        persistent_workers=persistent_workers,
     )
 
     # Scheduler and math around the number of training steps.
@@ -860,16 +820,14 @@ def main():
             unet, text_encoder_one, text_encoder_two, optimizer, train_dataloader, lr_scheduler
         )
     else:
-        unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-            unet, optimizer, train_dataloader, lr_scheduler
-        )
+        unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, optimizer, train_dataloader, lr_scheduler)
 
-        
     def transform_models_if_DDP(models):
         from torch.nn.parallel import DistributedDataParallel as DDP
 
         # Transform text_encoder, unet and network from DistributedDataParallel
         return [model.module if type(model) == DDP else model for model in models if model is not None]
+
     # transform DDP after prepare (train_network here only)
     text_encoder_one, text_encoder_two = transform_models_if_DDP([text_encoder_one, text_encoder_two])
     unet, network = transform_models_if_DDP([unet, network])
@@ -912,9 +870,7 @@ def main():
             path = dirs[-1] if len(dirs) > 0 else None
 
         if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
+            accelerator.print(f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run.")
             args.resume_from_checkpoint = None
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
@@ -935,11 +891,11 @@ def main():
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
         metadata = {"ss_base_model_version": "sdxl_"}
         unwrapped_nw.save_weights(ckpt_file, weight_dtype, metadata)
-    
+
     user_id = os.path.basename(os.path.dirname(args.output_dir))
     # check log path
     if accelerator.is_main_process:
-        output_log = open(args.cache_log_file, 'w')
+        output_log = open(args.cache_log_file, "w")
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -970,14 +926,10 @@ def main():
                 noise = torch.randn_like(model_input)
                 if args.noise_offset:
                     # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-                    noise += args.noise_offset * torch.randn(
-                        (model_input.shape[0], model_input.shape[1], 1, 1), device=model_input.device
-                    )
+                    noise += args.noise_offset * torch.randn((model_input.shape[0], model_input.shape[1], 1, 1), device=model_input.device)
                 bsz = model_input.shape[0]
                 # Sample a random timestep for each image
-                timesteps = torch.randint(
-                    0, noise_scheduler.config.num_train_timesteps, (bsz,), device=model_input.device
-                )
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=model_input.device)
                 timesteps = timesteps.long()
 
                 # Add noise to the model input according to the noise magnitude at each timestep
@@ -989,13 +941,11 @@ def main():
                     text_encoders=[text_encoder_one, text_encoder_two],
                     tokenizers=None,
                     prompt=None,
-                    text_input_ids_list=[batch['input_ids'][0], batch['input_ids'][1]],
+                    text_input_ids_list=[batch["input_ids"][0], batch["input_ids"][1]],
                 )
                 unet_added_conditions = {"time_ids": add_time_ids.repeat(bsz, 1)}
                 unet_added_conditions.update({"text_embeds": pooled_prompt_embeds})
-                model_pred = unet(
-                    noisy_model_input, timesteps, prompt_embeds, added_cond_kwargs=unet_added_conditions
-                ).sample
+                model_pred = unet(noisy_model_input, timesteps, prompt_embeds, added_cond_kwargs=unet_added_conditions).sample
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
@@ -1006,7 +956,7 @@ def main():
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                
+
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
@@ -1023,12 +973,13 @@ def main():
             if accelerator.sync_gradients:
                 if global_step % 10 == 0:
                     time_info = str(time.asctime(time.localtime(time.time())))
-                    log_line = "{}: training (SDXL) lora of {} at step {} / {}\n" \
-                        "".format(time_info, user_id, global_step, args.max_train_steps)
+                    log_line = "{}: training (SDXL) lora of {} at step {} / {}\n" "".format(
+                        time_info, user_id, global_step, args.max_train_steps
+                    )
                     if accelerator.is_main_process:
                         output_log.write(log_line)
                         output_log.flush()
-                
+
                 progress_bar.update(1)
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
@@ -1056,8 +1007,8 @@ def main():
                                     removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
                                     shutil.rmtree(removing_checkpoint)
 
-                        safetensor_save_path    = os.path.join(args.output_dir, f"checkpoint-{global_step}.safetensors")
-                        accelerator_save_path   = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        safetensor_save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}.safetensors")
+                        accelerator_save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         save_model(safetensor_save_path, accelerator.unwrap_model(network))
                         if args.save_state:
                             accelerator.save_state(accelerator_save_path)
@@ -1083,18 +1034,17 @@ def main():
                         f" {args.validation_prompt}."
                     )
                     log_validation(args, accelerator, weight_dtype, network, global_step)
-        
+
         # Epoch-level validation.
         if accelerator.is_main_process:
             if (
                 args.validation_steps is None
                 and args.validation_prompt is not None
-                and epoch % args.validation_epochs == 0 and
-                args.validation
+                and epoch % args.validation_epochs == 0
+                and args.validation
             ):
                 logger.info(
-                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
-                    f" {args.validation_prompt}."
+                    f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}."
                 )
                 log_validation(args, accelerator, weight_dtype, network, global_step)
 
@@ -1106,7 +1056,7 @@ def main():
         save_model(safetensor_save_path, accelerator.unwrap_model(network))
         if args.save_state:
             accelerator.save_state(accelerator_save_path)
-        
+
         if args.validation:
             log_validation(args, accelerator, weight_dtype, network, global_step)
         # TODO: Model selection.

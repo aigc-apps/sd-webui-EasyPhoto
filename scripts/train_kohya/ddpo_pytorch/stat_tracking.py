@@ -1,21 +1,23 @@
 """Borrowed from https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/stat_tracking.py.
 """
 
-import numpy as np
 from collections import deque
 from typing import List
+
+import numpy as np
 
 
 class PerPromptStatTracker:
     """Track the mean and std of reward on a per-prompt basis and use that to compute advantages.
 
     Args:
-        buffer_size (int): The number of reward values to store in the buffer for each prompt. 
+        buffer_size (int): The number of reward values to store in the buffer for each prompt.
         The buffer persists across epochs.
-        min_count (int): The minimum number of reward values to store in the buffer before using the 
-        per-prompt mean and std. If the buffer contains fewer than `min_count` values, the mean and 
+        min_count (int): The minimum number of reward values to store in the buffer before using the
+        per-prompt mean and std. If the buffer contains fewer than `min_count` values, the mean and
         std of the entire batch will be used instead.
     """
+
     def __init__(self, buffer_size: int, min_count: int):
         self.buffer_size = buffer_size
         self.min_count = min_count
@@ -43,7 +45,4 @@ class PerPromptStatTracker:
         return advantages
 
     def get_stats(self):
-        return {
-            k: {"mean": np.mean(v), "std": np.std(v), "count": len(v)}
-            for k, v in self.stats.items()
-        }
+        return {k: {"mean": np.mean(v), "std": np.std(v), "count": len(v)} for k, v in self.stats.items()}

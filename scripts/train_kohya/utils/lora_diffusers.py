@@ -6,11 +6,12 @@ import bisect
 import math
 import random
 from typing import Any, Dict, List, Mapping, Optional, Union
-from diffusers import UNet2DConditionModel
+
 import numpy as np
+import torch
+from diffusers import UNet2DConditionModel
 from tqdm import tqdm
 from transformers import CLIPTextModel
-import torch
 
 
 def make_unet_conversion_map() -> Dict[str, str]:
@@ -320,12 +321,8 @@ class LoRANetwork(torch.nn.Module):
             for name, module in root_module.named_modules():
                 if module.__class__.__name__ in target_replace_modules:
                     for child_name, child_module in module.named_modules():
-                        is_linear = (
-                            child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "LoRACompatibleLinear"
-                        )
-                        is_conv2d = (
-                            child_module.__class__.__name__ == "Conv2d" or child_module.__class__.__name__ == "LoRACompatibleConv"
-                        )
+                        is_linear = child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "LoRACompatibleLinear"
+                        is_conv2d = child_module.__class__.__name__ == "Conv2d" or child_module.__class__.__name__ == "LoRACompatibleConv"
 
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
@@ -472,10 +469,11 @@ class LoRANetwork(torch.nn.Module):
 
 if __name__ == "__main__":
     # sample code to use LoRANetwork
-    import os
     import argparse
-    from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
+    import os
+
     import torch
+    from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

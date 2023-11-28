@@ -1,5 +1,5 @@
 # 📷 EasyPhoto | Your Smart AI Photo Generator.
-🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. 
+🦜 EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you.
 
 🦜 🦜 Welcome!
 
@@ -27,11 +27,11 @@ English | [简体中文](./README_zh-CN.md)
 - [ContactUS](#contactus)
 
 # Introduction
-EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos, and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.    
+EasyPhoto is a Webui UI plugin for generating AI portraits that can be used to train digital doppelgangers relevant to you. Training is recommended to be done with 5 to 20 portrait images, preferably half-body photos, and do not wear glasses (It doesn't matter if the characters in a few pictures wear glasses). After the training is done, we can generate it in the Inference section. We support using preset template images or uploading your own images for Inference.
 
-Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).   
+Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).
 
-If you encounter any problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
+If you encounter any problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).
 
 We now support quick pull-ups from different platforms, refer to [Quick Start](#quick-start).
 
@@ -62,7 +62,7 @@ Photo Part:
 ![results_2](images/results_2.jpg)
 ![results_3](images/results_3.jpg)
 
-Our UI interface is as follows:  
+Our UI interface is as follows:
 **train part:**
 ![train_ui](images/train_ui.jpg)
 **inference part:**
@@ -94,8 +94,8 @@ You can select the desired mirror by filling in the following information in Com
 aigc-apps/sd-webui-EasyPhoto/sd-webui-EasyPhoto
 ```
 
-#### c. From docker 
-If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
+#### c. From docker
+If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.
 
 Then execute the following commands in this way:
 ```
@@ -108,7 +108,7 @@ docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beiji
 # launch webui
 python3 launch.py --port 7860
 ```
-The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first. 
+The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first.
 ```
 cd extensions/sd-webui-EasyPhoto/
 git pull
@@ -117,10 +117,10 @@ cd /workspace
 
 ### 2. Local install: Environment Check/Downloading/Installation
 #### a. Environment Check
-We have verified EasyPhoto execution on the following environment:  
+We have verified EasyPhoto execution on the following environment:
 If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some `num_threads` to `0` and report other fix to us, thanks.
 
-The detailed of Windows 10:  
+The detailed of Windows 10:
 - OS: Windows10
 - python: py3.10
 - pytorch: torch2.0.1
@@ -129,7 +129,7 @@ The detailed of Windows 10:
 - CUDNN: 8+
 - GPU: Nvidia-3060 12G
 
-The detailed of Linux:  
+The detailed of Linux:
 - OS: Ubuntu 20.04, CentOS
 - python: py3.10 & py3.11
 - pytorch: torch2.0.1
@@ -141,7 +141,7 @@ The detailed of Linux:
 We need about 60GB available on disk (for saving weights and datasets process), please check!
 
 #### b.  Relevant Repositories & Weights Downloading
-##### i. Controlnet 
+##### i. Controlnet
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
 In addition, we need at least three Controlnets for inference. So you need to set the **Multi ControlNet: Max models amount (requires restart)** in Setting.
@@ -191,7 +191,7 @@ If you want to set parameters, the parsing of each parameter is as follows:
 |Rank Lora | The feature length of the weight, default to `128`|
 |Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to `64`|
 
-### 2. Inference 
+### 2. Inference
 #### a. single people
 - Step 1: Click the refresh button to query the model corresponding to the trained user ID.
 - Step 2: Select the `user ID`.
@@ -219,20 +219,20 @@ If you want to set parameters, the parsing of each parameter is as follows:
 
 ![overview](images/overview.jpg)
 
-In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference. 
+In the field of AI portraits, we expect model-generated images to be realistic and resemble the user, and traditional approaches introduce unrealistic lighting (such as face fusion or roop). To address this unrealism, we introduce the image-to-image capability of the stable diffusion model. Generating a perfect personal portrait takes into account the desired generation scenario and the user's digital doppelgänger. We use a pre-prepared template as the desired generation scene and an online trained face LoRA model as the user's digital doppelganger, which is a popular stable diffusion fine-tuning model. We use a small number of user images to train a stable digital doppelgänger of the user, and generate a personal portrait image based on the face LoRA model and the expected generative scene during inference.
 
 ### 2. Training Detailed
 
 ![overview](images/train_detail1.jpg)
 
-First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.   
+First, we perform face detection on the input user image, and after determining the face location, we intercept the input image according to a certain ratio. Then, we use the saliency detection model and the skin beautification model to obtain a clean face training image, which basically consists of only faces. Then, we label each image with a fixed label. There is no need to use a labeler here, and the results are good. Finally, we fine-tune the stabilizing diffusion model to get the user's digital doppelganger.
 
 During training, we utilize the template image for verification in real time, and at the end of training, we calculate the face id gap between the verification image and the user's image to achieve Lora fusion, which ensures that our Lora is a perfect digital doppelganger of the user.
 
 In addition, we will choose the image that is most similar to the user in the validation as the face_id image, which will be used in Inference.
 
 ### 3. Inference Detailed
-#### a. First Diffusion:  
+#### a. First Diffusion:
 First, we will perform face detection on our incoming template image to determine the mask that needs to be inpainted for stable diffusion. then we will use the template image to perform face fusion with the optimal user image. After the face fusion is completed, we use the above mask to inpaint (fusion_image) with the face fused image. In addition, we will affix the optimal face_id image obtained during training to the template image by affine transformation (replaced_image). Then we will apply Controlnets on it, we use canny with color to extract features for fusion_image and openpose for replaced_image to ensure the similarity and stability of the images. Then we will use Stable Diffusion combined with the user's digital split for generation.
 
 #### b. Second Diffusion:
@@ -242,11 +242,11 @@ After getting the result of First Diffusion, we will fuse the result with the op
 Special thanks to DevelopmentZheng, qiuyanxin, rainlee, jhuang1207, bubbliiiing, wuziheng, yjjinjie, hkunzhe, yunkchen for their code contributions (in no particular order).
 
 # Reference
-- insightface：https://github.com/deepinsight/insightface    
-- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary  
-- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary 
-- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary   
-- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary  
+- insightface：https://github.com/deepinsight/insightface
+- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary
+- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary
+- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary
+- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary
 - kohya：https://github.com/bmaltais/kohya_ss
 - controlnet-webui：https://github.com/Mikubill/sd-webui-controlnet
 

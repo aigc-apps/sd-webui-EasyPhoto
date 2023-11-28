@@ -8,11 +8,8 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import torch
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline, rescale_noise_cfg
 
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
-    StableDiffusionPipeline,
-    rescale_noise_cfg,
-)
 from .ddim_with_logprob import ddim_step_with_logprob
 
 

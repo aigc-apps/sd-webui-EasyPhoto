@@ -1,0 +1,54 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+      - id: black
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+        args: ["--line-length=140"]
+  - repo: https://github.com/PyCQA/flake8
+    rev: 3.9.2
+    hooks:
+      - id: flake8
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+        args: ["--max-line-length=140", "--ignore=E303,E731,W191,W504,E402,E203,F541,W605,W503,E501", "--exclude=__init__.py"]
+  - repo: https://github.com/myint/autoflake
+    rev: v1.4
+    hooks:
+      - id: autoflake
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+        args:
+          [
+            "--recursive",
+            "--in-place",
+            "--remove-all-unused-imports",
+            "--remove-unused-variable",
+            "--ignore-init-module-imports",
+            "--exclude=__init__.py"
+          ]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-ast
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-byte-order-marker
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-case-conflict
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-docstring-first
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-executables-have-shebangs
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-json
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: check-yaml
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: debug-statements
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: detect-private-key
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: end-of-file-fixer
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: trailing-whitespace
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
+      - id: mixed-line-ending
+        exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py

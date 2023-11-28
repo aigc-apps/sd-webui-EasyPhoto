@@ -6,13 +6,12 @@
 # - Timesteps can be a batched torch.Tensor.
 # Copied from https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/ddim_with_logprob.py.
 
+import math
 from typing import Optional, Tuple, Union
 
-import math
 import torch
-
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler, DDIMSchedulerOutput
 from diffusers.utils import randn_tensor
-from diffusers.schedulers.scheduling_ddim import DDIMSchedulerOutput, DDIMScheduler
 
 
 def _left_broadcast(t, shape):
@@ -71,9 +70,7 @@ def ddim_step_with_logprob(
     """
     assert isinstance(self, DDIMScheduler)
     if self.num_inference_steps is None:
-        raise ValueError(
-            "Number of inference steps is 'None', you need to run 'set_timesteps' after creating the scheduler"
-        )
+        raise ValueError("Number of inference steps is 'None', you need to run 'set_timesteps' after creating the scheduler")
 
     # See formulas (12) and (16) of DDIM paper https://arxiv.org/pdf/2010.02502.pdf
     # Ideally, read DDIM paper in-detail understanding
@@ -93,9 +90,7 @@ def ddim_step_with_logprob(
 
     # 2. compute alphas, betas
     alpha_prod_t = self.alphas_cumprod.gather(0, timestep.cpu())
-    alpha_prod_t_prev = torch.where(
-        prev_timestep.cpu() >= 0, self.alphas_cumprod.gather(0, prev_timestep.cpu()), self.final_alpha_cumprod
-    )
+    alpha_prod_t_prev = torch.where(prev_timestep.cpu() >= 0, self.alphas_cumprod.gather(0, prev_timestep.cpu()), self.final_alpha_cumprod)
     alpha_prod_t = _left_broadcast(alpha_prod_t, sample.shape).to(sample.device)
     alpha_prod_t_prev = _left_broadcast(alpha_prod_t_prev, sample.shape).to(sample.device)
 
@@ -113,18 +108,13 @@ def ddim_step_with_logprob(
         pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
         pred_epsilon = (alpha_prod_t**0.5) * model_output + (beta_prod_t**0.5) * sample
     else:
-        raise ValueError(
-            f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample`, or"
-            " `v_prediction`"
-        )
+        raise ValueError(f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample`, or" " `v_prediction`")
 
     # 4. Clip or threshold "predicted x_0"
     if self.config.thresholding:
         pred_original_sample = self._threshold_sample(pred_original_sample)
     elif self.config.clip_sample:
-        pred_original_sample = pred_original_sample.clamp(
-            -self.config.clip_sample_range, self.config.clip_sample_range
-        )
+        pred_original_sample = pred_original_sample.clamp(-self.config.clip_sample_range, self.config.clip_sample_range)
 
     # 5. compute variance: "sigma_t(η)" -> see formula (16)
     # σ_t = sqrt((1 − α_t−1)/(1 − α_t)) * sqrt(1 − α_t/α_t−1)
@@ -144,14 +134,11 @@ def ddim_step_with_logprob(
 
     if prev_sample is not None and generator is not None:
         raise ValueError(
-            "Cannot pass both generator and prev_sample. Please make sure that either `generator` or"
-            " `prev_sample` stays `None`."
+            "Cannot pass both generator and prev_sample. Please make sure that either `generator` or" " `prev_sample` stays `None`."
         )
 
     if prev_sample is None:
-        variance_noise = randn_tensor(
-            model_output.shape, generator=generator, device=model_output.device, dtype=model_output.dtype
-        )
+        variance_noise = randn_tensor(model_output.shape, generator=generator, device=model_output.device, dtype=model_output.dtype)
         prev_sample = prev_sample_mean + std_dev_t * variance_noise
 
     # log prob of prev_sample given prev_sample_mean and std_dev_t
