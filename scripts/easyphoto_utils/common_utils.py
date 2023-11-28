@@ -48,14 +48,17 @@ if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_builtin_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
 else:
     controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
 
 download_urls = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -63,8 +66,13 @@ download_urls = {
         # base model
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors",
         # controlnets
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
+        # vaes
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
+    ],
+    "portrait": [
+        # controlnet
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
         # loras
@@ -73,8 +81,6 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
-        # vaes
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         # other models
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
@@ -118,6 +124,13 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
+    ],
+    "add_tryon": [
+        # controlnets
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/dpt_hybrid-midas-501f0c75.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1p_sd15_depth.pth",
+        # sam
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sam_vit_l_0b3195.pth",
     ],
     # Scene Lora Collection
     "Christmas_1": [
@@ -173,12 +186,17 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         # controlnets
         [
-            os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
-            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth"),
-        ],
-        [
             os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
             os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth"),
+        ],
+        # vaes
+        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
+    ],
+    "portrait": [
+        # controlnets
+        [
+            os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth"),
         ],
         [
             os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
@@ -194,8 +212,6 @@ save_filenames = {
         os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
         os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
-        # vaes
-        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         # other models
         os.path.join(easyphoto_models_path, "face_skin.pth"),
         os.path.join(easyphoto_models_path, "face_landmarks.pth"),
@@ -247,6 +263,11 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         os.path.join(easyphoto_models_path, "mm_sd_v15_v2.ckpt"),
         os.path.join(easyphoto_models_path, "flownet.pkl"),
+    ],
+    "add_tryon": [
+        os.path.join(controlnet_depth_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
+        os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
+        os.path.join(easyphoto_models_path, "sam_vit_l_0b3195.pth"),
     ],
     # Scene Lora Collection
     "Christmas_1": [
