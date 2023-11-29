@@ -1473,6 +1473,7 @@ def on_ui_tabs():
                                                     show_label=False,
                                                     source="upload",
                                                     tool="sketch",
+                                                    height=400,
                                                 )
                                             with gr.Column(visible=True):
                                                 template_mask = gr.Image(
@@ -1481,6 +1482,7 @@ def on_ui_tabs():
                                                     show_label=False,
                                                     show_download_button=True,
                                                     interactive=True,
+                                                    height=400,
                                                 )
 
                                             template_mask_preview = ToolButton(value="👀")
@@ -1516,7 +1518,7 @@ def on_ui_tabs():
                                         show_label=False,
                                     )
 
-                                def prepare_tryon_cloth_gallery():
+                                def prepare_tryon_cloth_gallery(with_info=True):
                                     tryon_cloth_paths = glob.glob(
                                         os.path.join(os.path.join(tryon_preview_dir, "cloth"), "*.jpg")
                                     ) + glob.glob(os.path.join(os.path.join(tryon_gallery_dir, "cloth"), "*.jpg"))
@@ -1528,7 +1530,10 @@ def on_ui_tabs():
                                             and tryon_preview_dir in tryon_cloth
                                         ) or "mask" in tryon_cloth:
                                             continue
-                                        tryon_cloth_gallery_list.append((tryon_cloth, tryon_cloth.split("/")[-1].split(".")[0]))
+                                        if with_info:
+                                            tryon_cloth_gallery_list.append((tryon_cloth, tryon_cloth.split("/")[-1].split(".")[0]))
+                                        else:
+                                            tryon_cloth_gallery_list.append(tryon_cloth)
 
                                     return tryon_cloth_gallery_list
 
@@ -1546,6 +1551,8 @@ def on_ui_tabs():
                                         cloth_id_refresh = ToolButton(value="\U0001f504")
 
                                     def tryon_cloth_select_function(evt: gr.SelectData):
+                                        # it may be updated by a new trained lora
+                                        tryon_cloth_gallery_list = prepare_tryon_cloth_gallery()
                                         old_tryon_cloth_path = tryon_cloth_gallery_list[evt.index][0]
                                         tryon_cloth_id = tryon_cloth_gallery_list[evt.index][1]
 
@@ -1561,15 +1568,15 @@ def on_ui_tabs():
 
                                             return [(new_tryon_cloth_path, tryon_cloth_id), gr.update(value=new_tryon_cloth_gallery_list)]
                                         else:
-                                            cloth_ids = prepare_tryon_cloth_gallery()
-                                            return [cloth_ids[evt.index], gr.update(value=cloth_ids)]
+                                            cloth_gallery_list = prepare_tryon_cloth_gallery()
+
+                                            return [cloth_gallery_list[evt.index], gr.update(value=cloth_gallery_list)]
 
                                     selected_cloth_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
                                     cloth_gallery.select(tryon_cloth_select_function, None, outputs=[selected_cloth_images, cloth_gallery])
 
                                     def cloth_gallery_refresh_function():
-                                        cloth_ids = tryon_cloth_gallery_list
-                                        cloth_gallery_list = [(i, i.split("/")[-1].split(".")[0]) for i in cloth_ids]
+                                        cloth_gallery_list = prepare_tryon_cloth_gallery()
                                         return gr.update(value=cloth_gallery_list)
 
                                     cloth_id_refresh.click(
@@ -1587,6 +1594,7 @@ def on_ui_tabs():
                                                 show_label=False,
                                                 source="upload",
                                                 tool="sketch",
+                                                height=400,
                                             )
 
                                         with gr.Column():
@@ -1596,6 +1604,7 @@ def on_ui_tabs():
                                                 show_label=False,
                                                 show_download_button=True,
                                                 interactive=True,
+                                                height=400,
                                             )
                                         reference_mask_preview = ToolButton(value="👀")
                                     with gr.Row():
@@ -1650,7 +1659,7 @@ def on_ui_tabs():
                             template_img_selected_tab = gr.State(0)
                             ref_image_selected_tab = gr.State(0)
 
-                            upload_way.change(generate_tryon_template_tabs, template_upload_way, template_img_selected_tab)
+                            template_upload_way.change(generate_tryon_template_tabs, template_upload_way, template_img_selected_tab)
                             cloth_upload_way.change(generate_tryon_reference_tabs, cloth_upload_way, ref_image_selected_tab)
 
                             with gr.Row():
@@ -1673,7 +1682,7 @@ def on_ui_tabs():
                                 additional_prompt = gr.Textbox(
                                     label="Additional Prompt",
                                     lines=3,
-                                    value="masterpiece, beauty",
+                                    value="",
                                     interactive=True,
                                 )
                                 seed = gr.Textbox(

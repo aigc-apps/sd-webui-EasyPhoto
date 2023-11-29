@@ -50,7 +50,7 @@ from scripts.sdwebui import get_checkpoint_type, reload_sd_model_vae, switch_sd_
 python_executable_path = sys.executable
 # base portrait sdxl add_text2image add_ipa_base add_ipa_sdxl add_video add_tryon
 check_hash = [True, True, True, True, True, True, True, True]
-sam_sam_predictor = None
+sam_predictor = None
 
 
 @switch_sd_model_vae()
@@ -84,6 +84,7 @@ def easyphoto_tryon_infer_forward(
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
 
+    ep_logger.info(f"Chosen Tab: {template_img_selected_tab}, {ref_image_selected_tab}")
     # check input
     check_files_exists_and_download(check_hash[0], "base")
     check_files_exists_and_download(check_hash[7], "add_tryon")
@@ -103,16 +104,16 @@ def easyphoto_tryon_infer_forward(
 
     # Template: choose tabs selected
     if template_img_selected_tab == 0:
-        # choose from template
-        if selected_template_images is None:
-            info = "Please choose a template image from gallery."
-            ep_logger.error(info)
-            return info, [], template_mask, reference_mask
-        else:
+        try:
             # choose from gallery
             input_tem_img_path = eval(selected_template_images)[0]
             # clean previous template mask result
             template_mask = None
+        except Exception as e:
+            ep_logger.info(f"selected_template_images: {selected_template_images}")
+            info = "Please choose a template image from gallery."
+            ep_logger.error(info + e)
+            return info, [], template_mask, reference_mask
     else:
         # use uploaded template
         if template_image is None:
@@ -135,16 +136,17 @@ def easyphoto_tryon_infer_forward(
     # Reference: choose tabs select
     if ref_image_selected_tab == 0:
         # choose from template
-        if selected_template_images is None:
-            info = "Please choose a cloth image from gallery."
-            ep_logger.error(info)
-            return info, [], template_mask, reference_mask
-        else:
+        try:
             input_ref_img_path = eval(selected_cloth_images)[0]
             cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
 
             # clean previous reference mask result
             reference_mask = None
+        except Exception as e:
+            ep_logger.info(f"selected_cloth_images: {selected_cloth_images}")
+            info = "Please choose a cloth image from gallery."
+            ep_logger.error(info + e)
+            return info, [], template_mask, reference_mask
     else:
         # use uploaded reference
         if cloth_uuid == "" or cloth_uuid is None:
@@ -680,7 +682,7 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
     if mask.max() == 0:
         # no input mask
         info = f"({img_type}) No input hint given. Upload a mask image or give some hints."
-        print(info)
+        ep_logger.info(info)
         return info, None
 
     num_connected, centroids = find_connected_components(mask[:, :, 0])
