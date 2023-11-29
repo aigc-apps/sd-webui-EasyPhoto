@@ -243,6 +243,8 @@ def txt2img(
     seed: int = 123456,
     sd_model_checkpoint="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
     sampler="DPM++ 2M SDE Karras",
+    outpath_samples=easyphoto_txt2img_samples,
+    do_not_save_samples=False,
     animatediff_flag=False,
     animatediff_video_length=0,
     animatediff_fps=0,
@@ -264,7 +266,8 @@ def txt2img(
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
-        outpath_samples=easyphoto_txt2img_samples,
+        outpath_samples=outpath_samples,
+        do_not_save_samples=do_not_save_samples,
         sampler=sampler,
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
@@ -288,6 +291,8 @@ def inpaint(
     seed: int = 123456,
     sd_model_checkpoint="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
     sampler="DPM++ 2M SDE Karras",
+    outpath_samples=easyphoto_img2img_samples,
+    do_not_save_samples=False,
     animatediff_flag=False,
     animatediff_video_length=0,
     animatediff_fps=0,
@@ -320,7 +325,8 @@ def inpaint(
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
-        outpath_samples=easyphoto_img2img_samples,
+        outpath_samples=outpath_samples,
+        do_not_save_samples=do_not_save_samples,
         sampler=sampler,
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
@@ -698,7 +704,7 @@ def easyphoto_infer_forward(
     # or do txt2img with SDXL once before img2img.
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
     if sdxl_pipeline_flag and not sdxl_txt2img_flag:
-        txt2img([], diffusion_steps=2)
+        txt2img([], diffusion_steps=2, outpath_samples=None, do_not_save_samples=True)
         sdxl_txt2img_flag = True
     for index, user_id in enumerate(user_ids):
         if user_id == "none":
