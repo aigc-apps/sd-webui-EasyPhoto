@@ -16,7 +16,7 @@ from modules.shared import opts
 from PIL import Image
 from segment_anything import SamPredictor, sam_model_registry
 
-from scripts.easyphoto_config import cache_log_file_path, cloth_id_outpath_samples, easyphoto_outpath_samples, validation_tryon_prompt, DEFAULT_POSITIVE_TRYON, DEFAULT_NEGATIVE_TRYON
+from scripts.easyphoto_config import cache_log_file_path, cloth_id_outpath_samples, easyphoto_outpath_samples, validation_tryon_prompt
 from scripts.easyphoto_infer import inpaint
 from scripts.easyphoto_utils import (
     align_and_overlay_images,
@@ -68,6 +68,7 @@ def easyphoto_tryon_infer_forward(
     refine_input_mask,
     optimize_angle_and_ratio,
     refine_bound,
+    template_img_selected_tab,
     ref_image_selected_tab,
     cloth_uuid,
     max_train_steps,
@@ -86,7 +87,7 @@ def easyphoto_tryon_infer_forward(
     if checkpoint_type == 2 or checkpoint_type == 3:
         info = "Tryon does not support the SD2 / SDXL checkpoint."
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
     cloth_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
     gallery_lists = glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob(os.path.join(cloth_gallery_dir, "*.png"))
@@ -99,49 +100,58 @@ def easyphoto_tryon_infer_forward(
             # choose from gallery
             input_ref_img_path = eval(selected_cloth_template_images)[0]
             cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
+
+            # clean previous reference mask result
+            reference_mask = None
+
         elif ref_image_selected_tab == 1:
             if cloth_uuid == "" or cloth_uuid is None:
                 info = "The user id cannot be empty."
                 ep_logger.error(info)
-                return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+                return info, [], template_mask, reference_mask
 
             cloth_uuid = cloth_uuid + "_" + str(max_train_steps)
 
             if cloth_uuid in user_ids:
                 info = "The user id cannot be repeat. Please check in the cloth gallery. Or use a new id to mark the new cloth"
                 ep_logger.error(info)
-                return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+                return info, [], template_mask, reference_mask
 
     except Exception:
         torch.cuda.empty_cache()
         info = "Please choose or upload a reference image."
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
-    if template_image is None:
-        info = "Please upload a template image."
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+    
+    if template_img_selected_tab == 0:
+        # read and download gallery from oss
+        pass
+    else:
+        if template_image is None:
+            info = "Please upload a template image."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
 
     if template_mask is None and template_image["mask"].max() == 0:
         info = "Please give a hint of template, or upload template mask by clicking show mask."
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
     if ref_image_selected_tab == 1 and reference_mask is None and reference_image["mask"].max() == 0:
         info = "Please give a hint of reference, or upload reference mask by clicking show mask."
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
     if template_mask is not None and template_mask.shape != template_image["image"].shape:
         info = "Please upload a mask with the same size as template. Or remove the uploaded mask and generate automatically by given hints"
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
     if reference_mask is not None and reference_mask.shape != reference_image["image"].shape:
         info = "Please upload a mask with the same size as reference. Or remove the uploaded mask and generate automatically by given hints"
         ep_logger.error(info)
-        return info, [], template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+        return info, [], template_mask, reference_mask
 
     ep_logger.info(f"cloth user id: {cloth_uuid}")
 
@@ -200,17 +210,13 @@ def easyphoto_tryon_infer_forward(
                 [],
                 template_mask,
                 reference_mask,
-                gr.update(visible=True),
-                gr.update(visible=True),
             )
         if not os.path.exists(json_save_path):
             return (
                 "Failed to obtain preprocessed metadata.jsonl, please check the preprocessing process.",
                 [],
                 template_mask,
-                reference_mask,
-                gr.update(visible=True),
-                gr.update(visible=True),
+                reference_mask
             )
 
         train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
@@ -312,9 +318,7 @@ def easyphoto_tryon_infer_forward(
                 "Failed to obtain Lora after training, please check the training process.",
                 [],
                 template_mask,
-                reference_mask,
-                gr.update(visible=True),
-                gr.update(visible=True),
+                reference_mask
             )
 
         # save to gallery
@@ -455,7 +459,8 @@ def easyphoto_tryon_infer_forward(
     result_img = Image.fromarray(np.uint8(result_img))
 
     # get inner canny and resize img to 512
-    resize_image, res_canny = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask_ref, mask_template)
+    resize_image, res_canny, inner_bound_mask = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask_ref, mask_template)
+    inner_bound_mask = Image.fromarray(np.uint8(inner_bound_mask))
 
     resize_mask_template, remove_pad = resize_image_with_pad(mask_template, resolution=512)
     resize_mask_template = remove_pad(resize_mask_template)
@@ -478,10 +483,11 @@ def easyphoto_tryon_infer_forward(
     return_res = []
     for i in range(batch_size):
         ep_logger.info("Start First diffusion.")
-
+        # inpaint the main region
         controlnet_pairs = [
             ["canny_no_pre", res_canny, 1.0, 0],
             ["depth", resize_img_template, 1.0, 0],
+            # ["color", resize_image_input, 0.8, 0],
         ]
 
         result_img = inpaint(
@@ -491,8 +497,30 @@ def easyphoto_tryon_infer_forward(
             diffusion_steps=first_diffusion_steps,
             denoising_strength=first_denoising_strength,
             input_prompt=input_prompt,
-            default_positive_prompt=DEFAULT_POSITIVE_TRYON,
-            default_negative_prompt=DEFAULT_NEGATIVE_TRYON,
+            default_positive_prompt='',
+            default_negative_prompt='',
+            hr_scale=1.0,
+            seed=str(seed),
+            sd_model_checkpoint=sd_model_checkpoint,
+        )
+
+        # start inner bound refine
+        controlnet_pairs = [
+            ["canny", resize_img_template, 1.0, 0],
+            ["depth", resize_img_template, 1.0, 0],
+        ]
+        refine_diffusion_steps = 30
+        refine_denoising_strength = 0.7
+        
+        result_img = inpaint(
+            result_img,
+            inner_bound_mask,
+            controlnet_pairs,
+            diffusion_steps=refine_diffusion_steps,
+            denoising_strength=refine_denoising_strength,
+            input_prompt=input_prompt,
+            default_positive_prompt='',
+            default_negative_prompt='',
             hr_scale=1.0,
             seed=str(seed),
             sd_model_checkpoint=sd_model_checkpoint,
@@ -617,14 +645,14 @@ def easyphoto_tryon_infer_forward(
 
         ep_logger.info("Finished")
 
-    return "Success\n" + return_msg, return_res, template_mask, reference_mask, gr.update(visible=True), gr.update(visible=True)
+    return "Success\n" + return_msg, return_res, template_mask, reference_mask
 
 
 def easyphoto_tryon_mask_forward(input_image, img_type):
     global predictor
 
     if input_image is None:
-        info = "Please upload a template image."
+        info = f"Please upload a {img_type} image."
         ep_logger.error(info)
         return info, None
 
@@ -668,5 +696,7 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
         )
         mask = masks[0].astype(np.uint8)  # mask = [sam_outputs_num, h, w]
         mask = mask * 255
+    
+    cv2.imwrite('template_mask.jpg', mask)
 
     return "Show Mask Success", mask

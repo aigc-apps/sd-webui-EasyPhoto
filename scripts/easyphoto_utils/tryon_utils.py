@@ -65,6 +65,9 @@ def mask_to_box(mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]
             - Largest connected component binary mask.
             - Bounding box coordinates (x, y, x + width, y + height).
     """
+    if len(mask.shape)==3:
+        mask = mask[:,:,0]
+
     # Find connected components
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
 
@@ -158,6 +161,7 @@ def draw_box_on_image(image: np.ndarray, box: tuple, det_path: str):
 
 def prepare_tryon_train_data(reference_image, reference_mask, ref_image_path, images_save_path, json_save_path, validation_prompt):
     # crop
+    print(reference_mask.shape)
     _, mask_box = mask_to_box(reference_mask)
 
     # crop to get local img
@@ -815,8 +819,8 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
     _, resize_mask2 = canny(mask2)
 
     mask1_outline = np.uint8(
-        cv2.dilate(np.array(resize_mask1), np.ones((10, 10), np.uint8), iterations=1)
-        - cv2.erode(np.array(resize_mask1), np.ones((10, 10), np.uint8), iterations=1)
+        cv2.dilate(np.array(resize_mask1), np.ones((30, 30), np.uint8), iterations=1)
+        - cv2.erode(np.array(resize_mask1), np.ones((30, 30), np.uint8), iterations=1)
     )
 
     mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
@@ -824,7 +828,7 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
     # Remove the mask1 outline from the Canny image to obtain inner edges
     canny_image_inner = remove_outline(canny_image, mask1_outline)
 
-    return resize_image, canny_image_inner
+    return resize_image, canny_image_inner, mask1_outline
 
 
 def resize_image_with_pad(input_image, resolution, skip_hwc3=False):

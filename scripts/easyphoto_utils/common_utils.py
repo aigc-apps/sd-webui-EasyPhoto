@@ -67,6 +67,7 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors",
         # controlnets
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
         # vaes
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
     ],
@@ -74,7 +75,6 @@ download_urls = {
         # controlnet
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
         # loras
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
         # controlnet annotator
@@ -189,6 +189,10 @@ save_filenames = {
             os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
             os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth"),
         ],
+        [
+            os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth"),
+        ],
         # vaes
         os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
     ],
@@ -202,10 +206,7 @@ save_filenames = {
             os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
             os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth"),
         ],
-        [
-            os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
-            os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth"),
-        ],
+        
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         # controlnet annotator
