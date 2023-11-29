@@ -15,7 +15,7 @@ from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path
+from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -59,6 +59,10 @@ else:
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
     controlnet_depth_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+
+# tryon gallery path
+tryon_template_gallery_dir = os.path.join(tryon_gallery_dir, "template")
+tryon_cloth_gallery_dir = os.path.join(tryon_gallery_dir, "cloth")
 
 download_urls = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -177,6 +181,32 @@ download_urls = {
     ],
     "SchoolUniform_2": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
+    ],
+    # Tryon Gallery Collections
+    # template
+    "boy": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/boy.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/boy_mask.jpg",
+    ],
+    "girl": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/girl.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/girl_mask.jpg",
+    ],
+    # cloth
+    "demo_white_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/demo_white_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/ref_image_mask.jpg",
+    ],
+    "demo_black_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/demo_black_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/ref_image_mask.jpg",
+    ],
+    "demo_purple_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/demo_purple_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image_mask.jpg",
     ],
 }
 save_filenames = {
@@ -314,6 +344,26 @@ save_filenames = {
     ],
     "SchoolUniform_2": [
         os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
+    ],
+    # Tryon Gallery Collections
+    # template
+    "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg"), os.path.join(tryon_template_gallery_dir, "boy_mask.jpg")],
+    "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg"), os.path.join(tryon_template_gallery_dir, "girl_mask.jpg")],
+    # cloth
+    "demo_white_200": [
+        os.path.join(models_path, f"Lora/demo_white_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_white_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_white_200_mask.jpg"),
+    ],
+    "demo_black_200": [
+        os.path.join(models_path, f"Lora/demo_black_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_black_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_black_200_mask.jpg"),
+    ],
+    "demo_purple_200": [
+        os.path.join(models_path, f"Lora/demo_purple_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_purple_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_purple_200_mask.jpg"),
     ],
 }
 

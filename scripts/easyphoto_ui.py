@@ -8,12 +8,14 @@ from modules.ui_components import ToolButton as ToolButton_webui
 
 from scripts.easyphoto_config import (
     DEFAULT_SCENE_LORA,
+    DEFAULT_CLOTH_LORA,
     cache_log_file_path,
-    cloth_id_outpath_samples,
     easyphoto_models_path,
     easyphoto_video_outpath_samples,
     models_path,
     user_id_outpath_samples,
+    tryon_preview_dir,
+    tryon_gallery_dir,
 )
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
@@ -1416,17 +1418,51 @@ def on_ui_tabs():
                                         show_label=False,
                                     )
                                 with gr.Row():
-                                    with gr.Column() as template_cloth_gallery:
-                                        template_gallery_list = [(i, i) for i in preset_template]
-                                        gallery = gr.Gallery(template_gallery_list).style(
+                                    tryon_template_gallery_preview_list = glob.glob(
+                                        os.path.join(
+                                            os.path.join(
+                                                tryon_preview_dir,
+                                                "template",
+                                            ),
+                                            "*.jpg",
+                                        )
+                                    )
+
+                                    tryon_template_gallery_list = [
+                                        (i, i.split("/")[-1].split(".")[0]) for i in tryon_template_gallery_preview_list
+                                    ]
+
+                                    with gr.Column() as template_tryon_gallery:
+
+                                        tryon_template_gallery = gr.Gallery(tryon_template_gallery_list).style(
                                             columns=[5], rows=[2], object_fit="contain", height="auto"
                                         )
 
-                                        def select_function(evt: gr.SelectData):
-                                            return [preset_template[evt.index]]
+                                        def tryon_template_select_function(evt: gr.SelectData):
+                                            old_tryon_template_path = tryon_template_gallery_list[evt.index][0]
+                                            tryon_template_id = tryon_template_gallery_list[evt.index][1]
+                                            check_files_exists_and_download(False, tryon_template_id)
 
-                                        selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                                        gallery.select(select_function, None, selected_template_images)
+                                            # update with high quality image
+                                            new_tryon_template_path = tryon_template_gallery_list[evt.index][0].replace(
+                                                tryon_preview_dir, tryon_gallery_dir
+                                            )
+                                            new_tryon_template_gallery_list = [
+                                                (new_tryon_template_path, y) if x == old_tryon_template_path else (x, y)
+                                                for x, y in tryon_template_gallery_list
+                                            ]
+
+                                            return [
+                                                (new_tryon_template_path, tryon_template_id),
+                                                gr.update(value=new_tryon_template_gallery_list),
+                                            ]
+
+                                        tryon_selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
+                                        tryon_template_gallery.select(
+                                            tryon_template_select_function,
+                                            inputs=None,
+                                            outputs=[tryon_selected_template_images, tryon_template_gallery],
+                                        )
 
                                     with gr.Column(visible=False) as template_single_upload:
                                         with gr.Row():
@@ -1464,7 +1500,7 @@ def on_ui_tabs():
                             template_upload_way.change(
                                 template_upload_way_change,
                                 template_upload_way,
-                                [template_cloth_gallery, template_single_upload, tryon_template_chosen],
+                                [template_tryon_gallery, template_single_upload, tryon_template_chosen],
                             )
 
                             def clean_mask():
@@ -1480,16 +1516,27 @@ def on_ui_tabs():
                                         show_label=False,
                                     )
 
-                                with gr.Column() as cloth_gallery:
-                                    cloth_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
-                                    os.makedirs(cloth_gallery_dir, exist_ok=True)
-                                    cloth_ids = glob.glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob.glob(
-                                        os.path.join(cloth_gallery_dir, "*.png")
-                                    )
-                                    cloth_gallery_list = [(i, i.split("/")[-1].split(".")[0]) for i in cloth_ids]
+                                def prepare_tryon_cloth_gallery():
+                                    tryon_cloth_paths = glob.glob(
+                                        os.path.join(os.path.join(tryon_preview_dir, "cloth"), "*.jpg")
+                                    ) + glob.glob(os.path.join(os.path.join(tryon_gallery_dir, "cloth"), "*.jpg"))
+                                    tryon_cloth_gallery_list = []
+                                    # remove duplicate and mask
+                                    for tryon_cloth in tryon_cloth_paths:
+                                        if (
+                                            os.path.exists(tryon_cloth.replace(tryon_preview_dir, tryon_gallery_dir))
+                                            and tryon_preview_dir in tryon_cloth
+                                        ) or "mask" in tryon_cloth:
+                                            continue
+                                        tryon_cloth_gallery_list.append((tryon_cloth, tryon_cloth.split("/")[-1].split(".")[0]))
 
+                                    return tryon_cloth_gallery_list
+
+                                tryon_cloth_gallery_list = prepare_tryon_cloth_gallery()
+
+                                with gr.Column() as cloth_gallery:
                                     with gr.Row():
-                                        cloth_gallery = gr.Gallery(cloth_gallery_list).style(
+                                        cloth_gallery = gr.Gallery(tryon_cloth_gallery_list).style(
                                             columns=[5],
                                             rows=[1],
                                             object_fit="contain",
@@ -1498,19 +1545,30 @@ def on_ui_tabs():
 
                                         cloth_id_refresh = ToolButton(value="\U0001f504")
 
-                                    def select_function(evt: gr.SelectData):
-                                        cloth_ids = glob.glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob.glob(
-                                            os.path.join(cloth_gallery_dir, "*.png")
-                                        )
-                                        return [cloth_ids[evt.index]]
+                                    def tryon_cloth_select_function(evt: gr.SelectData):
+                                        old_tryon_cloth_path = tryon_cloth_gallery_list[evt.index][0]
+                                        tryon_cloth_id = tryon_cloth_gallery_list[evt.index][1]
 
-                                    selected_cloth_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                                    cloth_gallery.select(select_function, None, selected_cloth_template_images)
+                                        if tryon_cloth_id in DEFAULT_CLOTH_LORA:
+                                            check_files_exists_and_download(False, tryon_cloth_id)
+
+                                            # update with high quality image
+                                            new_tryon_cloth_path = old_tryon_cloth_path.replace(tryon_preview_dir, tryon_gallery_dir)
+                                            new_tryon_cloth_gallery_list = [
+                                                (new_tryon_cloth_path, y) if x == old_tryon_cloth_path else (x, y)
+                                                for x, y in tryon_cloth_gallery_list
+                                            ]
+
+                                            return [(new_tryon_cloth_path, tryon_cloth_id), gr.update(value=new_tryon_cloth_gallery_list)]
+                                        else:
+                                            cloth_ids = prepare_tryon_cloth_gallery()
+                                            return [cloth_ids[evt.index], gr.update(value=cloth_ids)]
+
+                                    selected_cloth_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
+                                    cloth_gallery.select(tryon_cloth_select_function, None, outputs=[selected_cloth_images, cloth_gallery])
 
                                     def cloth_gallery_refresh_function():
-                                        cloth_ids = glob.glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob.glob(
-                                            os.path.join(cloth_gallery_dir, "*.png")
-                                        )
+                                        cloth_ids = tryon_cloth_gallery_list
                                         cloth_gallery_list = [(i, i.split("/")[-1].split(".")[0]) for i in cloth_ids]
                                         return gr.update(value=cloth_gallery_list)
 
@@ -1827,7 +1885,7 @@ def on_ui_tabs():
                                 inputs=[],
                                 outputs=[
                                     template_upload_way,
-                                    template_cloth_gallery,
+                                    template_tryon_gallery,
                                     template_single_upload,
                                 ],
                             )
@@ -1874,7 +1932,8 @@ def on_ui_tabs():
                             sd_model_checkpoint,
                             template_image_tryon,
                             template_mask,
-                            selected_cloth_template_images,
+                            tryon_selected_template_images,
+                            selected_cloth_images,
                             main_image,
                             reference_mask,
                             additional_prompt,

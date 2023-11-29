@@ -15,6 +15,10 @@ cloth_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-cloth-id-in
 scene_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-scene-id-infos")
 cache_log_file_path = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_log.txt")
 
+# gallery_dir
+tryon_preview_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "tryon")
+tryon_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
+
 # prompts
 validation_prompt = "easyphoto_face, easyphoto, 1person"
 validation_prompt_scene = "special_scene, scene"
@@ -44,5 +48,12 @@ DEFAULT_SCENE_LORA = [
     "SchoolUniform_1",
     "SchoolUniform_2",
 ]
+
+# tryon template
+DEFAULT_TRYON_TEMPLATE = ["boy", "girl"]
+
+# cloth lora
+DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200"]
+
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"

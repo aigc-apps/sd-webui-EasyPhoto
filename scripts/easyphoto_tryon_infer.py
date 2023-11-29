@@ -15,7 +15,14 @@ from modules.shared import opts
 from PIL import Image
 from segment_anything import SamPredictor, sam_model_registry
 
-from scripts.easyphoto_config import cache_log_file_path, cloth_id_outpath_samples, easyphoto_outpath_samples, validation_tryon_prompt
+from scripts.easyphoto_config import (
+    cache_log_file_path,
+    cloth_id_outpath_samples,
+    easyphoto_outpath_samples,
+    validation_tryon_prompt,
+    tryon_gallery_dir,
+    DEFAULT_CLOTH_LORA,
+)
 from scripts.easyphoto_infer import inpaint
 from scripts.easyphoto_utils import (
     align_and_overlay_images,
@@ -51,7 +58,8 @@ def easyphoto_tryon_infer_forward(
     sd_model_checkpoint,
     template_image,
     template_mask,
-    selected_cloth_template_images,
+    selected_template_images,
+    selected_cloth_images,
     reference_image,
     reference_mask,
     additional_prompt,
@@ -88,68 +96,75 @@ def easyphoto_tryon_infer_forward(
         ep_logger.error(info)
         return info, [], template_mask, reference_mask
 
-    cloth_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
+    cloth_gallery_dir = os.path.join(tryon_gallery_dir, "cloth")
     gallery_lists = glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob(os.path.join(cloth_gallery_dir, "*.png"))
     user_ids = [i.split("/")[-1].split(".")[0] for i in gallery_lists]
     ep_logger.info(f"user_ids: {user_ids}")
 
-    try:
-        # choose tabs select
-        if ref_image_selected_tab == 0:
-            # choose from gallery
-            input_ref_img_path = eval(selected_cloth_template_images)[0]
-            cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
-
-            # clean previous reference mask result
-            reference_mask = None
-
-        elif ref_image_selected_tab == 1:
-            if cloth_uuid == "" or cloth_uuid is None:
-                info = "The user id cannot be empty."
-                ep_logger.error(info)
-                return info, [], template_mask, reference_mask
-
-            cloth_uuid = cloth_uuid + "_" + str(max_train_steps)
-
-            if cloth_uuid in user_ids:
-                info = "The user id cannot be repeat. Please check in the cloth gallery. Or use a new id to mark the new cloth"
-                ep_logger.error(info)
-                return info, [], template_mask, reference_mask
-
-    except Exception:
-        torch.cuda.empty_cache()
-        info = "Please choose or upload a reference image."
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask
-
+    # Template: choose tabs selected
     if template_img_selected_tab == 0:
-        # read and download gallery from oss
-        pass
+        if selected_template_images is None:
+            info = "Please choose a template image from gallery."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
+        else:
+            # choose from gallery
+            input_tem_img_path = eval(selected_template_images)[0]
+            # clean previous template mask result
+            template_mask = None
     else:
         if template_image is None:
             info = "Please upload a template image."
             ep_logger.error(info)
             return info, [], template_mask, reference_mask
 
-    if template_mask is None and template_image["mask"].max() == 0:
-        info = "Please give a hint of template, or upload template mask by clicking show mask."
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask
+        if template_mask is None and template_image["mask"].max() == 0:
+            info = "Please give a hint of template, or upload template mask by clicking show mask."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
 
-    if ref_image_selected_tab == 1 and reference_mask is None and reference_image["mask"].max() == 0:
-        info = "Please give a hint of reference, or upload reference mask by clicking show mask."
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask
+        if template_mask is not None and template_mask.shape != template_image["image"].shape:
+            info = (
+                "Please upload a mask with the same size as template. Or remove the uploaded mask and generate automatically by given hints"
+            )
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
 
-    if template_mask is not None and template_mask.shape != template_image["image"].shape:
-        info = "Please upload a mask with the same size as template. Or remove the uploaded mask and generate automatically by given hints"
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask
+    # Reference: choose tabs select
+    if ref_image_selected_tab == 0:
+        if selected_template_images is None:
+            info = "Please choose a cloth image from gallery."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
+        else:
+            # choose from gallery
+            input_ref_img_path = eval(selected_cloth_images)[0]
+            cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
 
-    if reference_mask is not None and reference_mask.shape != reference_image["image"].shape:
-        info = "Please upload a mask with the same size as reference. Or remove the uploaded mask and generate automatically by given hints"
-        ep_logger.error(info)
-        return info, [], template_mask, reference_mask
+            # clean previous reference mask result
+            reference_mask = None
+    else:
+        if cloth_uuid == "" or cloth_uuid is None:
+            info = "The user id cannot be empty."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
+
+        cloth_uuid = cloth_uuid + "_" + str(max_train_steps)
+
+        if cloth_uuid in user_ids:
+            info = "The user id cannot be repeat. Please check in the cloth gallery. Or use a new id to mark the new cloth"
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
+
+        if reference_mask is None and reference_image["mask"].max() == 0:
+            info = "Please give a hint of reference, or upload reference mask by clicking show mask."
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
+
+        if reference_mask is not None and reference_mask.shape != reference_image["image"].shape:
+            info = "Please upload a mask with the same size as reference. Or remove the uploaded mask and generate automatically by given hints"
+            ep_logger.error(info)
+            return info, [], template_mask, reference_mask
 
     ep_logger.info(f"cloth user id: {cloth_uuid}")
 
@@ -325,28 +340,35 @@ def easyphoto_tryon_infer_forward(
         seed = np.random.randint(0, 65536)
 
     # prompt init
-    input_prompt = f"{validation_tryon_prompt}, <lora:{cloth_uuid}:{lora_weight}>"
+    input_prompt = f"{validation_tryon_prompt}, <lora:{cloth_uuid}:{lora_weight}>" + additional_prompt
     ep_logger.info(f"input_prompt: {input_prompt}")
 
-    # Step1: open image and prepare for mask
     # reference image
-    img_ref = np.uint8(Image.open(os.path.join(cloth_id_outpath_samples, cloth_uuid, "ref_image.jpg")))
-    mask_ref = np.uint8(Image.open(os.path.join(cloth_id_outpath_samples, cloth_uuid, "ref_image_mask.jpg")))
+    if cloth_uuid in DEFAULT_CLOTH_LORA:
+        img_ref = np.uint8(Image.open(os.path.join(cloth_gallery_dir, cloth_uuid + ".jpg")))
+        mask_ref = np.uint8(Image.open(os.path.join(cloth_gallery_dir, cloth_uuid + "_mask.jpg")))
+    else:
+        img_ref = np.uint8(Image.open(os.path.join(cloth_id_outpath_samples, cloth_uuid, "ref_image.jpg")))
+        mask_ref = np.uint8(Image.open(os.path.join(cloth_id_outpath_samples, cloth_uuid, "ref_image_mask.jpg")))
+
     if len(mask_ref.shape) == 2:
         mask_ref = np.repeat(mask_ref[:, :, np.newaxis], 3, axis=2)
 
     # template image
-    img_template = np.uint8(Image.fromarray(np.uint8(template_image["image"])))
-    mask_template_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
-    if template_mask is None:
-        # refine
-        _, mask_template = easyphoto_tryon_mask_forward(template_image, "Template")
-        # update for return
-        template_mask = mask_template
+    if template_img_selected_tab == 0:
+        img_template = np.uint8(Image.open(input_tem_img_path))
+        mask_template = np.uint8(Image.open(input_tem_img_path.replace(".jpg", "_mask.jpg")))
     else:
-        mask_template = template_mask[:, :, 0]
+        img_template = np.uint8(Image.fromarray(np.uint8(template_image["image"])))
+        mask_template_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
+        if template_mask is None:
+            # refine
+            _, mask_template = easyphoto_tryon_mask_forward(template_image, "Template")
+            # update for return
+            template_mask = mask_template
+        else:
+            mask_template = template_mask[:, :, 0]
 
-    print(mask_template.shape)
     # for final paste
     _, box_main = mask_to_box(np.uint8(mask_ref[:, :, 0]))
     _, box_template = mask_to_box(mask_template)
@@ -689,7 +711,5 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
         )
         mask = masks[0].astype(np.uint8)  # mask = [sam_outputs_num, h, w]
         mask = mask * 255
-
-    cv2.imwrite("template_mask.jpg", mask)
 
     return "Show Mask Success", mask
