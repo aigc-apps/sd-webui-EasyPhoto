@@ -206,7 +206,6 @@ save_filenames = {
             os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
             os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth"),
         ],
-        
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
         # controlnet annotator

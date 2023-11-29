@@ -4,7 +4,6 @@ import platform
 import subprocess
 import sys
 from glob import glob
-import gradio as gr
 from shutil import copyfile
 
 import cv2
@@ -123,7 +122,6 @@ def easyphoto_tryon_infer_forward(
         ep_logger.error(info)
         return info, [], template_mask, reference_mask
 
-    
     if template_img_selected_tab == 0:
         # read and download gallery from oss
         pass
@@ -216,7 +214,7 @@ def easyphoto_tryon_infer_forward(
                 "Failed to obtain preprocessed metadata.jsonl, please check the preprocessing process.",
                 [],
                 template_mask,
-                reference_mask
+                reference_mask,
             )
 
         train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
@@ -314,12 +312,7 @@ def easyphoto_tryon_infer_forward(
 
         best_weight_path = os.path.join(weights_save_path, f"pytorch_lora_weights.safetensors")
         if not os.path.exists(best_weight_path):
-            return (
-                "Failed to obtain Lora after training, please check the training process.",
-                [],
-                template_mask,
-                reference_mask
-            )
+            return ("Failed to obtain Lora after training, please check the training process.", [], template_mask, reference_mask)
 
         # save to gallery
         Image.open(ref_image_path).save(os.path.join(cloth_gallery_dir, f"{cloth_uuid}.jpg"))
@@ -497,8 +490,8 @@ def easyphoto_tryon_infer_forward(
             diffusion_steps=first_diffusion_steps,
             denoising_strength=first_denoising_strength,
             input_prompt=input_prompt,
-            default_positive_prompt='',
-            default_negative_prompt='',
+            default_positive_prompt="",
+            default_negative_prompt="",
             hr_scale=1.0,
             seed=str(seed),
             sd_model_checkpoint=sd_model_checkpoint,
@@ -511,7 +504,7 @@ def easyphoto_tryon_infer_forward(
         ]
         refine_diffusion_steps = 30
         refine_denoising_strength = 0.7
-        
+
         result_img = inpaint(
             result_img,
             inner_bound_mask,
@@ -519,8 +512,8 @@ def easyphoto_tryon_infer_forward(
             diffusion_steps=refine_diffusion_steps,
             denoising_strength=refine_denoising_strength,
             input_prompt=input_prompt,
-            default_positive_prompt='',
-            default_negative_prompt='',
+            default_positive_prompt="",
+            default_negative_prompt="",
             hr_scale=1.0,
             seed=str(seed),
             sd_model_checkpoint=sd_model_checkpoint,
@@ -696,7 +689,7 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
         )
         mask = masks[0].astype(np.uint8)  # mask = [sam_outputs_num, h, w]
         mask = mask * 255
-    
-    cv2.imwrite('template_mask.jpg', mask)
+
+    cv2.imwrite("template_mask.jpg", mask)
 
     return "Show Mask Success", mask

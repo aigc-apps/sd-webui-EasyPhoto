@@ -65,8 +65,8 @@ def mask_to_box(mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]
             - Largest connected component binary mask.
             - Bounding box coordinates (x, y, x + width, y + height).
     """
-    if len(mask.shape)==3:
-        mask = mask[:,:,0]
+    if len(mask.shape) == 3:
+        mask = mask[:, :, 0]
 
     # Find connected components
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask)

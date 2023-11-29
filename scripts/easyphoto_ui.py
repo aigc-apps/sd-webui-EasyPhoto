@@ -1430,7 +1430,7 @@ def on_ui_tabs():
 
                                     with gr.Column(visible=False) as template_single_upload:
                                         with gr.Row():
-                                            with gr.Column():     
+                                            with gr.Column():
                                                 template_image_tryon = gr.Image(
                                                     label="Image for skybox",
                                                     elem_id="{id_part}_tem_image",
@@ -1444,27 +1444,33 @@ def on_ui_tabs():
                                                     elem_id="{id_part}_tem_image",
                                                     show_label=False,
                                                     show_download_button=True,
-                                                    interactive=True
+                                                    interactive=True,
                                                 )
 
                                             template_mask_preview = ToolButton(value="👀")
 
                             def template_upload_way_change(template_upload_way):
                                 if template_upload_way == "Template Gallery":
-                                    return [gr.update(visible=True), gr.update(visible=False), gr.update(label='Templtate Image')]
+                                    return [gr.update(visible=True), gr.update(visible=False), gr.update(label="Templtate Image")]
                                 else:
-                                    return [gr.update(visible=False), gr.update(visible=True), gr.update(label='Templtate Image  (Upload your template image, give mask hint (point) in the left or upload in the right)')]
+                                    return [
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(
+                                            label="Templtate Image  (Upload your template image, give mask hint (point) in the left or upload in the right)"
+                                        ),
+                                    ]
 
                             template_upload_way.change(
-                                template_upload_way_change, template_upload_way, [template_cloth_gallery, template_single_upload, tryon_template_chosen]
+                                template_upload_way_change,
+                                template_upload_way,
+                                [template_cloth_gallery, template_single_upload, tryon_template_chosen],
                             )
 
                             def clean_mask():
                                 return None
-                            
-                            template_image_tryon.upload(
-                                clean_mask, outputs=[template_mask]
-                            )
+
+                            template_image_tryon.upload(clean_mask, outputs=[template_mask])
 
                             with gr.Accordion("Reference Image", open=True) as tryon_cloth_chosen:
                                 with gr.Row():
@@ -1473,7 +1479,7 @@ def on_ui_tabs():
                                         value="Cloth Gallery",
                                         show_label=False,
                                     )
-                               
+
                                 with gr.Column() as cloth_gallery:
                                     cloth_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
                                     os.makedirs(cloth_gallery_dir, exist_ok=True)
@@ -1481,7 +1487,7 @@ def on_ui_tabs():
                                         os.path.join(cloth_gallery_dir, "*.png")
                                     )
                                     cloth_gallery_list = [(i, i.split("/")[-1].split(".")[0]) for i in cloth_ids]
-                                    
+
                                     with gr.Row():
                                         cloth_gallery = gr.Gallery(cloth_gallery_list).style(
                                             columns=[5],
@@ -1507,7 +1513,7 @@ def on_ui_tabs():
                                         )
                                         cloth_gallery_list = [(i, i.split("/")[-1].split(".")[0]) for i in cloth_ids]
                                         return gr.update(value=cloth_gallery_list)
-                                    
+
                                     cloth_id_refresh.click(
                                         fn=cloth_gallery_refresh_function,
                                         inputs=[],
@@ -1515,45 +1521,57 @@ def on_ui_tabs():
                                     )
 
                                 with gr.Column(visible=False) as cloth_upload:
-                                        with gr.Row():
-                                            with gr.Column():
-                                                main_image = gr.Image(
-                                                    label="Image for skybox",
-                                                    elem_id="{id_part}_ref_image",
-                                                    show_label=False,
-                                                    source="upload",
-                                                    tool="sketch",
-                                                )
-
-                                            with gr.Column():
-                                                reference_mask = gr.Image(
-                                                    label="preview reference mask",
-                                                    elem_id="{id_part}_ref_image",
-                                                    show_label=False,
-                                                    show_download_button=True,
-                                                    interactive=True
-                                                )
-                                            reference_mask_preview = ToolButton(value="👀")
-                                        with gr.Row():
-                                            cloth_uuid = gr.Textbox(
-                                                label="Cloth User ID",
-                                                lines=1,
-                                                value="",
-                                                interactive=True,
+                                    with gr.Row():
+                                        with gr.Column():
+                                            main_image = gr.Image(
+                                                label="Image for skybox",
+                                                elem_id="{id_part}_ref_image",
+                                                show_label=False,
+                                                source="upload",
+                                                tool="sketch",
                                             )
 
-                                        main_image.upload(
-                                            clean_mask, outputs=[reference_mask]
+                                        with gr.Column():
+                                            reference_mask = gr.Image(
+                                                label="preview reference mask",
+                                                elem_id="{id_part}_ref_image",
+                                                show_label=False,
+                                                show_download_button=True,
+                                                interactive=True,
+                                            )
+                                        reference_mask_preview = ToolButton(value="👀")
+                                    with gr.Row():
+                                        cloth_uuid = gr.Textbox(
+                                            label="Cloth User ID",
+                                            lines=1,
+                                            value="",
+                                            interactive=True,
                                         )
-                                        
+
+                                    main_image.upload(clean_mask, outputs=[reference_mask])
+
                             def cloth_upload_way_change(cloth_upload_way):
                                 if cloth_upload_way == "Cloth Gallery":
-                                    return [gr.update(visible=True),  gr.update(visible=True), gr.update(visible=False), gr.update(label='Reference Image')]
+                                    return [
+                                        gr.update(visible=True),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                        gr.update(label="Reference Image"),
+                                    ]
                                 else:
-                                    return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(label='Reference Image  (Upload your template image, give mask hint (point) in the left or upload in the right)')]
+                                    return [
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(
+                                            label="Reference Image  (Upload your template image, give mask hint (point) in the left or upload in the right)"
+                                        ),
+                                    ]
 
                             cloth_upload_way.change(
-                                cloth_upload_way_change, cloth_upload_way, [cloth_gallery, cloth_id_refresh, cloth_upload, tryon_cloth_chosen]
+                                cloth_upload_way_change,
+                                cloth_upload_way,
+                                [cloth_gallery, cloth_id_refresh, cloth_upload, tryon_cloth_chosen],
                             )
 
                             def generate_tryon_template_tabs(upload_way):
@@ -1562,7 +1580,7 @@ def on_ui_tabs():
                                     "Template Upload": 1,
                                 }[upload_way]
                                 return tabs
-                            
+
                             def generate_tryon_reference_tabs(upload_way):
                                 tabs = {
                                     "Cloth Gallery": 0,
@@ -1573,7 +1591,7 @@ def on_ui_tabs():
                             # get tabs
                             template_img_selected_tab = gr.State(0)
                             ref_image_selected_tab = gr.State(0)
-                   
+
                             upload_way.change(generate_tryon_template_tabs, template_upload_way, template_img_selected_tab)
                             cloth_upload_way.change(generate_tryon_reference_tabs, cloth_upload_way, ref_image_selected_tab)
 
@@ -1802,7 +1820,7 @@ def on_ui_tabs():
                                     gr.update(visible=False),
                                     gr.update(visible=True),
                                 ]
-                            
+
                             buttons_photo_infer["tryon"].click(
                                 fn=select_tryon_template_upload,
                                 _js="switch_to_ep_tryon",
@@ -1813,7 +1831,7 @@ def on_ui_tabs():
                                     template_single_upload,
                                 ],
                             )
-                            
+
                             def select_single_image_upload():
                                 upload_way = "Single Image Upload"
                                 return [
@@ -1834,13 +1852,21 @@ def on_ui_tabs():
                                     batch_images_upload,
                                 ],
                             )
-                    
+
                     def preview_mask(image_tryon, img_type):
                         return_info, refine_mask = easyphoto_tryon_mask_forward(image_tryon, img_type)
                         return return_info, refine_mask
-                    
-                    template_mask_preview.click(fn=preview_mask, inputs=[template_image_tryon, gr.Text(label="Template", value="Template", visible=False)], outputs=[infer_progress,template_mask])
-                    reference_mask_preview.click(fn=preview_mask, inputs= [main_image, gr.Text(label="Reference", value="Reference", visible=False)], outputs=[infer_progress,reference_mask])
+
+                    template_mask_preview.click(
+                        fn=preview_mask,
+                        inputs=[template_image_tryon, gr.Text(label="Template", value="Template", visible=False)],
+                        outputs=[infer_progress, template_mask],
+                    )
+                    reference_mask_preview.click(
+                        fn=preview_mask,
+                        inputs=[main_image, gr.Text(label="Reference", value="Reference", visible=False)],
+                        outputs=[infer_progress, reference_mask],
+                    )
 
                     tryon_button.click(
                         fn=easyphoto_tryon_infer_forward,
