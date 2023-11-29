@@ -704,7 +704,7 @@ def easyphoto_infer_forward(
     # or do txt2img with SDXL once before img2img.
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
     if sdxl_pipeline_flag and not sdxl_txt2img_flag:
-        txt2img([], diffusion_steps=2, outpath_samples=None, do_not_save_samples=True)
+        txt2img([], diffusion_steps=2, do_not_save_samples=True)
         sdxl_txt2img_flag = True
     for index, user_id in enumerate(user_ids):
         if user_id == "none":
