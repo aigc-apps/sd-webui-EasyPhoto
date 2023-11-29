@@ -50,7 +50,7 @@ from scripts.sdwebui import get_checkpoint_type, reload_sd_model_vae, switch_sd_
 python_executable_path = sys.executable
 # base portrait sdxl add_text2image add_ipa_base add_ipa_sdxl add_video add_tryon
 check_hash = [True, True, True, True, True, True, True, True]
-predictor = None
+sam_sam_predictor = None
 
 
 @switch_sd_model_vae()
@@ -80,7 +80,7 @@ def easyphoto_tryon_infer_forward(
     cloth_uuid,
     max_train_steps,
 ):
-    global check_hash, predictor
+    global check_hash, sam_predictor
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
 
@@ -103,6 +103,7 @@ def easyphoto_tryon_infer_forward(
 
     # Template: choose tabs selected
     if template_img_selected_tab == 0:
+        # choose from template
         if selected_template_images is None:
             info = "Please choose a template image from gallery."
             ep_logger.error(info)
@@ -113,6 +114,7 @@ def easyphoto_tryon_infer_forward(
             # clean previous template mask result
             template_mask = None
     else:
+        # use uploaded template
         if template_image is None:
             info = "Please upload a template image."
             ep_logger.error(info)
@@ -132,18 +134,19 @@ def easyphoto_tryon_infer_forward(
 
     # Reference: choose tabs select
     if ref_image_selected_tab == 0:
+        # choose from template
         if selected_template_images is None:
             info = "Please choose a cloth image from gallery."
             ep_logger.error(info)
             return info, [], template_mask, reference_mask
         else:
-            # choose from gallery
             input_ref_img_path = eval(selected_cloth_images)[0]
             cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
 
             # clean previous reference mask result
             reference_mask = None
     else:
+        # use uploaded reference
         if cloth_uuid == "" or cloth_uuid is None:
             info = "The user id cannot be empty."
             ep_logger.error(info)
@@ -664,7 +667,7 @@ def easyphoto_tryon_infer_forward(
 
 
 def easyphoto_tryon_mask_forward(input_image, img_type):
-    global predictor
+    global sam_predictor
 
     if input_image is None:
         info = f"Please upload a {img_type} image."
@@ -684,27 +687,27 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
     ep_logger.info(f"({img_type}) Find input mask connected num: {num_connected}.")
 
     # model init
-    if predictor is None:
+    if sam_predictor is None:
         sam_checkpoint = os.path.join(
             os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
             "sam_vit_l_0b3195.pth",
         )
         sam = sam_model_registry["vit_l"]()
         sam.load_state_dict(torch.load(sam_checkpoint))
-        predictor = SamPredictor(sam.cuda())
+        sam_predictor = SamPredictor(sam.cuda())
 
     if num_connected < 2:
         ep_logger.info(f"{(img_type)} Refine input mask of by mask.")
         # support the input is a mask, we use box and sam to refine mask
         _, box_template = mask_to_box(mask[:, :, 0])
-        mask = np.uint8(seg_by_box(np.array(img), box_template, predictor))
+        mask = np.uint8(seg_by_box(np.array(img), box_template, sam_predictor))
     else:
         ep_logger.info(f"{(img_type)} Refine input mask of by points.")
         # support points is given, points are used to refine mask
         centroids = np.array(centroids)
         input_label = np.array([1] * centroids.shape[0])
-        predictor.set_image(np.array(img))
-        masks, _, _ = predictor.predict(
+        sam_predictor.set_image(np.array(img))
+        masks, _, _ = sam_predictor.predict(
             point_coords=centroids,
             point_labels=input_label,
             multimask_output=False,

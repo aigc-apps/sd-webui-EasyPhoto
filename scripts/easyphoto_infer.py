@@ -331,7 +331,7 @@ def inpaint(
 
     for pair in controlnet_pairs:
         if len(pair) == 4:
-            # set control_mode
+            # if control_mode is additional given (default 1 prompt is better)
             controlnet_units_list.append(
                 get_controlnet_unit(
                     pair[0],
