@@ -13,10 +13,17 @@ from scripts.easyphoto_config import (
     easyphoto_video_outpath_samples,
     models_path,
     user_id_outpath_samples,
+    DEFAULT_FEATURE_EDIT_LORA,
 )
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
-from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, check_scene_valid, video_visible
+from scripts.easyphoto_utils import (
+    check_files_exists_and_download,
+    check_id_valid,
+    check_scene_valid,
+    video_visible,
+    check_feature_edit_valid,
+)
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
@@ -690,6 +697,126 @@ def on_ui_tabs():
                                 label="Seed",
                                 value=-1,
                             )
+
+                            with gr.Accordion("Feature Edit (Click here to Feature Edit)", open=False):
+
+                                def feature_edit_change_function(feature_edit_id_gallery, evt: gr.SelectData):
+                                    feature_edit_id = feature_edit_id_gallery[evt.index][1]
+                                    # feature_edit lora path
+                                    lora_model_path_pt = os.path.join(models_path, "Lora", f"{feature_edit_id}.pt")
+                                    lora_model_path_safetensors = os.path.join(models_path, "Lora", f"{feature_edit_id}.safetensors")
+                                    if feature_edit_id == "none":
+                                        return gr.update(value="none")
+                                    if feature_edit_id in DEFAULT_FEATURE_EDIT_LORA:
+                                        check_files_exists_and_download(False, download_mode=feature_edit_id)
+                                    if not os.path.exists(lora_model_path_pt) and not os.path.exists(lora_model_path_safetensors):
+                                        return gr.update(value="none")
+
+                                    return gr.update(value=feature_edit_id)
+
+                                def feature_edit_refresh_function():
+                                    feature_edit = [
+                                        [
+                                            os.path.join(
+                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                                "feature_edit_lora",
+                                                f"{_feature_edit}.jpg",
+                                            ),
+                                            _feature_edit,
+                                        ]
+                                        for _feature_edit in DEFAULT_FEATURE_EDIT_LORA
+                                    ]
+                                    _feature_edits = os.listdir(os.path.join(models_path, "Lora"))
+                                    for _feature_edit in _feature_edits:
+                                        if check_feature_edit_valid(_feature_edit, models_path):
+                                            if os.path.splitext(_feature_edit)[0] in DEFAULT_FEATURE_EDIT_LORA:
+                                                continue
+                                            ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_feature_edit)[0]}.jpg")
+                                            if not os.path.exists(ref_image):
+                                                ref_image = os.path.join(
+                                                    os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                                    "no_found_image.jpg",
+                                                )
+                                            feature_edit.append([ref_image, os.path.splitext(_feature_edit)[0]])
+                                    feature_edit = sorted(feature_edit)
+                                    feature_edit.insert(
+                                        0,
+                                        [
+                                            os.path.join(
+                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                                "no_found_image.jpg",
+                                            ),
+                                            "none",
+                                        ],
+                                    )
+                                    return gr.update(value=feature_edit)
+
+                                feature_edit = [
+                                    [
+                                        os.path.join(
+                                            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                            "feature_edit_lora",
+                                            f"{_feature_edit}.jpg",
+                                        ),
+                                        _feature_edit,
+                                    ]
+                                    for _feature_edit in DEFAULT_FEATURE_EDIT_LORA
+                                ]
+                                _feature_edits = os.listdir(os.path.join(models_path, "Lora"))
+                                for _feature_edit in _feature_edits:
+                                    if check_feature_edit_valid(_feature_edit, models_path):
+                                        if os.path.splitext(_feature_edit)[0] in DEFAULT_FEATURE_EDIT_LORA:
+                                            continue
+                                        ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_feature_edit)[0]}.jpg")
+                                        if not os.path.exists(ref_image):
+                                            ref_image = os.path.join(
+                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                                "no_found_image.jpg",
+                                            )
+                                        feature_edit.append([ref_image, os.path.splitext(_feature_edit)[0]])
+                                feature_edit = sorted(feature_edit)
+                                feature_edit.insert(
+                                    0,
+                                    [
+                                        os.path.join(
+                                            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                                            "no_found_image.jpg",
+                                        ),
+                                        "none",
+                                    ],
+                                )
+
+                                feature_edit_id = gr.Text(
+                                    value="none", show_label=False, visible=True, placeholder="Selected", interactive=False
+                                )
+                                _ = gr.Markdown(
+                                    value="**The preset Lora will be downloaded on the first click.**",
+                                    show_label=False,
+                                    visible=True,
+                                )
+                                with gr.Row():
+                                    feature_edit_id_gallery = gr.Gallery(
+                                        value=feature_edit,
+                                        label="feature_edit Lora Gallery",
+                                        allow_preview=False,
+                                        elem_id="feature_edit_id_select",
+                                        show_share_button=False,
+                                        visible=True,
+                                    ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
+                                    feature_edit_id_gallery.select(
+                                        feature_edit_change_function, [feature_edit_id_gallery], [feature_edit_id]
+                                    )
+
+                                    feature_edit_id_refresh = ToolButton(value="\U0001f504")
+                                    feature_edit_id_refresh.click(
+                                        fn=feature_edit_refresh_function, inputs=[], outputs=[feature_edit_id_gallery]
+                                    )
+
+                                with gr.Row():
+                                    feature_edit_id_ratio = gr.Slider(
+                                        minimum=-3.00, maximum=3.00, value=2.00, step=0.10, label="Feature Edit Ratio"
+                                    )
+
                             with gr.Row():
                                 before_face_fusion_ratio = gr.Slider(
                                     minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Face Fusion Ratio Before"
@@ -927,6 +1054,8 @@ def on_ui_tabs():
                         ref_mode_choose,
                         ipa_only_weight,
                         ipa_only_image_path,
+                        feature_edit_id,
+                        feature_edit_id_ratio,
                         *uuids,
                     ],
                     outputs=[infer_progress, output_images, face_id_outputs],

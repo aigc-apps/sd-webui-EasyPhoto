@@ -386,6 +386,8 @@ def easyphoto_infer_forward(
     ref_mode_choose,
     ipa_only_weight,
     ipa_only_image_path,
+    feature_edit_id,
+    feature_edit_id_ratio,
     *user_ids,
 ):
     # global
@@ -752,11 +754,15 @@ def easyphoto_infer_forward(
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
-                input_prompt += "<lora:ddpo_{}>".format(user_id)
+                input_prompt += f"<lora:ddpo_{user_id}>, "
 
             # TODO: face_id_image_path may have to be picked with pitch yaw angle in video mode.
             if sdxl_pipeline_flag:
                 input_prompt = f"{validation_prompt}, <lora:{user_id}>, " + additional_prompt
+
+            # Feature edit id
+            if feature_edit_id != "none":
+                input_prompt += f"<lora:{feature_edit_id}:0@0, 0@0.5, {feature_edit_id_ratio}@0.5, {feature_edit_id_ratio}@1>, "
 
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))

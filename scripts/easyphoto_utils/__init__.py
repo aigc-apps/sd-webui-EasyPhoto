@@ -38,6 +38,8 @@ try:
         modelscope_models_to_gpu,
         switch_ms_model_cpu,
         unload_models,
+        check_feature_edit_valid,
     )
+    from .loractl_utils import extra_networks, LoraCtlNetwork, apply, set_active, reset_lora_weights, set_hire_fix, ctl_lora_flag
 except Exception as e:
     print(f"The file include sdwebui modules will be not include when preprocess.")

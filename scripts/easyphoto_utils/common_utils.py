@@ -309,6 +309,12 @@ def check_scene_valid(lora_path, models_path):
     return False
 
 
+def check_feature_edit_valid(lora_path, models_path):
+    if not lora_path.startswith("feature_edit_"):
+        return False
+    return True
+
+
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
     face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg")
     if not os.path.exists(face_id_image_path):

@@ -15,7 +15,6 @@ from modules.sd_models import list_models
 from modules.sd_vae import refresh_vae_list
 from modules.shared import opts
 from modules.timer import Timer
-
 from scripts.easyphoto_utils import (
     AnimateDiffControl,
     AnimateDiffI2VLatent,
@@ -25,8 +24,15 @@ from scripts.easyphoto_utils import (
     AnimateDiffProcess,
     AnimateDiffPromptSchedule,
     AnimateDiffUiGroup,
+    LoraCtlNetwork,
+    apply,
+    ctl_lora_flag,
     ep_logger,
+    extra_networks,
     motion_module,
+    reset_lora_weights,
+    set_active,
+    set_hire_fix,
     update_infotext,
     video_visible,
 )
@@ -293,6 +299,46 @@ if video_visible:
                 AnimateDiffOutput().output(p, res, params)
                 motion_module.remove()
                 ep_logger.info("AnimateDiff process end.")
+
+
+if ctl_lora_flag:
+
+    class LoraCtlScript(scripts.Script):
+        def __init__(self):
+            self.original_network = None
+            super().__init__()
+
+        def title(self):
+            return "Dynamic Lora Weights"
+
+        def show(self, is_img2img):
+            return scripts.AlwaysVisible
+
+        def ui(self, is_img2img):
+            return []
+
+        def process(self, p: StableDiffusionProcessing, **kwargs):
+            if type(extra_networks.extra_network_registry["lora"]) != LoraCtlNetwork:
+                self.original_network = extra_networks.extra_network_registry["lora"]
+                network = LoraCtlNetwork()
+                extra_networks.register_extra_network(network)
+                extra_networks.register_extra_network_alias(network, "loractl")
+
+            # apply LoraCtlNetwork
+            apply()
+
+            # set active after first diffusion
+            set_active(True)
+
+            # clear all lora weights
+            reset_lora_weights()
+
+            # normal process without hirefix
+            set_hire_fix(False)
+
+        def before_hr(self, p, *args):
+            # process with hirefix
+            set_hire_fix(True)
 
 
 def reload_sd_model_vae(sd_model, vae):
