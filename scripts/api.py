@@ -48,7 +48,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         for instance_image in instance_images:
             hash_value = hashlib.md5(instance_image.tobytes()).hexdigest()
             save_path = os.path.join("/tmp", hash_value + ".jpg")
-            if (instance_image.mode == 'RGBA'):
+            if instance_image.mode == 'RGBA':
                 instance_image = instance_image.convert('RGB')
             instance_image.save(save_path)
             _instance_images.append({"name": save_path})
