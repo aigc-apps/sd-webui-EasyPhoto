@@ -3,7 +3,7 @@ import re
 import sys
 
 import numpy as np
-from modules import shared
+from modules import shared, extra_networks
 from scripts.easyphoto_config import data_path
 
 Lora_extensions_path = os.path.join(data_path, "extensions", "Lora")
