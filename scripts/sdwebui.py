@@ -448,6 +448,7 @@ def t2i_call(
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_txt2img = StableDiffusionProcessingTxt2Img(
         outpath_samples=outpath_samples,
+        do_not_save_samples=do_not_save_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -632,6 +633,7 @@ def i2i_inpaint_call(
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_img2img = StableDiffusionProcessingImg2Img(
         outpath_samples=outpath_samples,
+        do_not_save_samples=do_not_save_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
