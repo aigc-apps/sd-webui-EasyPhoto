@@ -236,6 +236,7 @@ def txt2img(
     controlnet_pairs: list,
     input_prompt="1girl",
     diffusion_steps=50,
+    cfg_scale=7,
     width: int = 1024,
     height: int = 1024,
     default_positive_prompt=DEFAULT_POSITIVE,
@@ -259,7 +260,7 @@ def txt2img(
 
     image = t2i_call(
         steps=diffusion_steps,
-        cfg_scale=7,
+        cfg_scale=cfg_scale,
         width=width,
         height=height,
         seed=seed,
@@ -285,6 +286,7 @@ def inpaint(
     input_prompt="1girl",
     diffusion_steps=50,
     denoising_strength=0.45,
+    cfg_scale=7,
     hr_scale: float = 1.0,
     default_positive_prompt=DEFAULT_POSITIVE,
     default_negative_prompt=DEFAULT_NEGATIVE,
@@ -316,7 +318,7 @@ def inpaint(
         inpainting_fill=1,
         steps=diffusion_steps,
         denoising_strength=denoising_strength,
-        cfg_scale=7,
+        cfg_scale=cfg_scale,
         inpainting_mask_invert=0,
         width=int(w * hr_scale),
         height=int(h * hr_scale),
@@ -346,7 +348,7 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = [True, True, True, True, True, True]
+check_hash = [True, True, True, True, True, True, True]
 sdxl_txt2img_flag = False
 
 
@@ -392,6 +394,7 @@ def easyphoto_infer_forward(
     ref_mode_choose,
     ipa_only_weight,
     ipa_only_image_path,
+    lcm_accelerate,
     *user_ids,
 ):
     # global
@@ -438,6 +441,9 @@ def easyphoto_infer_forward(
             if check_hash[4]:
                 refresh_model_vae()
             check_hash[4] = False
+    if lcm_accelerate:
+        check_files_exists_and_download(check_hash[5], download_mode="lcm")
+        check_hash[5] = False
 
     # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
@@ -512,6 +518,9 @@ def easyphoto_infer_forward(
         if not display_score:
             display_score = True
             ep_logger.warning("Display score is forced to be true when IP-Adapter Control is enabled.")
+
+    if lcm_accelerate:
+        lcm_lora_name_and_weight = "lcm_lora_sdxl:0.25" if sdxl_pipeline_flag else "lcm_lora_sd15:0.60"
 
     # get random seed
     if int(seed) == -1:
@@ -615,6 +624,9 @@ def easyphoto_infer_forward(
         ipa_retinaface_masks = []
         ipa_face_part_only = False
 
+    if lcm_accelerate:
+        input_prompt_without_lora += f"<lora:{lcm_lora_name_and_weight}>, "
+
     ep_logger.info("Start templates and user_ids preprocess.")
 
     if tabs == 3:
@@ -645,6 +657,10 @@ def easyphoto_infer_forward(
                 last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, "
                 last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, "
 
+            if lcm_accelerate:
+                last_scene_lora_prompt_high_weight += f"<lora:{lcm_lora_name_and_weight}>, "
+                last_scene_lora_prompt_low_weight += f"<lora:{lcm_lora_name_and_weight}>, "
+
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
             pose_templates = glob.glob(os.path.join(easyphoto_models_path, "pose_templates/*.jpg")) + glob.glob(
@@ -655,7 +671,8 @@ def easyphoto_infer_forward(
             template_images = txt2img(
                 [["openpose", pose_template, 0.50, 1]],
                 input_prompt=last_scene_lora_prompt_high_weight,
-                diffusion_steps=30,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
@@ -669,7 +686,8 @@ def easyphoto_infer_forward(
                 None,
                 [],
                 input_prompt=last_scene_lora_prompt_low_weight,
-                diffusion_steps=30,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
                 denoising_strength=0.20,
                 hr_scale=1.5,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
@@ -680,11 +698,14 @@ def easyphoto_infer_forward(
             template_images = [np.uint8(template_images)]
         else:
             # text to image for template
+            if lcm_accelerate:
+                text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
             template_images = txt2img(
                 [],
                 input_prompt=text_to_image_input_prompt,
-                diffusion_steps=30,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
@@ -723,7 +744,8 @@ def easyphoto_infer_forward(
         elif user_id == "ipa_control_only":
             # get prompt
             input_prompt = f"1person, face, portrait, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
-
+            if lcm_accelerate:
+                input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ipa_image = Image.open(ipa_image_paths[index])
             ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
 
@@ -764,6 +786,8 @@ def easyphoto_infer_forward(
             if sdxl_pipeline_flag:
                 input_prompt = f"{validation_prompt}, <lora:{user_id}>, " + additional_prompt
 
+            if lcm_accelerate:
+                input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
             # get roop image
@@ -1120,10 +1144,12 @@ def easyphoto_infer_forward(
                         input_mask,
                         controlnet_pairs,
                         diffusion_steps=first_diffusion_steps,
+                        cfg_scale=7 if not lcm_accelerate else 2,
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=str(seed),
+                        sampler="DPM++ 2M SDE Karras",
                     )
                 else:
                     if not sdxl_pipeline_flag:
@@ -1139,10 +1165,12 @@ def easyphoto_infer_forward(
                         None,
                         controlnet_pairs,
                         diffusion_steps=first_diffusion_steps,
+                        cfg_scale=7 if not lcm_accelerate else 2,
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=str(seed),
+                        sampler="DPM++ 2M SDE Karras",
                     )
 
                     # detect face area
@@ -1271,9 +1299,11 @@ def easyphoto_infer_forward(
                     controlnet_pairs,
                     input_prompts[index],
                     diffusion_steps=second_diffusion_steps,
+                    cfg_scale=7 if not lcm_accelerate else 2,
                     denoising_strength=second_denoising_strength,
                     hr_scale=default_hr_scale,
                     seed=str(seed),
+                    sampler="DPM++ 2M SDE Karras",
                 )
 
                 # use original template face area to shift generated face color at last
@@ -1466,10 +1496,12 @@ def easyphoto_infer_forward(
                             sub_output_mask,
                             controlnet_pairs,
                             input_prompt_without_lora,
-                            30,
+                            diffusion_steps=30 if not lcm_accelerate else 8,
+                            cfg_scale=7 if not lcm_accelerate else 2,
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=str(seed),
+                            sampler="DPM++ 2M SDE Karras",
                         )
 
                         # Paste the image back to the background
@@ -1497,10 +1529,12 @@ def easyphoto_infer_forward(
                             output_mask,
                             controlnet_pairs,
                             input_prompt_without_lora,
-                            30,
+                            diffusion_steps=30 if not lcm_accelerate else 8,
+                            cfg_scale=7 if not lcm_accelerate else 2,
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=str(seed),
+                            sampler="DPM++ 2M SDE Karras",
                         )
 
             except Exception as e:
@@ -1616,10 +1650,10 @@ def easyphoto_video_infer_forward(
         refresh_model_vae()
     check_hash[0] = False
 
-    check_files_exists_and_download(check_hash[5], download_mode="add_video")
-    if check_hash[5]:
+    check_files_exists_and_download(check_hash[6], download_mode="add_video")
+    if check_hash[6]:
         refresh_model_vae()
-    check_hash[5] = False
+    check_hash[6] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     checkpoint_type_text2video = get_checkpoint_type(sd_model_checkpoint_for_animatediff_text2video)

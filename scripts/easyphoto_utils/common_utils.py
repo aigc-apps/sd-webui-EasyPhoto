@@ -165,6 +165,10 @@ download_urls = {
     "SchoolUniform_2": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
     ],
+    "lcm": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sdxl.safetensors",
+    ],
 }
 save_filenames = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -293,6 +297,10 @@ save_filenames = {
     ],
     "SchoolUniform_2": [
         os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
+    ],
+    "lcm": [
+        os.path.join(models_path, f"Lora/lcm_lora_sd15.safetensors"),
+        os.path.join(models_path, f"Lora/lcm_lora_sdxl.safetensors"),
     ],
 }
 
