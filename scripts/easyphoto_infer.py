@@ -2053,7 +2053,10 @@ def easyphoto_video_infer_forward(
             for _input_mask in input_mask:
                 if _input_mask is not None:
                     sum_input_mask.append(np.array(_input_mask))
-            sum_input_mask = Image.fromarray(np.uint8(np.max(np.array(sum_input_mask), axis=0)))
+            if len(sum_input_mask) == 0:
+                sum_input_mask = None
+            else:
+                sum_input_mask = Image.fromarray(np.uint8(np.max(np.array(sum_input_mask), axis=0)))
 
             first_diffusion_output_image = inpaint(
                 input_image,
