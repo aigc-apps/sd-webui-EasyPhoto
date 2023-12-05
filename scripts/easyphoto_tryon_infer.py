@@ -335,6 +335,7 @@ def easyphoto_tryon_infer_forward(
             return ("Failed to obtain Lora after training, please check the training process.", [], template_mask, reference_mask)
 
         # save to gallery
+        os.makedirs(cloth_gallery_dir, exist_ok=True)
         Image.open(ref_image_path).save(os.path.join(cloth_gallery_dir, f"{cloth_uuid}.jpg"))
         # save to models/LoRA
         copyfile(best_weight_path, webui_save_path)
@@ -433,7 +434,7 @@ def easyphoto_tryon_infer_forward(
         initial_parameters = np.array([angle, ratio])
         max_iters = 100
 
-        angle, ratio = find_best_angle_ratio(
+        angle, ratio, = find_best_angle_ratio(
             polygon1,
             polygon2,
             initial_parameters,
@@ -507,7 +508,7 @@ def easyphoto_tryon_infer_forward(
         controlnet_pairs = [
             ["canny_no_pre", res_canny, 1.0, 0],
             ["depth", resize_img_template, 1.0, 0],
-            # ["color", resize_image_input, 0.8, 0],
+            ["color", resize_image_input, 0.5, 0],
         ]
 
         result_img = inpaint(
