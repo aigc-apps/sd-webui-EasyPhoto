@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
                 with open(img_path, "rb") as f:
                     encoded_image = base64.b64encode(f.read()).decode("utf-8")
-                    outputs = post(encoded_image, user_id)
+                    outputs = post(encoded_image, user_id=user_id)
                     outputs = json.loads(outputs)
 
                     if len(outputs["outputs"]):
