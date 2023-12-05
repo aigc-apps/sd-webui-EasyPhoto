@@ -1,5 +1,4 @@
 import os
-
 from modules.paths import data_path, models_path
 
 # save_dirs
@@ -50,10 +49,10 @@ DEFAULT_SCENE_LORA = [
 ]
 
 # tryon template
-DEFAULT_TRYON_TEMPLATE = ["boy", "girl"]
+DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
 
 # cloth lora
-DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200"]
+DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "demo_dress_200", "demo_short_200"]
 
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"

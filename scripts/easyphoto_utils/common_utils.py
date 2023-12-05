@@ -192,6 +192,14 @@ download_urls = {
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/girl.jpg",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/girl_mask.jpg",
     ],
+    "dress": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/dress.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/dress_mask.jpg",
+    ],
+    "short": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/short.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/short_mask.jpg",
+    ],
     # cloth
     "demo_white_200": [
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/demo_white_200.safetensors",
@@ -207,6 +215,16 @@ download_urls = {
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/demo_purple_200.safetensors",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image.jpg",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image_mask.jpg",
+    ],
+    "demo_dress_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/demo_dress_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/ref_image_mask.jpg",
+    ],
+    "demo_short_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/demo_short_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image_mask.jpg",
     ],
 }
 save_filenames = {
@@ -349,6 +367,8 @@ save_filenames = {
     # template
     "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg"), os.path.join(tryon_template_gallery_dir, "boy_mask.jpg")],
     "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg"), os.path.join(tryon_template_gallery_dir, "girl_mask.jpg")],
+    "dress": [os.path.join(tryon_template_gallery_dir, "dress.jpg"), os.path.join(tryon_template_gallery_dir, "dress_mask.jpg")],
+    "short": [os.path.join(tryon_template_gallery_dir, "short.jpg"), os.path.join(tryon_template_gallery_dir, "short_mask.jpg")],
     # cloth
     "demo_white_200": [
         os.path.join(models_path, f"Lora/demo_white_200.safetensors"),
@@ -364,6 +384,16 @@ save_filenames = {
         os.path.join(models_path, f"Lora/demo_purple_200.safetensors"),
         os.path.join(tryon_cloth_gallery_dir, "demo_purple_200.jpg"),
         os.path.join(tryon_cloth_gallery_dir, "demo_purple_200_mask.jpg"),
+    ],
+    "demo_dress_200": [
+        os.path.join(models_path, f"Lora/demo_dress_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_dress_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_dress_200_mask.jpg"),
+    ],
+    "demo_short_200": [
+        os.path.join(models_path, f"Lora/demo_short_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_short_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_short_200_mask.jpg"),
     ],
 }
 
