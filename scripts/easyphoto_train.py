@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 import sys
+import numpy as np
 from glob import glob
 from shutil import copyfile
 
@@ -201,6 +202,7 @@ def easyphoto_train_forward(
         env["TRANSFORMERS_CACHE"] = sdxl_model_dir
 
     unload_models()
+    random_seed = np.random.randint(1, 1e6)
     if platform.system() == "Windows":
         pwd = os.getcwd()
         dataloader_num_workers = 0  # for solve multi process bug
@@ -226,7 +228,7 @@ def easyphoto_train_forward(
             "--lr_scheduler=constant",
             "--lr_warmup_steps=0",
             "--train_text_encoder",
-            "--seed=42",
+            f"--seed={random_seed}",
             f"--rank={rank}",
             f"--network_alpha={network_alpha}",
             f"--validation_prompt={local_validation_prompt}",
@@ -278,7 +280,7 @@ def easyphoto_train_forward(
                 f"--train_batch_size=1",
                 f"--gradient_accumulation_steps=8",
                 f"--learning_rate=0.0001",
-                "--seed=42",
+                f"--seed={random_seed}",
                 "--use_lora",
                 f"--rank=4",
                 f"--cfg",
@@ -324,7 +326,7 @@ def easyphoto_train_forward(
             "--lr_scheduler=constant",
             "--lr_warmup_steps=0",
             "--train_text_encoder",
-            "--seed=42",
+            f"--seed={random_seed}",
             f"--rank={rank}",
             f"--network_alpha={network_alpha}",
             f"--validation_prompt={local_validation_prompt}",
@@ -376,7 +378,7 @@ def easyphoto_train_forward(
                 f"--train_batch_size=1",
                 f"--gradient_accumulation_steps=8",
                 f"--learning_rate=0.0001",
-                "--seed=42",
+                f"--seed={random_seed}",
                 "--use_lora",
                 f"--rank=4",
                 f"--cfg",
