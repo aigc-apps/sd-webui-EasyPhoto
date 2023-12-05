@@ -1,3 +1,5 @@
+# Original XL Unet for diffusers
+# Borrow from https://github.com/bmaltais/kohya_ss/blob/master/library/sdxl_original_unet.py
 """
       target: sgm.modules.diffusionmodules.openaimodel.UNetModel
       params:

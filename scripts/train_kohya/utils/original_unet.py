@@ -1,3 +1,5 @@
+# Original Unet for diffusers
+# Borrow from https://github.com/bmaltais/kohya_ss/blob/master/library/original_unet.py
 import math
 from types import SimpleNamespace
 from typing import Dict, Optional, Tuple, Union

@@ -1,3 +1,6 @@
+# Borrow from https://github.com/bmaltais/kohya_ss/blob/master/library/model_util.py
+# v1: split from train_db_fixed.py.
+# v2: support safetensors
 import os
 from typing import List
 
