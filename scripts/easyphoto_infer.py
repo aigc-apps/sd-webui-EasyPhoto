@@ -5,6 +5,7 @@ import os
 import traceback
 from typing import Any, List, Union
 
+import random
 import cv2
 import numpy as np
 import torch
@@ -263,6 +264,7 @@ def txt2img(
         width=width,
         height=height,
         seed=seed,
+        subseed=seed,
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
@@ -322,6 +324,7 @@ def inpaint(
         height=int(h * hr_scale),
         inpaint_full_res=False,
         seed=seed,
+        subseed=seed,
         prompt=positive,
         negative_prompt=negative,
         controlnet_units=controlnet_units_list,
@@ -517,6 +520,15 @@ def easyphoto_infer_forward(
     if int(seed) == -1:
         seed = np.random.randint(0, 65536)
 
+    seed = int(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     try:
         # choose tabs select
         if tabs == 0:
@@ -660,7 +672,7 @@ def easyphoto_infer_forward(
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
-                seed=str(seed),
+                seed=seed,
                 sampler="Euler a",
             )
             ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
@@ -674,7 +686,7 @@ def easyphoto_infer_forward(
                 hr_scale=1.5,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
-                seed=str(seed),
+                seed=seed,
                 sampler="Euler a",
             )
             template_images = [np.uint8(template_images)]
@@ -829,7 +841,7 @@ def easyphoto_infer_forward(
             first_denoising_strength                : {str(first_denoising_strength)};
             second_diffusion_steps                  : {str(second_diffusion_steps)};
             second_denoising_strength               : {str(second_denoising_strength)};
-            seed                                    : {str(seed)}
+            seed                                    : {seed}
             crop_face_preprocess                    : {str(crop_face_preprocess)}
             apply_face_fusion_before                : {str(apply_face_fusion_before)}
             apply_face_fusion_after                 : {str(apply_face_fusion_after)}
@@ -1123,7 +1135,7 @@ def easyphoto_infer_forward(
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
-                        seed=str(seed),
+                        seed=seed,
                     )
                 else:
                     if not sdxl_pipeline_flag:
@@ -1142,7 +1154,7 @@ def easyphoto_infer_forward(
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
-                        seed=str(seed),
+                        seed=seed,
                     )
 
                     # detect face area
@@ -1273,7 +1285,7 @@ def easyphoto_infer_forward(
                     diffusion_steps=second_diffusion_steps,
                     denoising_strength=second_denoising_strength,
                     hr_scale=default_hr_scale,
-                    seed=str(seed),
+                    seed=seed,
                 )
 
                 # use original template face area to shift generated face color at last
@@ -1469,7 +1481,7 @@ def easyphoto_infer_forward(
                             30,
                             denoising_strength=denoising_strength,
                             hr_scale=1,
-                            seed=str(seed),
+                            seed=seed,
                         )
 
                         # Paste the image back to the background
@@ -1500,7 +1512,7 @@ def easyphoto_infer_forward(
                             30,
                             denoising_strength=denoising_strength,
                             hr_scale=1,
-                            seed=str(seed),
+                            seed=seed,
                         )
 
             except Exception as e:
@@ -1651,6 +1663,14 @@ def easyphoto_video_infer_forward(
     # get random seed
     if int(seed) == -1:
         seed = np.random.randint(0, 65536)
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     try:
         # choose tabs select
@@ -1857,7 +1877,7 @@ def easyphoto_video_infer_forward(
             after_face_fusion_ratio                 : {str(after_face_fusion_ratio)};
             first_diffusion_steps                   : {str(first_diffusion_steps)};
             first_denoising_strength                : {str(first_denoising_strength)};
-            seed                                    : {str(seed)}
+            seed                                    : {seed}
             apply_face_fusion_before                : {str(apply_face_fusion_before)}
             apply_face_fusion_after                 : {str(apply_face_fusion_after)}
             color_shift_middle                      : {str(color_shift_middle)}
@@ -2066,7 +2086,7 @@ def easyphoto_video_infer_forward(
                 denoising_strength=first_denoising_strength,
                 input_prompt=input_prompts[0],
                 hr_scale=1.0,
-                seed=str(seed),
+                seed=seed,
                 sd_model_checkpoint=sd_model_checkpoint,
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
                 default_negative_prompt=DEFAULT_NEGATIVE_AD,
