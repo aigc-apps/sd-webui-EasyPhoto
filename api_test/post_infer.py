@@ -55,6 +55,7 @@ def post(encoded_image, user_id=None, url="http://0.0.0.0:7860"):
             "ref_mode_choose": "Infer with Pretrained Lora",
             "ipa_only_weight": 0.60,
             "ipa_only_image": None,
+            "lcm_accelerate": True
         }
     )
     r = requests.post(f"{url}/easyphoto/easyphoto_infer_forward", data=datas, timeout=1500)
