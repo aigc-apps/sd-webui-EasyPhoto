@@ -24,17 +24,10 @@ from scripts.easyphoto_utils import (
     AnimateDiffProcess,
     AnimateDiffPromptSchedule,
     AnimateDiffUiGroup,
-    LoraCtlNetwork,
-    apply,
-    ctl_lora_flag,
     ep_logger,
-    extra_networks,
     motion_module,
-    reset_lora_weights,
-    set_active,
-    set_hire_fix,
     update_infotext,
-    video_visible,
+    video_visible
 )
 
 output_pic_dir = os.path.join(os.path.dirname(__file__), "online_files/output")
@@ -301,46 +294,6 @@ if video_visible:
                 ep_logger.info("AnimateDiff process end.")
 
 
-if ctl_lora_flag:
-
-    class LoraCtlScript(scripts.Script):
-        def __init__(self):
-            self.original_network = None
-            super().__init__()
-
-        def title(self):
-            return "Dynamic Lora Weights"
-
-        def show(self, is_img2img):
-            return scripts.AlwaysVisible
-
-        def ui(self, is_img2img):
-            return []
-
-        def process(self, p: StableDiffusionProcessing, **kwargs):
-            if type(extra_networks.extra_network_registry["lora"]) != LoraCtlNetwork:
-                self.original_network = extra_networks.extra_network_registry["lora"]
-                network = LoraCtlNetwork()
-                extra_networks.register_extra_network(network)
-                extra_networks.register_extra_network_alias(network, "loractl")
-
-            # apply LoraCtlNetwork
-            apply()
-
-            # set active after first diffusion
-            set_active(True)
-
-            # clear all lora weights
-            reset_lora_weights()
-
-            # normal process without hirefix
-            set_hire_fix(False)
-
-        def before_hr(self, p, *args):
-            # process with hirefix
-            set_hire_fix(True)
-
-
 def reload_sd_model_vae(sd_model, vae):
     """Reload sd model and vae"""
     shared.opts.sd_model_checkpoint = sd_model
@@ -448,7 +401,6 @@ def t2i_call(
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_txt2img = StableDiffusionProcessingTxt2Img(
         outpath_samples=outpath_samples,
-        do_not_save_samples=do_not_save_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -633,7 +585,6 @@ def i2i_inpaint_call(
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_img2img = StableDiffusionProcessingImg2Img(
         outpath_samples=outpath_samples,
-        do_not_save_samples=do_not_save_samples,
         outpath_grids=opts.outdir_grids or opts.outdir_img2img_grids,
         prompt=prompt,
         negative_prompt=negative_prompt,

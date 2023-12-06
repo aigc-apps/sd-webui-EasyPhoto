@@ -40,6 +40,6 @@ try:
         unload_models,
         check_feature_edit_valid,
     )
-    from .loractl_utils import extra_networks, LoraCtlNetwork, apply, set_active, reset_lora_weights, set_hire_fix, ctl_lora_flag
+    from .loractl_utils import LoraCtlScript
 except Exception as e:
     print(f"The file include sdwebui modules will be not include when preprocess.")
