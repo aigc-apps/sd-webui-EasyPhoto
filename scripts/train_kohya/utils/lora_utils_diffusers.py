@@ -1,4 +1,3 @@
-# Diffusersで動くLoRA。このファイル単独で完結する。
 # LoRA module for Diffusers. This file works independently.
 # Borrowed from https://github.com/kohya-ss/sd-scripts/blob/7e736da/networks/lora_diffusers.py.
 
@@ -102,7 +101,7 @@ def make_unet_conversion_map() -> Dict[str, str]:
 UNET_CONVERSION_MAP = make_unet_conversion_map()
 
 
-class LoRAModule(torch.nn.Module):
+class LoRAModule_For_Diffusers(torch.nn.Module):
     """
     replaces forward method of the original Linear, instead of replacing the original Linear module.
     """
@@ -151,7 +150,7 @@ class LoRAModule(torch.nn.Module):
         self.multiplier = multiplier
         self.org_module = [org_module]
         self.enabled = True
-        self.network: LoRANetwork = None
+        self.network: LoRANetwork_For_Diffusers = None
         self.org_forward = None
 
     # override org_module's forward method
@@ -257,7 +256,7 @@ def create_network_from_weights(
         if key not in modules_alpha:
             modules_alpha[key] = modules_dim[key]
 
-    return LoRANetwork(text_encoder, unet, multiplier=multiplier, modules_dim=modules_dim, modules_alpha=modules_alpha)
+    return LoRANetwork_For_Diffusers(text_encoder, unet, multiplier=multiplier, modules_dim=modules_dim, modules_alpha=modules_alpha)
 
 
 def merge_lora_weights(pipe, weights_sd: Dict, multiplier: float = 1.0):
@@ -269,8 +268,7 @@ def merge_lora_weights(pipe, weights_sd: Dict, multiplier: float = 1.0):
     lora_network.merge_to(multiplier=multiplier)
 
 
-# block weightや学習に対応しない簡易版 / simple version without block weight and training
-class LoRANetwork(torch.nn.Module):
+class LoRANetwork_For_Diffusers(torch.nn.Module):
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"]
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
     TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
@@ -306,7 +304,7 @@ class LoRANetwork(torch.nn.Module):
             text_encoder_idx: Optional[int],  # None, 1, 2
             root_module: torch.nn.Module,
             target_replace_modules: List[torch.nn.Module],
-        ) -> List[LoRAModule]:
+        ) -> List[LoRAModule_For_Diffusers]:
             prefix = (
                 self.LORA_PREFIX_UNET
                 if is_unet
@@ -335,7 +333,7 @@ class LoRANetwork(torch.nn.Module):
 
                             dim = modules_dim[lora_name]
                             alpha = modules_alpha[lora_name]
-                            lora = LoRAModule(
+                            lora = LoRAModule_For_Diffusers(
                                 lora_name,
                                 child_module,
                                 self.multiplier,
@@ -348,8 +346,7 @@ class LoRANetwork(torch.nn.Module):
         text_encoders = text_encoder if type(text_encoder) == list else [text_encoder]
 
         # create LoRA for text encoder
-        # 毎回すべてのモジュールを作るのは無駄なので要検討 / it is wasteful to create all modules every time, need to consider
-        self.text_encoder_loras: List[LoRAModule] = []
+        self.text_encoder_loras: List[LoRAModule_For_Diffusers] = []
         skipped_te = []
         for i, text_encoder in enumerate(text_encoders):
             if len(text_encoders) > 1:
@@ -357,7 +354,9 @@ class LoRANetwork(torch.nn.Module):
             else:
                 index = None
 
-            text_encoder_loras, skipped = create_modules(False, index, text_encoder, LoRANetwork.TEXT_ENCODER_TARGET_REPLACE_MODULE)
+            text_encoder_loras, skipped = create_modules(
+                False, index, text_encoder, LoRANetwork_For_Diffusers.TEXT_ENCODER_TARGET_REPLACE_MODULE
+            )
             self.text_encoder_loras.extend(text_encoder_loras)
             skipped_te += skipped
         print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.")
@@ -365,9 +364,11 @@ class LoRANetwork(torch.nn.Module):
             print(f"skipped {len(skipped_te)} modules because of missing weight for text encoder.")
 
         # extend U-Net target modules to include Conv2d 3x3
-        target_modules = LoRANetwork.UNET_TARGET_REPLACE_MODULE + LoRANetwork.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
+        target_modules = (
+            LoRANetwork_For_Diffusers.UNET_TARGET_REPLACE_MODULE + LoRANetwork_For_Diffusers.UNET_TARGET_REPLACE_MODULE_CONV2D_3X3
+        )
 
-        self.unet_loras: List[LoRAModule]
+        self.unet_loras: List[LoRAModule_For_Diffusers]
         self.unet_loras, skipped_un = create_modules(True, None, unet, target_modules)
         print(f"create LoRA for U-Net: {len(self.unet_loras)} modules.")
         if len(skipped_un) > 0:
@@ -393,8 +394,8 @@ class LoRANetwork(torch.nn.Module):
         map_keys.sort()
 
         for key in list(modules_dim.keys()):
-            if key.startswith(LoRANetwork.LORA_PREFIX_UNET + "_"):
-                search_key = key.replace(LoRANetwork.LORA_PREFIX_UNET + "_", "")
+            if key.startswith(LoRANetwork_For_Diffusers.LORA_PREFIX_UNET + "_"):
+                search_key = key.replace(LoRANetwork_For_Diffusers.LORA_PREFIX_UNET + "_", "")
                 position = bisect.bisect_right(map_keys, search_key)
                 map_key = map_keys[position - 1]
                 if search_key.startswith(map_key):
@@ -447,8 +448,8 @@ class LoRANetwork(torch.nn.Module):
         map_keys = list(UNET_CONVERSION_MAP.keys())  # prefix of U-Net modules
         map_keys.sort()
         for key in list(state_dict.keys()):
-            if key.startswith(LoRANetwork.LORA_PREFIX_UNET + "_"):
-                search_key = key.replace(LoRANetwork.LORA_PREFIX_UNET + "_", "")
+            if key.startswith(LoRANetwork_For_Diffusers.LORA_PREFIX_UNET + "_"):
+                search_key = key.replace(LoRANetwork_For_Diffusers.LORA_PREFIX_UNET + "_", "")
                 position = bisect.bisect_right(map_keys, search_key)
                 map_key = map_keys[position - 1]
                 if search_key.startswith(map_key):
@@ -468,7 +469,7 @@ class LoRANetwork(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    # sample code to use LoRANetwork
+    # sample code to use LoRANetwork_For_Diffusers
     import argparse
     import os
 
@@ -512,7 +513,7 @@ if __name__ == "__main__":
 
     # create by LoRA weights and load weights
     print(f"create LoRA network")
-    lora_network: LoRANetwork = create_network_from_weights(text_encoders, pipe.unet, lora_sd, multiplier=1.0)
+    lora_network: LoRANetwork_For_Diffusers = create_network_from_weights(text_encoders, pipe.unet, lora_sd, multiplier=1.0)
 
     print(f"load LoRA network weights")
     lora_network.load_state_dict(lora_sd)

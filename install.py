@@ -70,9 +70,13 @@ if not is_installed("modelscope==1.9.3"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install modelscope==1.9.3", "requirements for modelscope")
 
-if not is_installed("diffusers==0.18.2"):
+if not is_installed("diffusers>=0.18.2"):
     print("Installing requirements for easyphoto-webui")
-    launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
+    launch.run_pip("install \'diffusers<=0.23.0\'", "requirements for diffusers")
+
+if not is_installed("einops"):
+    print("Installing requirements for easyphoto-webui")
+    launch.run_pip("install einops", "requirements for diffusers")
 
 if not is_installed("imageio>=2.29.0"):
     print("Installing requirements for easyphoto-webui")
