@@ -346,7 +346,7 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = [True, True, True, True, True, True]
+check_hash = [True, True, True, True, True, True, True]
 sdxl_txt2img_flag = False
 
 
@@ -392,8 +392,8 @@ def easyphoto_infer_forward(
     ref_mode_choose,
     ipa_only_weight,
     ipa_only_image_path,
-    feature_edit_id,
-    feature_edit_id_ratio,
+    attribute_edit_id,
+    attribute_edit_ratio,
     *user_ids,
 ):
     # global
@@ -457,6 +457,11 @@ def easyphoto_infer_forward(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
                 return error_info, [], []
+    
+    if attribute_edit_id is not None:
+        # download all sliders here.
+        check_files_exists_and_download(check_hash[5], download_mode="sliders")
+        check_hash[5] = False
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -760,15 +765,15 @@ def easyphoto_infer_forward(
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
-                input_prompt += f"<lora:ddpo_{user_id}>, "
+                input_prompt += f", <lora:ddpo_{user_id}>"
 
             # TODO: face_id_image_path may have to be picked with pitch yaw angle in video mode.
             if sdxl_pipeline_flag:
                 input_prompt = f"{validation_prompt}, <lora:{user_id}>, " + additional_prompt
 
-            # Feature edit id
-            if feature_edit_id != "none":
-                input_prompt += f"<lora:{feature_edit_id}:0@0, 0@0.5, {feature_edit_id_ratio}@0.5, {feature_edit_id_ratio}@1>, "
+            # Add the slider lora when using the attribute edit.
+            if attribute_edit_id != "none":
+                input_prompt += f", <lora:{attribute_edit_id}:0@0, 0@0.2, {attribute_edit_ratio}@0.2, {attribute_edit_ratio}@1>"
 
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
@@ -856,6 +861,8 @@ def easyphoto_infer_forward(
             ref_mode_choose                         : {str(ref_mode_choose)}
             ipa_only_weight                         : {str(ipa_only_weight)}
             ipa_only_image_path                     : {str(ipa_only_image_path)}
+            attribute_edit_id                       : {str(attribute_edit_id)}
+            attribute_edit_ratio                    : {str(attribute_edit_ratio)}
         """
         ep_logger.info(template_idx_info)
         try:

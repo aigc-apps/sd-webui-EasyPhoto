@@ -42,8 +42,6 @@ DEFAULT_SCENE_LORA = [
     "SchoolUniform_1",
     "SchoolUniform_2",
 ]
-# feature edit
-DEFAULT_FEATURE_EDIT_LORA = []
 
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"

@@ -38,7 +38,7 @@ try:
         modelscope_models_to_gpu,
         switch_ms_model_cpu,
         unload_models,
-        check_feature_edit_valid,
+        check_attribute_edit_valid,
     )
     from .loractl_utils import LoraCtlScript
 except Exception as e:

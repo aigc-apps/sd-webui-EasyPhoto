@@ -165,6 +165,12 @@ download_urls = {
     "SchoolUniform_2": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
     ],
+    "sliders": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/smiling_sd1_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/age_sd1_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/smiling_sdxl_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/age_sdxl_sliders.pt",
+    ],
 }
 save_filenames = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -294,6 +300,13 @@ save_filenames = {
     "SchoolUniform_2": [
         os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
     ],
+    # Sliders
+    "sliders": [
+        os.path.join(models_path, f"Lora/smiling_sd1_sliders.pt"),
+        os.path.join(models_path, f"Lora/age_sd1_sliders.pt"),
+        os.path.join(models_path, f"Lora/smiling_sdxl_sliders.pt"),
+        os.path.join(models_path, f"Lora/age_sdxl_sliders.pt"),
+    ],
 }
 
 
@@ -309,8 +322,8 @@ def check_scene_valid(lora_path, models_path):
     return False
 
 
-def check_feature_edit_valid(lora_path, models_path):
-    if not lora_path.startswith("feature_edit_"):
+def check_attribute_edit_valid(lora_name):
+    if not (lora_name.endswith("sliders.safentensors") or lora_name.endswith("sliders.pt")):
         return False
     return True
 
