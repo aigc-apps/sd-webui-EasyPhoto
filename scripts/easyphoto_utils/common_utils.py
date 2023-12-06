@@ -7,6 +7,7 @@ import traceback
 from contextlib import ContextDecorator
 
 import cv2
+import random
 import numpy as np
 import requests
 import torch
@@ -576,6 +577,16 @@ def unload_models():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+
+
+def seed_everything(seed=11):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def get_controlnet_version() -> str:

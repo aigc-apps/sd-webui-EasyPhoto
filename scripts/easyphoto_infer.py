@@ -5,7 +5,6 @@ import os
 import traceback
 from typing import Any, List, Union
 
-import random
 import cv2
 import numpy as np
 import torch
@@ -52,6 +51,7 @@ from scripts.easyphoto_utils import (
     modelscope_models_to_gpu,
     switch_ms_model_cpu,
     unload_models,
+    seed_everything,
 )
 from scripts.sdwebui import (
     get_checkpoint_type,
@@ -516,19 +516,6 @@ def easyphoto_infer_forward(
             display_score = True
             ep_logger.warning("Display score is forced to be true when IP-Adapter Control is enabled.")
 
-    # get random seed
-    if int(seed) == -1:
-        seed = np.random.randint(0, 65536)
-
-    seed = int(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
     try:
         # choose tabs select
         if tabs == 0:
@@ -603,6 +590,12 @@ def easyphoto_infer_forward(
     # This is to increase the fault tolerance of the code.
     # If the code exits abnormally, it may cause the model to not function properly on the CPU
     modelscope_models_to_gpu()
+
+    # get random seed
+    if int(seed) == -1:
+        seed = np.random.randint(0, 65536)
+
+    seed_everything(int(seed))
 
     # params init
     input_prompts = []
@@ -1660,18 +1653,6 @@ def easyphoto_video_infer_forward(
     if len(user_ids) == len(passed_userid_list):
         return "Please choose a user id.", None, None, []
 
-    # get random seed
-    if int(seed) == -1:
-        seed = np.random.randint(0, 65536)
-
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
     try:
         # choose tabs select
         #
@@ -1749,6 +1730,12 @@ def easyphoto_video_infer_forward(
     # This is to increase the fault tolerance of the code.
     # If the code exits abnormally, it may cause the model to not function properly on the CPU
     modelscope_models_to_gpu()
+
+    # get random seed
+    if int(seed) == -1:
+        seed = np.random.randint(0, 65536)
+
+    seed_everything(int(seed))
 
     # params init
     input_prompts = []
