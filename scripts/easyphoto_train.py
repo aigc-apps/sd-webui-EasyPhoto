@@ -23,7 +23,8 @@ from scripts.sdwebui import get_checkpoint_type, unload_sd
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 python_executable_path = sys.executable
-check_hash = [True, True]
+# base, portrait, sdxl
+check_hash = [True, True, True]
 
 
 # Attention! Output of js is str or list, not float or int
@@ -79,7 +80,9 @@ def easyphoto_train_forward(
         return "The network alpha {} must not exceed rank {}. " "It will result in an unintended LoRA.".format(network_alpha, rank)
 
     check_files_exists_and_download(check_hash[0], "base")
+    check_files_exists_and_download(check_hash[1], "portrait")
     check_hash[0] = False
+    check_hash[1] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
@@ -87,8 +90,8 @@ def easyphoto_train_forward(
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
     if sdxl_pipeline_flag:
-        check_files_exists_and_download(check_hash[1], "sdxl")
-        check_hash[1] = False
+        check_files_exists_and_download(check_hash[2], "sdxl")
+        check_hash[2] = False
 
     # check if user want to train Scene Lora
     train_scene_lora_bool = True if train_mode_choose == "Train Scene Lora" else False
