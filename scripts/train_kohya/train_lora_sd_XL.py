@@ -45,7 +45,8 @@ from tqdm.auto import tqdm
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import utils.lora_utils as network_module
-from utils.lora_diffusers import merge_lora_weights
+from utils.model_utils import load_models_from_sdxl_checkpoint
+from utils.lora_utils_diffusers import merge_lora_weights
 
 torch.backends.cudnn.benchmark = True
 
@@ -585,9 +586,15 @@ def main():
         text_encoder=None,
         tokenizer=None,
     )
+    text_encoder, text_encoder_2, vae, unet, logit_scale, ckpt_info = load_models_from_sdxl_checkpoint(
+        "", args.pretrained_model_ckpt, "cpu"
+    )
+    pipeline.unet = unet
+    pipeline.text_encoder = text_encoder
+    pipeline.text_encoder_2 = text_encoder_2
+
     tokenizer_one, text_encoder_one = pipeline.tokenizer, pipeline.text_encoder
     tokenizer_two, text_encoder_two = pipeline.tokenizer_2, pipeline.text_encoder_2
-    vae, unet = pipeline.vae, pipeline.unet
     if args.pretrained_vae_model_name_or_path is not None:
         vae = AutoencoderKL.from_pretrained(args.pretrained_vae_model_name_or_path)
     noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
@@ -639,9 +646,12 @@ def main():
                 logger.warn(
                     "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
                 )
-            unet.enable_xformers_memory_efficient_attention()
+            unet.set_use_memory_efficient_attention(True, False)
         else:
             logger.warn("xformers is not available. Make sure it is installed correctly")
+            unet.set_use_memory_efficient_attention(False, True)
+    else:
+        unet.set_use_memory_efficient_attention(False, True)
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -723,15 +733,42 @@ def main():
         if caption_column not in column_names:
             raise ValueError(f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}")
 
+    def timestep_embedding(timesteps, dim, max_period=10000):
+        """
+        Create sinusoidal timestep embeddings.
+        :param timesteps: a 1-D Tensor of N indices, one per batch element.
+                        These may be fractional.
+        :param dim: the dimension of the output.
+        :param max_period: controls the minimum frequency of the embeddings.
+        :return: an [N x dim] Tensor of positional embeddings.
+        """
+        half = dim // 2
+        freqs = torch.exp(-math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half).to(device=timesteps.device)
+        args = timesteps[:, None].float() * freqs[None]
+        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+        if dim % 2:
+            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
+        return embedding
+
+    def get_timestep_embedding(x, outdim):
+        assert len(x.shape) == 2
+        b, dims = x.shape[0], x.shape[1]
+        x = torch.flatten(x)
+        emb = timestep_embedding(x, outdim)
+        emb = torch.reshape(emb, (b, dims * outdim))
+        return emb
+
     def compute_time_ids():
         # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
-        original_size = (args.resolution, args.resolution)
-        target_size = (args.resolution, args.resolution)
-        crops_coords_top_left = (args.crops_coords_top_left_h, args.crops_coords_top_left_w)
-        add_time_ids = list(original_size + crops_coords_top_left + target_size)
-        add_time_ids = torch.tensor([add_time_ids])
-        add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
-        return add_time_ids
+        original_size = torch.LongTensor((1024, 1024)).unsqueeze(0)
+        target_size = torch.LongTensor((1024, 1024)).unsqueeze(0)
+        crops_coords_top_left = torch.LongTensor((0, 0)).unsqueeze(0)
+
+        emb1 = get_timestep_embedding(original_size, 256)
+        emb2 = get_timestep_embedding(crops_coords_top_left, 256)
+        emb3 = get_timestep_embedding(target_size, 256)
+        vector = torch.cat([emb1, emb2, emb3], dim=1).to("cuda")
+        return vector
 
     # Pack the statically computed variables appropriately. This is so that we don't
     # have to pass them to the dataloader.
@@ -945,7 +982,8 @@ def main():
                 )
                 unet_added_conditions = {"time_ids": add_time_ids.repeat(bsz, 1)}
                 unet_added_conditions.update({"text_embeds": pooled_prompt_embeds})
-                model_pred = unet(noisy_model_input, timesteps, prompt_embeds, added_cond_kwargs=unet_added_conditions).sample
+
+                model_pred = unet(noisy_model_input, timesteps, prompt_embeds, unet_added_conditions)
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":

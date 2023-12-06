@@ -87,7 +87,7 @@ def resize_image(input_image, resolution, nearest=False, crop264=True):
 # Add control_mode=1 means Prompt is more important, to better control lips and eyes,
 # this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
 def get_controlnet_unit(
-    unit: str, input_image: Union[Any, List[Any]], weight: float, is_batch: bool = False
+    unit: str, input_image: Union[Any, List[Any]], weight: float, is_batch: bool = False, control_mode: int = 1
 ):  # Any should be replaced with a more specific image type  # Default to False, assuming single image input by default
     if unit == "canny":
         control_unit = dict(
@@ -101,11 +101,6 @@ def get_controlnet_unit(
             threshold_b=200,
             model="control_v11p_sd15_canny",
         )
-
-        if is_batch:
-            control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
-        else:
-            control_unit["input_image"] = {"image": np.asarray(input_image), "mask": None}
 
     elif unit == "sdxl_canny_mid":
         control_unit = dict(
@@ -131,11 +126,6 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
-
-        if is_batch:
-            control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
-        else:
-            control_unit["image"] = {"image": np.asarray(input_image), "mask": None}
 
     elif unit == "sdxl_openpose":
         control_unit = dict(
@@ -204,10 +194,6 @@ def get_controlnet_unit(
             model="control_v11f1e_sd15_tile",
         )
 
-        if is_batch:
-            control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
-        else:
-            control_unit["input_image"] = {"image": np.asarray(input_image), "mask": None}
     elif unit == "ipa_full_face":
         control_unit = dict(
             input_image={"image": np.asarray(input_image), "mask": None},
@@ -228,6 +214,50 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="ip-adapter-plus-face_sdxl_vit-h",
         )
+    elif unit == "depth":
+        control_unit = dict(
+            input_image=input_image,
+            module="depth_midas",
+            weight=weight,
+            guidance_end=1,
+            control_mode=control_mode,
+            resize_mode="Just Resize",
+            model="control_v11f1p_sd15_depth",
+        )
+
+    elif unit == "ipa":
+        control_unit = dict(
+            input_image=input_image,
+            module="ip-adapter_clip_sd15",
+            weight=weight,
+            guidance_end=1,
+            control_mode=control_mode,
+            resize_mode="Just Resize",
+            model="ip-adapter_sd15",
+        )
+
+    elif unit == "canny_no_pre":
+        control_unit = dict(
+            input_image=input_image,
+            module=None,
+            weight=weight,
+            guidance_end=1,
+            control_mode=control_mode,
+            resize_mode="Crop and Resize",
+            threshold_a=100,
+            threshold_b=200,
+            model="control_v11p_sd15_canny",
+        )
+
+    if unit != "color" and not unit.startswith("sdxl") and not unit.startswith("ipa"):
+        if is_batch:
+            control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
+        else:
+            control_unit["input_image"] = {
+                "image": np.asarray(input_image),
+                "mask": None,
+            }
+
     return control_unit
 
 
@@ -307,7 +337,26 @@ def inpaint(
     h = int(input_image.height) if type(input_image) is not list else int(input_image[0].height)
 
     for pair in controlnet_pairs:
-        controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(input_image) is not list else True))
+        if len(pair) == 4:
+            # if control_mode is additional given (default 1 prompt is better)
+            controlnet_units_list.append(
+                get_controlnet_unit(
+                    pair[0],
+                    pair[1],
+                    pair[2],
+                    False if type(input_image) is not list else True,
+                    pair[3],
+                )
+            )
+        else:
+            controlnet_units_list.append(
+                get_controlnet_unit(
+                    pair[0],
+                    pair[1],
+                    pair[2],
+                    False if type(input_image) is not list else True,
+                )
+            )
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -348,7 +397,7 @@ old_super_resolution_method = None
 face_skin = None
 face_recognition = None
 psgan_inference = None
-check_hash = [True, True, True, True, True, True, True]
+check_hash = {}
 sdxl_txt2img_flag = False
 
 
@@ -401,10 +450,12 @@ def easyphoto_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[0], download_mode="base")
-    if check_hash[0]:
+    check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
+    check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
+    if check_hash.get("base", True) or check_hash.get("portrait", True):
         refresh_model_vae()
-    check_hash[0] = False
+    check_hash["base"] = False
+    check_hash["portrait"] = False
 
     # check the checkpoint_type of sd_model_checkpoint
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
@@ -421,29 +472,29 @@ def easyphoto_infer_forward(
 
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
-        check_files_exists_and_download(check_hash[1], download_mode="sdxl")
-        if check_hash[1]:
+        check_files_exists_and_download(check_hash.get("sdxl", True), download_mode="sdxl")
+        if check_hash.get("sdxl", True):
             refresh_model_vae()
-        check_hash[1] = False
+        check_hash["sdxl"] = False
     if tabs == 3:
-        check_files_exists_and_download(check_hash[2], download_mode="add_text2image")
-        if check_hash[2]:
+        check_files_exists_and_download(check_hash.get("add_text2image", True), download_mode="add_text2image")
+        if check_hash.get("add_text2image", True):
             refresh_model_vae()
-        check_hash[2] = False
+        check_hash["add_text2image"] = False
     if ipa_control:
         if not sdxl_pipeline_flag:
-            check_files_exists_and_download(check_hash[3], download_mode="add_ipa_base")
-            if check_hash[3]:
+            check_files_exists_and_download(check_hash.get("add_ipa_base", True), download_mode="add_ipa_base")
+            if check_hash.get("add_ipa_base", True):
                 refresh_model_vae()
-            check_hash[3] = False
+            check_hash["add_ipa_base"] = False
         else:
-            check_files_exists_and_download(check_hash[4], download_mode="add_ipa_sdxl")
-            if check_hash[4]:
+            check_files_exists_and_download(check_hash.get("add_ipa_sdxl", True), download_mode="add_ipa_sdxl")
+            if check_hash.get("add_ipa_sdxl", True):
                 refresh_model_vae()
-            check_hash[4] = False
+            check_hash["add_ipa_sdxl"] = False
     if lcm_accelerate:
-        check_files_exists_and_download(check_hash[5], download_mode="lcm")
-        check_hash[5] = False
+        check_files_exists_and_download(check_hash.get("lcm", True), download_mode="lcm")
+        check_hash["lcm"] = False
 
     # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
@@ -1645,15 +1696,17 @@ def easyphoto_video_infer_forward(
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
-    check_files_exists_and_download(check_hash[0], download_mode="base")
-    if check_hash[0]:
+    check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
+    check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
+    if check_hash.get("base", True) or check_hash.get("portrait", True):
         refresh_model_vae()
-    check_hash[0] = False
+    check_hash["base"] = False
+    check_hash["portrait"] = False
 
-    check_files_exists_and_download(check_hash[6], download_mode="add_video")
-    if check_hash[6]:
+    check_files_exists_and_download(check_hash.get("add_video", True), download_mode="add_video")
+    if check_hash.get("add_video", True):
         refresh_model_vae()
-    check_hash[6] = False
+    check_hash["add_video"] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     checkpoint_type_text2video = get_checkpoint_type(sd_model_checkpoint_for_animatediff_text2video)
