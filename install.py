@@ -72,7 +72,7 @@ if not is_installed("modelscope==1.9.3"):
 
 if not is_installed("diffusers>=0.18.2"):
     print("Installing requirements for easyphoto-webui")
-    launch.run_pip("install \'diffusers<=0.23.0\'", "requirements for diffusers")
+    launch.run_pip("install 'diffusers<=0.23.0'", "requirements for diffusers")
 
 if not is_installed("einops"):
     print("Installing requirements for easyphoto-webui")
@@ -92,7 +92,6 @@ if not launch.is_installed("invisible-watermark"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install invisible-watermark", "requirements for invisible-watermark")
 
-# `StableDiffusionXLPipeline` in diffusers requires the invisible-watermark library.
 if not launch.is_installed("shapely"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install shapely", "requirements for shapely")
