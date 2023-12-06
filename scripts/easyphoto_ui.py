@@ -21,7 +21,7 @@ from scripts.easyphoto_config import (
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_tryon_infer import easyphoto_tryon_infer_forward, easyphoto_tryon_mask_forward
-from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, check_scene_valid, video_visible
+from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, check_scene_valid, video_visible, ep_logger
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 gradio_compat = True
@@ -1420,7 +1420,7 @@ def on_ui_tabs():
                                         with gr.Row():
                                             with gr.Column():
                                                 template_image_tryon = gr.Image(
-                                                    label="Image for skybox",
+                                                    label="Image for tryon",
                                                     elem_id="{id_part}_tem_image",
                                                     show_label=False,
                                                     source="upload",
@@ -1429,7 +1429,7 @@ def on_ui_tabs():
                                                 )
                                             with gr.Column(visible=True):
                                                 template_mask = gr.Image(
-                                                    label="preview template mask",
+                                                    label="Preview template mask",
                                                     elem_id="{id_part}_tem_image",
                                                     show_label=False,
                                                     show_download_button=True,
@@ -1438,10 +1438,15 @@ def on_ui_tabs():
                                                 )
 
                                             template_mask_preview = ToolButton(value="👀")
+
                                         with gr.Row():
                                             # download template images
                                             for template_name in DEFAULT_TRYON_TEMPLATE:
-                                                check_files_exists_and_download(False, template_name)
+                                                try:
+                                                    check_files_exists_and_download(False, template_name)
+                                                except Exception as e:
+                                                    ep_logger.error(f"Download Try On template Error. Error Info {e}")
+
                                             tryon_template_gallery_preview_list = glob.glob(
                                                 os.path.join(
                                                     os.path.join(
@@ -1458,10 +1463,7 @@ def on_ui_tabs():
                                                 label="Template Examples",
                                             )
 
-                            def clean_mask():
-                                return None
-
-                            template_image_tryon.edit(clean_mask, outputs=[template_mask])
+                            template_image_tryon.edit(lambda: None, outputs=[template_mask])
 
                             with gr.Accordion("Reference Image", open=True) as tryon_cloth_chosen:
                                 with gr.Row():
@@ -1568,7 +1570,7 @@ def on_ui_tabs():
                                             interactive=True,
                                         )
 
-                                    main_image.edit(clean_mask, outputs=[reference_mask])
+                                    main_image.edit(lambda: None, outputs=[reference_mask])
 
                             def cloth_upload_way_change(cloth_upload_way):
                                 if cloth_upload_way == "Cloth Gallery":
@@ -1593,13 +1595,6 @@ def on_ui_tabs():
                                 cloth_upload_way,
                                 [cloth_gallery, cloth_id_refresh, cloth_upload, tryon_cloth_chosen],
                             )
-
-                            def generate_tryon_template_tabs(upload_way):
-                                tabs = {
-                                    "Template Gallery": 0,
-                                    "Template Upload": 1,
-                                }[upload_way]
-                                return tabs
 
                             def generate_tryon_reference_tabs(upload_way):
                                 tabs = {
