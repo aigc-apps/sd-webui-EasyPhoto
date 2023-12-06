@@ -361,10 +361,10 @@ save_filenames = {
     ],
     # Tryon Gallery Collections
     # template
-    "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg"), os.path.join(tryon_template_gallery_dir, "boy_mask.jpg")],
-    "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg"), os.path.join(tryon_template_gallery_dir, "girl_mask.jpg")],
-    "dress": [os.path.join(tryon_template_gallery_dir, "dress.jpg"), os.path.join(tryon_template_gallery_dir, "dress_mask.jpg")],
-    "short": [os.path.join(tryon_template_gallery_dir, "short.jpg"), os.path.join(tryon_template_gallery_dir, "short_mask.jpg")],
+    "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg")],
+    "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg")],
+    "dress": [os.path.join(tryon_template_gallery_dir, "dress.jpg")],
+    "short": [os.path.join(tryon_template_gallery_dir, "short.jpg")],
     # cloth
     "demo_white_200": [
         os.path.join(models_path, f"Lora/demo_white_200.safetensors"),
