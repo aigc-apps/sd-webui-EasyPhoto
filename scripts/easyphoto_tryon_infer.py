@@ -58,7 +58,6 @@ def easyphoto_tryon_infer_forward(
     sd_model_checkpoint,
     template_image,
     template_mask,
-    selected_template_images,
     selected_cloth_images,
     reference_image,
     reference_mask,
@@ -71,11 +70,11 @@ def easyphoto_tryon_infer_forward(
     angle,
     azimuth,
     ratio,
+    dx,
+    dy,
     batch_size,
-    refine_input_mask,
     optimize_angle_and_ratio,
     refine_bound,
-    template_img_selected_tab,
     ref_image_selected_tab,
     cloth_uuid,
     max_train_steps,
@@ -84,8 +83,6 @@ def easyphoto_tryon_infer_forward(
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
 
-    ep_logger.info(f"Chosen Tab: {template_img_selected_tab}, {ref_image_selected_tab}")
-    # check input
     check_files_exists_and_download(check_hash[0], "base")
     check_files_exists_and_download(check_hash[7], "add_tryon")
     check_hash[0] = False
@@ -102,36 +99,21 @@ def easyphoto_tryon_infer_forward(
     user_ids = [i.split("/")[-1].split(".")[0] for i in gallery_lists]
     ep_logger.info(f"user_ids: {user_ids}")
 
-    # Template: choose tabs selected
-    if template_img_selected_tab == 0:
-        try:
-            # choose from gallery
-            input_tem_img_path = eval(selected_template_images)[0]
-            # clean previous template mask result
-            template_mask = None
-        except Exception as e:
-            ep_logger.info(f"selected_template_images: {selected_template_images}")
-            info = "Please choose a template image from gallery."
-            ep_logger.error(info + e)
-            return info, [], template_mask, reference_mask
-    else:
-        # use uploaded template
-        if template_image is None:
-            info = "Please upload a template image."
-            ep_logger.error(info)
-            return info, [], template_mask, reference_mask
+    # Template Input
+    if template_image is None:
+        info = "Please upload a template image."
+        ep_logger.error(info)
+        return info, [], template_mask, reference_mask
 
-        if template_mask is None and template_image["mask"].max() == 0:
-            info = "Please give a hint of template, or upload template mask by clicking show mask."
-            ep_logger.error(info)
-            return info, [], template_mask, reference_mask
+    if template_mask is None and template_image["mask"].max() == 0:
+        info = "Please give a hint of template, or upload template mask by clicking show mask."
+        ep_logger.error(info)
+        return info, [], template_mask, reference_mask
 
-        if template_mask is not None and template_mask.shape != template_image["image"].shape:
-            info = (
-                "Please upload a mask with the same size as template. Or remove the uploaded mask and generate automatically by given hints"
-            )
-            ep_logger.error(info)
-            return info, [], template_mask, reference_mask
+    if template_mask is not None and template_mask.shape != template_image["image"].shape:
+        info = "Please upload a mask with the same size as template. Or remove the uploaded mask and generate automatically by given hints"
+        ep_logger.error(info)
+        return info, [], template_mask, reference_mask
 
     # Reference: choose tabs select
     if ref_image_selected_tab == 0:
@@ -142,10 +124,9 @@ def easyphoto_tryon_infer_forward(
 
             # clean previous reference mask result
             reference_mask = None
-        except Exception as e:
+        except Exception:
             ep_logger.info(f"selected_cloth_images: {selected_cloth_images}")
             info = "Please choose a cloth image from gallery."
-            ep_logger.error(info + e)
             return info, [], template_mask, reference_mask
     else:
         # use uploaded reference
@@ -361,19 +342,15 @@ def easyphoto_tryon_infer_forward(
         mask_ref = np.repeat(mask_ref[:, :, np.newaxis], 3, axis=2)
 
     # template image
-    if template_img_selected_tab == 0:
-        img_template = np.uint8(Image.open(input_tem_img_path))
-        mask_template = np.uint8(Image.open(input_tem_img_path.replace(".jpg", "_mask.jpg")))
+    img_template = np.uint8(Image.fromarray(np.uint8(template_image["image"])))
+    mask_template_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
+    if template_mask is None:
+        # refine
+        _, mask_template = easyphoto_tryon_mask_forward(template_image, "Template")
+        # update for return
+        template_mask = mask_template
     else:
-        img_template = np.uint8(Image.fromarray(np.uint8(template_image["image"])))
-        mask_template_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
-        if template_mask is None:
-            # refine
-            _, mask_template = easyphoto_tryon_mask_forward(template_image, "Template")
-            # update for return
-            template_mask = mask_template
-        else:
-            mask_template = template_mask[:, :, 0]
+        mask_template = template_mask[:, :, 0]
 
     # for final paste
     _, box_main = mask_to_box(np.uint8(mask_ref[:, :, 0]))
@@ -449,15 +426,12 @@ def easyphoto_tryon_infer_forward(
 
     # paste
     result_img, rotate_img_ref, mask_ref, mask_template, iou = align_and_overlay_images(
-        np.array(img_ref),
-        np.array(background_img),
-        np.array(mask_ref),
-        np.array(mask_template),
-        angle=-angle,
-        ratio=ratio,
+        np.array(img_ref), np.array(background_img), np.array(mask_ref), np.array(mask_template), angle=-angle, ratio=ratio, dx=dx, dy=dy
     )
 
-    return_msg += f"Paste with angle {angle}, ratio: {ratio}, Match IoU: {iou}, optimize: {optimize_angle_and_ratio}. \n See paste result above, if you are not satisfatory with the optimized result, close the optimize_angle_and_ratio and manually set a angle and ratio.\n"
+    return_msg += "Paste with angle {:.2f}, ratio: {:.2f}, dx: {:.2f}, dy: {:.2f}, Match IoU: {:.2f}, optimize: {}. \n See paste result above, if you are not satisfatory with the optimized result, close the optimize_angle_and_ratio and manually set a angle and ratio.\n".format(
+        angle, ratio, dx, dy, iou, optimize_angle_and_ratio
+    )
 
     # Step4: prepare for control image
     h_expand, w_expand = result_img.shape[:2]

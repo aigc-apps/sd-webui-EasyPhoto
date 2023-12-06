@@ -514,6 +514,8 @@ def align_and_overlay_images(
     mask2: np.ndarray,
     angle: float = 0.0,
     ratio: float = 1.0,
+    dx: float = 0.0,
+    dy: float = 0.0,
     box2: Optional[Tuple[int, int, int, int]] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
     """
@@ -526,6 +528,8 @@ def align_and_overlay_images(
         mask2 (np.ndarray): The mask corresponding to img2.
         angle (float, optional): The rotation angle for img1 (default is 0.0).
         ratio (float, optional): The scaling ratio for img1 (default is 1.0).
+        dx (float, otional): the pixel of horizontal move for img1 (default is 0.0).
+        dy (float, otional): the pixel of vertical move for img1 (default is 0.0).
         box2 (Optional[Tuple[int, int, int, int]]): The bounding box for ROI in img2 (left, upper, right, lower) (default is None).
 
     Returns:
@@ -549,6 +553,8 @@ def align_and_overlay_images(
         angle: float,
         x: float,
         y: float,
+        dx: float,
+        dy: float,
         ratio: float,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
         """
@@ -562,6 +568,8 @@ def align_and_overlay_images(
             angle (float): The rotation angle for img1.
             x (float): The x-coordinate of the center point for transformation.
             y (float): The y-coordinate of the center point for transformation.
+            dx (float, otional): the pixel of horizontal move for img1 (default is 0.0).
+            dy (float, otional): the pixel of vertical move for img1 (default is 0.0).
             ratio (float): The scaling ratio for img1.
 
         Returns:
@@ -574,8 +582,8 @@ def align_and_overlay_images(
                 - The Intersection over Union (IoU) value.
         """
         # Rotate and resize img1 and mask1
-        img1 = rotate_resize_image(img1, angle, ratio)
-        mask1 = rotate_resize_image(mask1, angle, ratio)
+        img1 = rotate_resize_image(img1, angle, ratio, dx, dy)
+        mask1 = rotate_resize_image(mask1, angle, ratio, dx, dy)
 
         # Paste img1 onto img2, considering masks
         result_img, img1, img2, mask1, mask2, iou = merge_images(img1, img2, mask1, mask2, x, y)
@@ -586,6 +594,8 @@ def align_and_overlay_images(
         array: np.ndarray,
         angle: float = 0.0,
         scale_ratio: float = 1.0,
+        dx: float = 0.0,
+        dy: float = 0.0,
         use_white_bg: Optional[bool] = False,
     ) -> np.ndarray:
         """
@@ -595,6 +605,8 @@ def align_and_overlay_images(
             array (np.ndarray): The input image.
             angle (float, optional): The rotation angle in degrees (default is 0.0).
             scale_ratio (float, optional): The scaling ratio (default is 1.0).
+            dx (float, optional): The translation along the x-axis (default is 0.0).
+            dy (float, optional): The translation along the y-axis (default is 0.0).
             use_white_bg (bool, optional): Whether to set the excess border to white (default is False).
 
         Returns:
@@ -617,6 +629,13 @@ def align_and_overlay_images(
         rotation_mat[1, 2] += (bound_h - height) / 2
 
         rotated_mat = cv2.warpAffine(array, rotation_mat, (bound_w, bound_h))
+
+        # Apply the final padding (dx and dy)
+        pad_left = max(0, int(dx))
+        pad_right = max(0, -int(dx))
+        pad_top = max(0, int(dy))
+        pad_down = max(0, -int(dy))
+        rotated_mat = cv2.copyMakeBorder(rotated_mat, pad_top, pad_down, pad_left, pad_right, cv2.BORDER_CONSTANT, value=0)
 
         if use_white_bg:
             # Create a white background with the same size
@@ -758,7 +777,7 @@ def align_and_overlay_images(
 
     # rotate & expand img1, and paste to the center of img2
     final_res, final_img1, final_img2, final_mask1, final_mask2, iou = crop_and_paste(
-        resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio
+        resized_img1, resized_mask1, img2, mask2, angle, x, y, dx, dy, ratio
     )
 
     print(f"Merge img1, img2! Mask IoU: {iou}")

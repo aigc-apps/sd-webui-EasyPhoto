@@ -9,6 +9,7 @@ from modules.ui_components import ToolButton as ToolButton_webui
 from scripts.easyphoto_config import (
     DEFAULT_SCENE_LORA,
     DEFAULT_CLOTH_LORA,
+    DEFAULT_TRYON_TEMPLATE,
     cache_log_file_path,
     easyphoto_models_path,
     easyphoto_video_outpath_samples,
@@ -1410,61 +1411,12 @@ def on_ui_tabs():
                 with gr.Blocks():
                     with gr.Row():
                         with gr.Column():
-                            with gr.Accordion("Templtate Image", open=True) as tryon_template_chosen:
+                            with gr.Accordion(
+                                "Templtate Image  (Upload/Click your template image, give mask hint (point/box) in the left or upload in the right)",
+                                open=True,
+                            ):
                                 with gr.Row():
-                                    template_upload_way = gr.Radio(
-                                        ["Template Gallery", "Template Upload"],
-                                        value="Template Gallery",
-                                        show_label=False,
-                                    )
-                                with gr.Row():
-                                    tryon_template_gallery_preview_list = glob.glob(
-                                        os.path.join(
-                                            os.path.join(
-                                                tryon_preview_dir,
-                                                "template",
-                                            ),
-                                            "*.jpg",
-                                        )
-                                    )
-
-                                    tryon_template_gallery_list = [
-                                        (i, i.split("/")[-1].split(".")[0]) for i in tryon_template_gallery_preview_list
-                                    ]
-
-                                    with gr.Column() as template_tryon_gallery:
-
-                                        tryon_template_gallery = gr.Gallery(tryon_template_gallery_list).style(
-                                            columns=[5], rows=[2], object_fit="contain", height="auto"
-                                        )
-
-                                        def tryon_template_select_function(evt: gr.SelectData):
-                                            old_tryon_template_path = tryon_template_gallery_list[evt.index][0]
-                                            tryon_template_id = tryon_template_gallery_list[evt.index][1]
-                                            check_files_exists_and_download(False, tryon_template_id)
-
-                                            # update with high quality image
-                                            new_tryon_template_path = tryon_template_gallery_list[evt.index][0].replace(
-                                                tryon_preview_dir, tryon_gallery_dir
-                                            )
-                                            new_tryon_template_gallery_list = [
-                                                (new_tryon_template_path, y) if x == old_tryon_template_path else (x, y)
-                                                for x, y in tryon_template_gallery_list
-                                            ]
-
-                                            return [
-                                                (new_tryon_template_path, tryon_template_id),
-                                                gr.update(value=new_tryon_template_gallery_list),
-                                            ]
-
-                                        tryon_selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                                        tryon_template_gallery.select(
-                                            tryon_template_select_function,
-                                            inputs=None,
-                                            outputs=[tryon_selected_template_images, tryon_template_gallery],
-                                        )
-
-                                    with gr.Column(visible=False) as template_single_upload:
+                                    with gr.Column(visible=True):
                                         with gr.Row():
                                             with gr.Column():
                                                 template_image_tryon = gr.Image(
@@ -1486,29 +1438,30 @@ def on_ui_tabs():
                                                 )
 
                                             template_mask_preview = ToolButton(value="👀")
+                                        with gr.Row():
+                                            # download template images
+                                            for template_name in DEFAULT_TRYON_TEMPLATE:
+                                                check_files_exists_and_download(False, template_name)
+                                            tryon_template_gallery_preview_list = glob.glob(
+                                                os.path.join(
+                                                    os.path.join(
+                                                        tryon_gallery_dir,
+                                                        "template",
+                                                    ),
+                                                    "*.jpg",
+                                                )
+                                            )
 
-                            def template_upload_way_change(template_upload_way):
-                                if template_upload_way == "Template Gallery":
-                                    return [gr.update(visible=True), gr.update(visible=False), gr.update(label="Templtate Image")]
-                                else:
-                                    return [
-                                        gr.update(visible=False),
-                                        gr.update(visible=True),
-                                        gr.update(
-                                            label="Templtate Image  (Upload your template image, give mask hint (point) in the left or upload in the right)"
-                                        ),
-                                    ]
-
-                            template_upload_way.change(
-                                template_upload_way_change,
-                                template_upload_way,
-                                [template_tryon_gallery, template_single_upload, tryon_template_chosen],
-                            )
+                                            gr.Examples(
+                                                tryon_template_gallery_preview_list,
+                                                inputs=[template_image_tryon],
+                                                label="Template Examples",
+                                            )
 
                             def clean_mask():
                                 return None
 
-                            template_image_tryon.upload(clean_mask, outputs=[template_mask])
+                            template_image_tryon.edit(clean_mask, outputs=[template_mask])
 
                             with gr.Accordion("Reference Image", open=True) as tryon_cloth_chosen:
                                 with gr.Row():
@@ -1615,7 +1568,7 @@ def on_ui_tabs():
                                             interactive=True,
                                         )
 
-                                    main_image.upload(clean_mask, outputs=[reference_mask])
+                                    main_image.edit(clean_mask, outputs=[reference_mask])
 
                             def cloth_upload_way_change(cloth_upload_way):
                                 if cloth_upload_way == "Cloth Gallery":
@@ -1631,7 +1584,7 @@ def on_ui_tabs():
                                         gr.update(visible=False),
                                         gr.update(visible=True),
                                         gr.update(
-                                            label="Reference Image  (Upload your template image, give mask hint (point) in the left or upload in the right)"
+                                            label="Reference Image  (Upload your template image, give mask hint (point/box) in the left or upload in the right)"
                                         ),
                                     ]
 
@@ -1656,10 +1609,7 @@ def on_ui_tabs():
                                 return tabs
 
                             # get tabs
-                            template_img_selected_tab = gr.State(0)
                             ref_image_selected_tab = gr.State(0)
-
-                            template_upload_way.change(generate_tryon_template_tabs, template_upload_way, template_img_selected_tab)
                             cloth_upload_way.change(generate_tryon_reference_tabs, cloth_upload_way, ref_image_selected_tab)
 
                             with gr.Row():
@@ -1750,7 +1700,21 @@ def on_ui_tabs():
                                         step=0.1,
                                         label="Ratio",
                                     )
-
+                                with gr.Row():
+                                    dx = gr.Slider(
+                                        minimum=-1000,
+                                        maximum=1000,
+                                        value=0,
+                                        step=5,
+                                        label="Dx",
+                                    )
+                                    dy = gr.Slider(
+                                        minimum=-1000,
+                                        maximum=1000,
+                                        value=0,
+                                        step=5,
+                                        label="Dy",
+                                    )
                                 with gr.Row():
                                     batch_size = gr.Slider(
                                         minimum=1,
@@ -1761,7 +1725,6 @@ def on_ui_tabs():
                                     )
 
                                 with gr.Row():
-                                    refine_input_mask = gr.Checkbox(label="Refine Input Mask", value=True)
                                     optimize_angle_and_ratio = gr.Checkbox(label="Optimize Angle and Ratio", value=True)
                                     refine_bound = gr.Checkbox(label="Refine Boundary", value=True)
 
@@ -1880,24 +1843,7 @@ def on_ui_tabs():
                                 interactive=False,
                             )
 
-                            def select_tryon_template_upload():
-                                upload_way = "Template Upload"
-                                return [
-                                    upload_way,
-                                    gr.update(visible=False),
-                                    gr.update(visible=True),
-                                ]
-
-                            buttons_photo_infer["tryon"].click(
-                                fn=select_tryon_template_upload,
-                                _js="switch_to_ep_tryon",
-                                inputs=[],
-                                outputs=[
-                                    template_upload_way,
-                                    template_tryon_gallery,
-                                    template_single_upload,
-                                ],
-                            )
+                            buttons_photo_infer["tryon"].click(_js="switch_to_ep_tryon", fn=None)
 
                             def select_single_image_upload():
                                 upload_way = "Single Image Upload"
@@ -1941,7 +1887,6 @@ def on_ui_tabs():
                             sd_model_checkpoint,
                             template_image_tryon,
                             template_mask,
-                            tryon_selected_template_images,
                             selected_cloth_images,
                             main_image,
                             reference_mask,
@@ -1954,11 +1899,11 @@ def on_ui_tabs():
                             angle,
                             azimuth,
                             ratio,
+                            dx,
+                            dy,
                             batch_size,
-                            refine_input_mask,
                             optimize_angle_and_ratio,
                             refine_bound,
-                            template_img_selected_tab,
                             ref_image_selected_tab,
                             cloth_uuid,
                             max_train_steps,
