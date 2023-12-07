@@ -102,10 +102,10 @@ if not launch.is_installed("segment_anything"):
 if not is_installed("diffusers>=0.18.2"):
     print("Installing requirements for easyphoto-webui")
     try:
-        launch.run_pip("install 'diffusers==0.23.0'", "requirements for diffusers")
+        launch.run_pip("install diffusers==0.23.0", "requirements for diffusers")
     except Exception as e:
         print(f"Can't install the diffusers==0.23.0. Error info {e}")
-        launch.run_pip("install 'diffusers==0.18.2'", "requirements for diffusers")
+        launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
 
 if platform.system() != "Windows":
     if not is_installed("nvitop"):
