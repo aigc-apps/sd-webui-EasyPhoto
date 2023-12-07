@@ -55,6 +55,7 @@ def post(encoded_image, user_id=None, url="http://0.0.0.0:7860"):
             "ref_mode_choose": "Infer with Pretrained Lora",
             "ipa_only_weight": 0.60,
             "ipa_only_image": None,
+            "lcm_accelerate": False,
         }
     )
     r = requests.post(f"{url}/easyphoto/easyphoto_infer_forward", data=datas, timeout=1500)
@@ -94,11 +95,12 @@ if __name__ == "__main__":
         encoded_image = requests.get(encoded_image)
         encoded_image = base64.b64encode(BytesIO(encoded_image.content).read()).decode("utf-8")
 
-        outputs = post(encoded_image)
-        outputs = json.loads(outputs)
-        image = decode_image_from_base64jpeg(outputs["outputs"][0])
-        toutput_path = os.path.join(os.path.join(output_path), "tmp.jpg")
-        cv2.imwrite(toutput_path, image)
+        for user_id in tqdm(user_ids):
+            outputs = post(encoded_image, user_id)
+            outputs = json.loads(outputs)
+            image = decode_image_from_base64jpeg(outputs["outputs"][0])
+            toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.jpg")
+            cv2.imwrite(toutput_path, image)
 
     # When selecting a local file as a parameter input.
     else:
@@ -119,7 +121,7 @@ if __name__ == "__main__":
 
                 with open(img_path, "rb") as f:
                     encoded_image = base64.b64encode(f.read()).decode("utf-8")
-                    outputs = post(encoded_image, user_id)
+                    outputs = post(encoded_image, user_id=user_id)
                     outputs = json.loads(outputs)
 
                     if len(outputs["outputs"]):

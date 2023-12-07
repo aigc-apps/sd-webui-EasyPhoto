@@ -16,20 +16,17 @@
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import argparse
 import logging
 import math
 import random
 import shutil
 import time
-from collections import defaultdict
 from glob import glob
 from pathlib import Path
 from shutil import copyfile
 from typing import Dict
 
-import cv2
 import datasets
 import diffusers
 import numpy as np
@@ -37,7 +34,6 @@ import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
-import utils.lora_utils as network_module
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
@@ -51,12 +47,14 @@ from modelscope.pipelines import pipeline as modelscope_pipeline
 from modelscope.utils.constant import Tasks
 from packaging import version
 from PIL import Image
-from skimage import transform
 from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer
-from utils.gpu_info import gpu_monitor_decorator
+
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+import utils.lora_utils as network_module
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
+from utils.gpu_info import gpu_monitor_decorator
 
 torch.backends.cudnn.benchmark = True
 
@@ -67,56 +65,6 @@ if is_wandb_available():
 check_min_version("0.18.0")
 
 logger = get_logger(__name__, log_level="INFO")
-
-
-def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torch.float32):
-    """Merge state_dict in LoRANetwork to the pipeline in diffusers.
-
-    Reference:
-    1. https://github.com/huggingface/diffusers/issues/3064#issuecomment-1512429695.
-    """
-    LORA_PREFIX_UNET = "lora_unet"
-    LORA_PREFIX_TEXT_ENCODER = "lora_te"
-    updates = defaultdict(dict)
-    for key, value in lora_state_dict.items():
-        layer, elem = key.split(".", 1)
-        updates[layer][elem] = value
-    for layer, elems in updates.items():
-        if "text" in layer:
-            layer_infos = layer.split(LORA_PREFIX_TEXT_ENCODER + "_")[-1].split("_")
-            curr_layer = pipeline.text_encoder
-        else:
-            layer_infos = layer.split(LORA_PREFIX_UNET + "_")[-1].split("_")
-            curr_layer = pipeline.unet
-        temp_name = layer_infos.pop(0)
-        while len(layer_infos) > -1:
-            try:
-                curr_layer = curr_layer.__getattr__(temp_name)
-                if len(layer_infos) > 0:
-                    temp_name = layer_infos.pop(0)
-                elif len(layer_infos) == 0:
-                    break
-            except Exception:
-                if len(layer_infos) == 0:
-                    print("Error loading layer")
-                if len(temp_name) > 0:
-                    temp_name += "_" + layer_infos.pop(0)
-                else:
-                    temp_name = layer_infos.pop(0)
-        weight_up = elems["lora_up.weight"].to(dtype)
-        weight_down = elems["lora_down.weight"].to(dtype)
-        if "alpha" in elems.keys():
-            alpha = elems["alpha"].item() / weight_up.shape[1]
-        else:
-            alpha = 1.0
-        curr_layer.weight.data = curr_layer.weight.data.to(device)
-        if len(weight_up.shape) == 4:
-            curr_layer.weight.data += (
-                multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2), weight_down.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
-            )
-        else:
-            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
-    return pipeline
 
 
 def log_validation(
@@ -160,7 +108,7 @@ def log_validation(
     pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
     pipeline.set_progress_bar_config(disable=True)
 
-    merge_lora(pipeline, network.state_dict(), 1, "cuda", torch.float16)
+    network_module.merge_lora(pipeline, network.state_dict(), 1, "cuda", torch.float16)
     generator = torch.Generator(device=accelerator.device)
 
     if args.seed is not None:
@@ -274,39 +222,6 @@ def safe_get_box_mask_keypoints(image, retinaface_result, crop_ratio, face_seg, 
     return retinaface_box, retinaface_keypoints, retinaface_mask_pil
 
 
-def crop_and_paste(Source_image, Source_image_mask, Target_image, Source_Five_Point, Target_Five_Point, Source_box):
-    """
-    Inputs:
-        Source_image            原图像；
-        Source_image_mask       原图像人脸的mask比例；
-        Target_image            目标模板图像；
-        Source_Five_Point       原图像五个人脸关键点；
-        Target_Five_Point       目标图像五个人脸关键点；
-        Source_box              原图像人脸的坐标；
-
-    Outputs:
-        output                  贴脸后的人像
-    """
-    Source_Five_Point = np.reshape(Source_Five_Point, [5, 2]) - np.array(Source_box[:2])
-    Target_Five_Point = np.reshape(Target_Five_Point, [5, 2])
-
-    Crop_Source_image = Source_image.crop(np.int32(Source_box))
-    Crop_Source_image_mask = Source_image_mask.crop(np.int32(Source_box))
-    Source_Five_Point, Target_Five_Point = np.array(Source_Five_Point), np.array(Target_Five_Point)
-
-    tform = transform.SimilarityTransform()
-    # 程序直接估算出转换矩阵M
-    tform.estimate(Source_Five_Point, Target_Five_Point)
-    M = tform.params[0:2, :]
-
-    warped = cv2.warpAffine(np.array(Crop_Source_image), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
-    warped_mask = cv2.warpAffine(np.array(Crop_Source_image_mask), M, np.shape(Target_image)[:2][::-1], borderValue=0.0)
-
-    mask = np.float32(warped_mask == 0)
-    output = mask * np.float32(Target_image) + (1 - mask) * np.float32(warped)
-    return output
-
-
 def call_face_crop(retinaface_detection, image, crop_ratio, prefix="tmp"):
     # retinaface检测部分
     # 检测人脸框
@@ -413,34 +328,6 @@ def eval_jpg_with_faceid(pivot_dir, test_img_dir, top_merge=10):
     tlist = [i[1].split("_")[-2] for i in result_list][:top_merge]
     scores = [i[0] for i in result_list][:top_merge]
     return t_result_list, tlist, scores
-
-
-def merge_from_name_and_index(name, index_list, output_dir="output_dir/"):
-    loras_load_path = [os.path.join(output_dir, f"checkpoint-{i}/pytorch_model.bin") for i in index_list]
-    os.mkdir(os.path.join(output_dir, "ensemble"))
-    lora_save_path = os.path.join(output_dir, "ensemble", f"{name}.bin")
-    for lora_load_path in loras_load_path:
-        assert os.path.exists(lora_load_path) is True
-    merge_different_loras(loras_load_path, lora_save_path)
-    return lora_save_path
-
-
-def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
-    if ratios is None:
-        ratios = [1 / float(len(loras_load_path)) for _ in loras_load_path]
-
-    state_dict = {}
-    for lora_load, ratio in zip(loras_load_path, ratios):
-        weights_sd = torch.load(lora_load, map_location="cpu")
-
-        for key in weights_sd.keys():
-            if key not in state_dict.keys():
-                state_dict[key] = weights_sd[key] * ratio
-            else:
-                state_dict[key] += weights_sd[key] * ratio
-
-        torch.save(state_dict, lora_save_path)
-    return
 
 
 def parse_args():
@@ -899,7 +786,12 @@ def main():
                 logger.warn(
                     "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
                 )
-            unet.enable_xformers_memory_efficient_attention()
+            unet.set_use_memory_efficient_attention(True, False)
+        else:
+            logger.warn("xformers is not available. Make sure it is installed correctly")
+            unet.set_use_memory_efficient_attention(False, True)
+    else:
+        unet.set_use_memory_efficient_attention(False, True)
 
     def compute_snr(timesteps):
         """

@@ -7,6 +7,7 @@ import hashlib
 import math
 import os
 import re
+from collections import defaultdict
 from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Type, Union
 
@@ -285,9 +286,10 @@ class LoRAInfModule(LoRAModule):
         else:
             area = x.size()[1]
 
-        mask = self.network.mask_dic[area]
+        mask = self.network.mask_dic.get(area, None)
         if mask is None:
-            raise ValueError(f"mask is None for resolution {area}")
+            mask_size = (1, x.size()[1]) if len(x.size()) == 2 else (1, *x.size()[1:-1], 1)
+            return torch.ones(mask_size, dtype=x.dtype, device=x.device) / self.network.num_sub_prompts
         if len(x.size()) != 4:
             mask = torch.reshape(mask, (1, -1, 1))
         return mask
@@ -389,10 +391,10 @@ class LoRAInfModule(LoRAModule):
         if has_real_uncond:
             out[-self.network.batch_size :] = x[-self.network.batch_size :]  # real_uncond
 
-        # print("to_out_forward", self.lora_name, self.network.sub_prompt_index, self.network.num_sub_prompts)
-        # for i in range(len(masks)):
-        #     if masks[i] is None:
-        #         masks[i] = torch.zeros_like(masks[-1])
+        # if num_sub_prompts > num of LoRAs, fill with zero
+        for i in range(len(masks)):
+            if masks[i] is None:
+                masks[i] = torch.zeros_like(masks[0])
 
         mask = torch.cat(masks)
         mask_sum = torch.sum(mask, dim=0) + 1e-4
@@ -1260,6 +1262,56 @@ def merge_from_name_and_index(name, index_list, output_dir="output_dir/"):
         assert os.path.exists(lora_load_path) is True
     merge_different_loras(loras_load_path, lora_save_path)
     return lora_save_path
+
+
+def merge_lora(pipeline, lora_state_dict, multiplier=1, device="cpu", dtype=torch.float32):
+    """Merge state_dict in LoRANetwork to the pipeline in diffusers.
+
+    Reference:
+    1. https://github.com/huggingface/diffusers/issues/3064#issuecomment-1512429695.
+    """
+    LORA_PREFIX_UNET = "lora_unet"
+    LORA_PREFIX_TEXT_ENCODER = "lora_te"
+    updates = defaultdict(dict)
+    for key, value in lora_state_dict.items():
+        layer, elem = key.split(".", 1)
+        updates[layer][elem] = value
+    for layer, elems in updates.items():
+        if "text" in layer:
+            layer_infos = layer.split(LORA_PREFIX_TEXT_ENCODER + "_")[-1].split("_")
+            curr_layer = pipeline.text_encoder
+        else:
+            layer_infos = layer.split(LORA_PREFIX_UNET + "_")[-1].split("_")
+            curr_layer = pipeline.unet
+        temp_name = layer_infos.pop(0)
+        while len(layer_infos) > -1:
+            try:
+                curr_layer = curr_layer.__getattr__(temp_name)
+                if len(layer_infos) > 0:
+                    temp_name = layer_infos.pop(0)
+                elif len(layer_infos) == 0:
+                    break
+            except Exception:
+                if len(layer_infos) == 0:
+                    print("Error loading layer")
+                if len(temp_name) > 0:
+                    temp_name += "_" + layer_infos.pop(0)
+                else:
+                    temp_name = layer_infos.pop(0)
+        weight_up = elems["lora_up.weight"].to(dtype)
+        weight_down = elems["lora_down.weight"].to(dtype)
+        if "alpha" in elems.keys():
+            alpha = elems["alpha"].item() / weight_up.shape[1]
+        else:
+            alpha = 1.0
+        curr_layer.weight.data = curr_layer.weight.data.to(device)
+        if len(weight_up.shape) == 4:
+            curr_layer.weight.data += (
+                multiplier * alpha * torch.mm(weight_up.squeeze(3).squeeze(2), weight_down.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+            )
+        else:
+            curr_layer.weight.data += multiplier * alpha * torch.mm(weight_up, weight_down)
+    return pipeline
 
 
 def convert_lora_to_safetensors(in_lora_file: str, out_lora_file: str):

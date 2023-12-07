@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 import sys
+import numpy as np
 from glob import glob
 from shutil import copyfile
 
@@ -22,7 +23,8 @@ from scripts.sdwebui import get_checkpoint_type, unload_sd
 from scripts.train_kohya.utils.lora_utils import convert_lora_to_safetensors
 
 python_executable_path = sys.executable
-check_hash = [True, True]
+# base, portrait, sdxl
+check_hash = {}
 
 
 # Attention! Output of js is str or list, not float or int
@@ -77,8 +79,10 @@ def easyphoto_train_forward(
     if int(rank) < int(network_alpha):
         return "The network alpha {} must not exceed rank {}. " "It will result in an unintended LoRA.".format(network_alpha, rank)
 
-    check_files_exists_and_download(check_hash[0], "base")
-    check_hash[0] = False
+    check_files_exists_and_download(check_hash.get("base", True), "base")
+    check_files_exists_and_download(check_hash.get("portrait", True), "portrait")
+    check_hash["base"] = False
+    check_hash["portrait"] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
@@ -86,8 +90,8 @@ def easyphoto_train_forward(
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
     if sdxl_pipeline_flag:
-        check_files_exists_and_download(check_hash[1], "sdxl")
-        check_hash[1] = False
+        check_files_exists_and_download(check_hash.get("sdxl", True), "sdxl")
+        check_hash["sdxl"] = False
 
     # check if user want to train Scene Lora
     train_scene_lora_bool = True if train_mode_choose == "Train Scene Lora" else False
@@ -201,6 +205,7 @@ def easyphoto_train_forward(
         env["TRANSFORMERS_CACHE"] = sdxl_model_dir
 
     unload_models()
+    random_seed = np.random.randint(1, 1e6)
     if platform.system() == "Windows":
         pwd = os.getcwd()
         dataloader_num_workers = 0  # for solve multi process bug
@@ -226,7 +231,7 @@ def easyphoto_train_forward(
             "--lr_scheduler=constant",
             "--lr_warmup_steps=0",
             "--train_text_encoder",
-            "--seed=42",
+            f"--seed={random_seed}",
             f"--rank={rank}",
             f"--network_alpha={network_alpha}",
             f"--validation_prompt={local_validation_prompt}",
@@ -278,7 +283,7 @@ def easyphoto_train_forward(
                 f"--train_batch_size=1",
                 f"--gradient_accumulation_steps=8",
                 f"--learning_rate=0.0001",
-                "--seed=42",
+                f"--seed={random_seed}",
                 "--use_lora",
                 f"--rank=4",
                 f"--cfg",
@@ -324,7 +329,7 @@ def easyphoto_train_forward(
             "--lr_scheduler=constant",
             "--lr_warmup_steps=0",
             "--train_text_encoder",
-            "--seed=42",
+            f"--seed={random_seed}",
             f"--rank={rank}",
             f"--network_alpha={network_alpha}",
             f"--validation_prompt={local_validation_prompt}",
@@ -376,7 +381,7 @@ def easyphoto_train_forward(
                 f"--train_batch_size=1",
                 f"--gradient_accumulation_steps=8",
                 f"--learning_rate=0.0001",
-                "--seed=42",
+                f"--seed={random_seed}",
                 "--use_lora",
                 f"--rank=4",
                 f"--cfg",

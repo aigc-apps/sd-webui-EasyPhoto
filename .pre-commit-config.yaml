@@ -10,7 +10,7 @@ repos:
     hooks:
       - id: flake8
         exclude: models/|scripts/easyphoto_utils/animatediff/|scripts/easyphoto_utils/animatediff_utils.py
-        args: ["--max-line-length=140", "--ignore=E303,E731,W191,W504,E402,E203,F541,W605,W503,E501,F401", "--exclude=__init__.py"]
+        args: ["--max-line-length=140", "--ignore=E303,E731,W191,W504,E402,E203,F541,W605,W503,E501,E712,F401", "--exclude=__init__.py"]
   - repo: https://github.com/myint/autoflake
     rev: v1.4
     hooks:

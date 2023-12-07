@@ -7,6 +7,7 @@ import traceback
 from contextlib import ContextDecorator
 
 import cv2
+import random
 import numpy as np
 import requests
 import torch
@@ -15,7 +16,7 @@ from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path
+from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -48,14 +49,21 @@ if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_builtin_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
 else:
     controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
+    controlnet_depth_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+
+# tryon gallery path
+tryon_template_gallery_dir = os.path.join(tryon_gallery_dir, "template")
+tryon_cloth_gallery_dir = os.path.join(tryon_gallery_dir, "cloth")
 
 download_urls = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -63,18 +71,21 @@ download_urls = {
         # base model
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ChilloutMix-ni-fp16.safetensors",
         # controlnets
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_canny.pth",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
+        # vaes
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
+    ],
+    "portrait": [
+        # controlnet
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11p_sd15_openpose.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1e_sd15_tile.pth",
         # loras
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/FilmVelvia3.safetensors",
         # controlnet annotator
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/body_pose_model.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/facenet.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/hand_pose_model.pth",
-        # vaes
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/vae-ft-mse-840000-ema-pruned.ckpt",
         # other models
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_skin.pth",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/face_landmarks.pth",
@@ -118,6 +129,13 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
+    ],
+    "add_tryon": [
+        # controlnets
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/dpt_hybrid-midas-501f0c75.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_v11f1p_sd15_depth.pth",
+        # sam
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sam_vit_l_0b3195.pth",
     ],
     # Scene Lora Collection
     "Christmas_1": [
@@ -165,6 +183,50 @@ download_urls = {
     "SchoolUniform_2": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
     ],
+    "lcm": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sdxl.safetensors",
+    ],
+    # Tryon Gallery Collections
+    # template
+    "boy": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/boy.jpg",
+    ],
+    "girl": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/girl.jpg",
+    ],
+    "dress": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/dress.jpg",
+    ],
+    "short": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/template/short.jpg",
+    ],
+    # cloth
+    "demo_white_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/demo_white_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_white/ref_image_mask.jpg",
+    ],
+    "demo_black_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/demo_black_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_black/ref_image_mask.jpg",
+    ],
+    "demo_purple_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/demo_purple_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_purple/ref_image_mask.jpg",
+    ],
+    "demo_dress_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/demo_dress_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_dress/ref_image_mask.jpg",
+    ],
+    "demo_short_200": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/demo_short_200.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image.jpg",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image_mask.jpg",
+    ],
     "sliders": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/smiling_sd1_sliders.pt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/age_sd1_sliders.pt",
@@ -179,20 +241,25 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         # controlnets
         [
-            os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
-            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth"),
-        ],
-        [
             os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
             os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_canny.pth"),
         ],
         [
-            os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
-            os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth"),
-        ],
-        [
             os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),
             os.path.join(controlnet_cache_path, f"models/control_sd15_random_color.pth"),
+        ],
+        # vaes
+        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
+    ],
+    "portrait": [
+        # controlnets
+        [
+            os.path.join(models_path, f"ControlNet/control_v11p_sd15_openpose.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11p_sd15_openpose.pth"),
+        ],
+        [
+            os.path.join(models_path, f"ControlNet/control_v11f1e_sd15_tile.pth"),
+            os.path.join(controlnet_cache_path, f"models/control_v11f1e_sd15_tile.pth"),
         ],
         # loras
         os.path.join(models_path, f"Lora/FilmVelvia3.safetensors"),
@@ -200,8 +267,6 @@ save_filenames = {
         os.path.join(controlnet_annotator_cache_path, f"body_pose_model.pth"),
         os.path.join(controlnet_annotator_cache_path, f"facenet.pth"),
         os.path.join(controlnet_annotator_cache_path, f"hand_pose_model.pth"),
-        # vaes
-        os.path.join(models_path, f"VAE/vae-ft-mse-840000-ema-pruned.ckpt"),
         # other models
         os.path.join(easyphoto_models_path, "face_skin.pth"),
         os.path.join(easyphoto_models_path, "face_landmarks.pth"),
@@ -254,6 +319,11 @@ save_filenames = {
         os.path.join(easyphoto_models_path, "mm_sd_v15_v2.ckpt"),
         os.path.join(easyphoto_models_path, "flownet.pkl"),
     ],
+    "add_tryon": [
+        os.path.join(controlnet_depth_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
+        os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
+        os.path.join(easyphoto_models_path, "sam_vit_l_0b3195.pth"),
+    ],
     # Scene Lora Collection
     "Christmas_1": [
         os.path.join(models_path, f"Lora/Christmas_1.safetensors"),
@@ -299,6 +369,42 @@ save_filenames = {
     ],
     "SchoolUniform_2": [
         os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
+    ],
+    "lcm": [
+        os.path.join(models_path, f"Lora/lcm_lora_sd15.safetensors"),
+        os.path.join(models_path, f"Lora/lcm_lora_sdxl.safetensors"),
+    ],
+    # Tryon Gallery Collections
+    # template
+    "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg")],
+    "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg")],
+    "dress": [os.path.join(tryon_template_gallery_dir, "dress.jpg")],
+    "short": [os.path.join(tryon_template_gallery_dir, "short.jpg")],
+    # cloth
+    "demo_white_200": [
+        os.path.join(models_path, f"Lora/demo_white_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_white_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_white_200_mask.jpg"),
+    ],
+    "demo_black_200": [
+        os.path.join(models_path, f"Lora/demo_black_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_black_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_black_200_mask.jpg"),
+    ],
+    "demo_purple_200": [
+        os.path.join(models_path, f"Lora/demo_purple_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_purple_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_purple_200_mask.jpg"),
+    ],
+    "demo_dress_200": [
+        os.path.join(models_path, f"Lora/demo_dress_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_dress_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_dress_200_mask.jpg"),
+    ],
+    "demo_short_200": [
+        os.path.join(models_path, f"Lora/demo_short_200.safetensors"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_short_200.jpg"),
+        os.path.join(tryon_cloth_gallery_dir, "demo_short_200_mask.jpg"),
     ],
     # Sliders
     "sliders": [
@@ -597,6 +703,16 @@ def unload_models():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+
+
+def seed_everything(seed=11):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def get_controlnet_version() -> str:
