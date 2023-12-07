@@ -92,9 +92,16 @@ if not launch.is_installed("invisible-watermark"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install invisible-watermark", "requirements for invisible-watermark")
 
+# Tryon requires the shapely and segment-anything library.
 if not launch.is_installed("shapely"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install shapely", "requirements for shapely")
+
+if not launch.is_installed("segment_anything"):
+    try:
+        launch.run_pip("install segment-anything", "requirements for segment_anything")
+    except Exception:
+        print("Can't install segment-anything. Please follow the readme to install manually")
 
 if platform.system() != "Windows":
     if not is_installed("nvitop"):
