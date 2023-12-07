@@ -70,10 +70,6 @@ if not is_installed("modelscope==1.9.3"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install modelscope==1.9.3", "requirements for modelscope")
 
-if not is_installed("diffusers>=0.18.2"):
-    print("Installing requirements for easyphoto-webui")
-    launch.run_pip("install 'diffusers<=0.23.0'", "requirements for diffusers")
-
 if not is_installed("einops"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install einops", "requirements for diffusers")
@@ -102,6 +98,14 @@ if not launch.is_installed("segment_anything"):
         launch.run_pip("install segment-anything", "requirements for segment_anything")
     except Exception:
         print("Can't install segment-anything. Please follow the readme to install manually")
+
+if not is_installed("diffusers>=0.18.2"):
+    print("Installing requirements for easyphoto-webui")
+    try:
+        launch.run_pip("install 'diffusers<=0.23.0'", "requirements for diffusers")
+    except Exception as e:
+        print(f"Can't install the diffusers==0.23.0. Error info {e}")
+        launch.run_pip("install 'diffusers==0.18.2'", "requirements for diffusers")
 
 if platform.system() != "Windows":
     if not is_installed("nvitop"):
