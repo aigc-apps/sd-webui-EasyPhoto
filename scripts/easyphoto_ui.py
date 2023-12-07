@@ -793,12 +793,14 @@ def on_ui_tabs():
                                         if lcm_accelerate:
                                             return (
                                                 gr.update(value=12, minimum=4, maximum=20),
+                                                gr.update(value=0.50),
                                                 gr.update(value=8, minimum=4, maximum=20),
                                                 gr.update(value=0.60),
                                                 gr.update(value=0.60),
                                             )
                                         return (
                                             gr.update(value=50, minimum=15, maximum=50),
+                                            gr.update(value=0.45),
                                             gr.update(value=20, minimum=15, maximum=50),
                                             gr.update(value=0.50),
                                             gr.update(value=0.50),
@@ -809,6 +811,7 @@ def on_ui_tabs():
                                         inputs=[lcm_accelerate],
                                         outputs=[
                                             first_diffusion_steps,
+                                            first_denoising_strength,
                                             second_diffusion_steps,
                                             before_face_fusion_ratio,
                                             after_face_fusion_ratio,
