@@ -182,6 +182,10 @@ download_urls = {
     "SchoolUniform_2": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
     ],
+    "lcm": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sdxl.safetensors",
+    ],
     # Tryon Gallery Collections
     # template
     "boy": [
@@ -358,6 +362,10 @@ save_filenames = {
     ],
     "SchoolUniform_2": [
         os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
+    ],
+    "lcm": [
+        os.path.join(models_path, f"Lora/lcm_lora_sd15.safetensors"),
+        os.path.join(models_path, f"Lora/lcm_lora_sdxl.safetensors"),
     ],
     # Tryon Gallery Collections
     # template

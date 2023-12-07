@@ -48,7 +48,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         for instance_image in instance_images:
             hash_value = hashlib.md5(instance_image.tobytes()).hexdigest()
             save_path = os.path.join("/tmp", hash_value + ".jpg")
-            instance_image = instance_image.convert('RGB')
+            instance_image = instance_image.convert("RGB")
             instance_image.save(save_path)
             _instance_images.append({"name": save_path})
         instance_images = _instance_images
@@ -141,6 +141,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         ipa_only_weight = datas.get("ipa_only_weight", 0.60)
         ipa_only_image = datas.get("ipa_only_image", None)
 
+        lcm_accelerate = datas.get("lcm_accelerate", None)
+
         if type(user_ids) == str:
             user_ids = [user_ids]
 
@@ -226,6 +228,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 ref_mode_choose,
                 ipa_only_weight,
                 ipa_only_image_path,
+                lcm_accelerate,
                 *user_ids,
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]

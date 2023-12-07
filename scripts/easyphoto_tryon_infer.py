@@ -49,7 +49,7 @@ from scripts.sdwebui import get_checkpoint_type, reload_sd_model_vae, switch_sd_
 
 python_executable_path = sys.executable
 # base portrait sdxl add_text2image add_ipa_base add_ipa_sdxl add_video add_tryon
-check_hash = [True, True, True, True, True, True, True, True]
+check_hash = {}
 sam_predictor = None
 
 
@@ -83,10 +83,10 @@ def easyphoto_tryon_infer_forward(
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
 
-    check_files_exists_and_download(check_hash[0], "base")
-    check_files_exists_and_download(check_hash[7], "add_tryon")
-    check_hash[0] = False
-    check_hash[7] = False
+    check_files_exists_and_download(check_hash.get("base", True), "base")
+    check_files_exists_and_download(check_hash.get("add_tryon", True), "add_tryon")
+    check_hash["base"] = False
+    check_hash["add_tryon"] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2 or checkpoint_type == 3:

@@ -786,7 +786,34 @@ def on_ui_tabs():
                                         inputs=[ref_mode_choose],
                                         outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row],
                                     )
+                                with gr.Row():
+                                    lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
 
+                                    def lcm_change(lcm_accelerate):
+                                        if lcm_accelerate:
+                                            return (
+                                                gr.update(value=12, minimum=4, maximum=20),
+                                                gr.update(value=8, minimum=4, maximum=20),
+                                                gr.update(value=0.60),
+                                                gr.update(value=0.60),
+                                            )
+                                        return (
+                                            gr.update(value=50, minimum=15, maximum=50),
+                                            gr.update(value=20, minimum=15, maximum=50),
+                                            gr.update(value=0.50),
+                                            gr.update(value=0.50),
+                                        )
+
+                                    lcm_accelerate.change(
+                                        lcm_change,
+                                        inputs=[lcm_accelerate],
+                                        outputs=[
+                                            first_diffusion_steps,
+                                            second_diffusion_steps,
+                                            before_face_fusion_ratio,
+                                            after_face_fusion_ratio,
+                                        ],
+                                    )
                                 with gr.Row():
                                     super_resolution_method = gr.Dropdown(
                                         value="gpen",
@@ -963,6 +990,7 @@ def on_ui_tabs():
                             ref_mode_choose,
                             ipa_only_weight,
                             ipa_only_image_path,
+                            lcm_accelerate,
                             *uuids,
                         ],
                         outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
