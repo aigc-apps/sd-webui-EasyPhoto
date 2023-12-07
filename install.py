@@ -70,9 +70,13 @@ if not is_installed("modelscope==1.9.3"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install modelscope==1.9.3", "requirements for modelscope")
 
-if not is_installed("diffusers==0.18.2"):
+if not is_installed("diffusers>=0.18.2"):
     print("Installing requirements for easyphoto-webui")
-    launch.run_pip("install diffusers==0.18.2", "requirements for diffusers")
+    launch.run_pip("install 'diffusers<=0.23.0'", "requirements for diffusers")
+
+if not is_installed("einops"):
+    print("Installing requirements for easyphoto-webui")
+    launch.run_pip("install einops", "requirements for diffusers")
 
 if not is_installed("imageio>=2.29.0"):
     print("Installing requirements for easyphoto-webui")
@@ -87,6 +91,17 @@ if not is_installed("fsspec==2023.9.2"):
 if not launch.is_installed("invisible-watermark"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install invisible-watermark", "requirements for invisible-watermark")
+
+# Tryon requires the shapely and segment-anything library.
+if not launch.is_installed("shapely"):
+    print("Installing requirements for easyphoto-webui")
+    launch.run_pip("install shapely", "requirements for shapely")
+
+if not launch.is_installed("segment_anything"):
+    try:
+        launch.run_pip("install segment-anything", "requirements for segment_anything")
+    except Exception:
+        print("Can't install segment-anything. Please follow the readme to install manually")
 
 if platform.system() != "Windows":
     if not is_installed("nvitop"):

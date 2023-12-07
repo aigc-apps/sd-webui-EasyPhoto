@@ -31,10 +31,10 @@ from transformers import CLIPTokenizer
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import ddpo_pytorch.prompts
 import ddpo_pytorch.rewards
+import utils.lora_utils as network_module
 from ddpo_pytorch.diffusers_patch.ddim_with_logprob import ddim_step_with_logprob
 from ddpo_pytorch.diffusers_patch.pipeline_with_logprob import pipeline_with_logprob
 from ddpo_pytorch.stat_tracking import PerPromptStatTracker
-from train_lora import merge_lora
 from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 
 
@@ -387,7 +387,7 @@ def main():
         feature_extractor=None,
     )
     face_lora_state_dict = load_file(args.face_lora_path, device="cpu")
-    merge_lora(pipeline, face_lora_state_dict)
+    network_module.merge_lora(pipeline, face_lora_state_dict)
 
     # freeze parameters of models to save more memory
     pipeline.vae.requires_grad_(False)

@@ -1,5 +1,4 @@
 import os
-
 from modules.paths import data_path, models_path
 
 # save_dirs
@@ -11,12 +10,18 @@ easyphoto_txt2img_samples = os.path.join(data_dir, "outputs/txt2img-images")
 easyphoto_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-outputs")
 easyphoto_video_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-video-outputs")
 user_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-user-id-infos")
+cloth_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-cloth-id-infos")
 scene_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-scene-id-infos")
 cache_log_file_path = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_log.txt")
+
+# gallery_dir
+tryon_preview_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "tryon")
+tryon_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
 
 # prompts
 validation_prompt = "easyphoto_face, easyphoto, 1person"
 validation_prompt_scene = "special_scene, scene"
+validation_tryon_prompt = "easyphoto, 1thing"
 DEFAULT_POSITIVE = "(cloth:1.5), (best quality), (realistic, photo-realistic:1.3), (beautiful eyes:1.3), (sparkling eyes:1.3), (beautiful mouth:1.3), finely detail, light smile, extremely detailed CG unity 8k wallpaper, huge filesize, best quality, realistic, photo-realistic, ultra high res, raw photo, put on makeup"
 DEFAULT_NEGATIVE = "(bags under the eyes:1.5), (bags under eyes:1.5), (earrings:1.3), (glasses:1.2), (naked:1.5), (nsfw:1.5), nude, breasts, penis, cum, (over red lips: 1.3), (bad lips: 1.3), (bad ears:1.3), (bad hair: 1.3), (bad teeth: 1.3), (worst quality:2), (low quality:2), (normal quality:2), lowres, watermark, badhand, lowres, bad anatomy, bad hands, normal quality, mural,"
 DEFAULT_POSITIVE_AD = "(cowbody shot, realistic, photorealistic), (masterpiece, best quality, high quality), (colorful), (delicate eyes and face), volumatic light, ray tracing"
@@ -42,5 +47,12 @@ DEFAULT_SCENE_LORA = [
     "SchoolUniform_1",
     "SchoolUniform_2",
 ]
+
+# tryon template
+DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
+
+# cloth lora
+DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "demo_dress_200", "demo_short_200"]
+
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"
