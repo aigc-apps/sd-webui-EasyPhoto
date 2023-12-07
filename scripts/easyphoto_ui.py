@@ -20,12 +20,17 @@ from scripts.easyphoto_utils import (
     check_files_exists_and_download,
     check_id_valid,
     check_scene_valid,
-    video_visible,
-    check_attribute_edit_valid,
-    LoraCtlScript
+    check_loractl_conflict,
+    ep_logger,
+    get_attribute_edit_ids,
+    video_visible
 )
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
+if not check_loractl_conflict():
+    from scripts.easyphoto_utils import LoraCtlScript
+else:
+    ep_logger.info("Import LoraCtlScript from sd-webui-loractl since the plugin already exists and is enabled.")
 
 gradio_compat = True
 
@@ -699,31 +704,29 @@ def on_ui_tabs():
                                 value=-1,
                             )
                             with gr.Row():
-                                def attribute_edit_refresh_function():
-                                    attribute_edit_ids = []
-                                    for lora_name in os.listdir(os.path.join(models_path, "Lora")):
-                                        if check_attribute_edit_valid(lora_name):
-                                            attribute_edit_ids.append(os.path.splitext(lora_name)[0])
-                                    return gr.update(choices=["none"] + attribute_edit_ids)
-                                
-                                attribute_edit_ids = []
-                                for lora_name in os.listdir(os.path.join(models_path, "Lora")):
-                                    if check_attribute_edit_valid(lora_name):
-                                        attribute_edit_ids.append(os.path.splitext(lora_name)[0])
-                                attribute_edit_ids = sorted(attribute_edit_ids)
-
                                 attribute_edit_id = gr.Dropdown(
                                     value="none",
                                     elem_id="dropdown",
-                                    choices=["none"] + attribute_edit_ids,
+                                    choices=["none"] + get_attribute_edit_ids(),
                                     label="Attribute Edit Sliders"
                                 )
                                 attribute_edit_id_refresh = ToolButton(value="\U0001f504")
-                                attribute_edit_id_ratio = gr.Slider(
-                                    minimum=-3.00, maximum=3.00, value=2.00, step=0.10, label="Attribute Edit Ratio"
-                                )
                                 attribute_edit_id_refresh.click(
-                                    fn=attribute_edit_refresh_function, inputs=[], outputs=[attribute_edit_id]
+                                    fn=lambda: gr.update(choices=["none"] + get_attribute_edit_ids()),
+                                    inputs=[],
+                                    outputs=[attribute_edit_id]
+                                )
+                                attribute_edit_id.select(
+                                    fn=lambda additional_prompt, attribute_edit_id: gr.update(
+                                        value=additional_prompt + f" <lora:{attribute_edit_id}:0@0, 0@0.2, 2@0.2, 2@1>"
+                                    ),
+                                    inputs=[additional_prompt, attribute_edit_id],
+                                    outputs=[additional_prompt]
+                                )
+                            with gr.Row():
+                                attribute_edit_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit"
+                                _ = gr.Markdown(
+                                    value="**Please check the [[wiki]]({}) before using attribute edit**.".format(attribute_edit_wiki_url)
                                 )
 
                             with gr.Row():
@@ -963,8 +966,6 @@ def on_ui_tabs():
                         ref_mode_choose,
                         ipa_only_weight,
                         ipa_only_image_path,
-                        attribute_edit_id,
-                        attribute_edit_id_ratio,
                         *uuids,
                     ],
                     outputs=[infer_progress, output_images, face_id_outputs],

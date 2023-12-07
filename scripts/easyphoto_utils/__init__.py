@@ -38,8 +38,8 @@ try:
         modelscope_models_to_gpu,
         switch_ms_model_cpu,
         unload_models,
-        check_attribute_edit_valid,
+        get_attribute_edit_ids
     )
-    from .loractl_utils import LoraCtlScript
+    from .loractl_utils import check_loractl_conflict, LoraCtlScript
 except Exception as e:
     print(f"The file include sdwebui modules will be not include when preprocess.")

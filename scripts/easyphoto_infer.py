@@ -392,8 +392,6 @@ def easyphoto_infer_forward(
     ref_mode_choose,
     ipa_only_weight,
     ipa_only_image_path,
-    attribute_edit_id,
-    attribute_edit_ratio,
     *user_ids,
 ):
     # global
@@ -771,10 +769,6 @@ def easyphoto_infer_forward(
             if sdxl_pipeline_flag:
                 input_prompt = f"{validation_prompt}, <lora:{user_id}>, " + additional_prompt
 
-            # Add the slider lora when using the attribute edit.
-            if attribute_edit_id != "none":
-                input_prompt += f", <lora:{attribute_edit_id}:0@0, 0@0.2, {attribute_edit_ratio}@0.2, {attribute_edit_ratio}@1>"
-
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
             # get roop image
@@ -861,8 +855,6 @@ def easyphoto_infer_forward(
             ref_mode_choose                         : {str(ref_mode_choose)}
             ipa_only_weight                         : {str(ipa_only_weight)}
             ipa_only_image_path                     : {str(ipa_only_image_path)}
-            attribute_edit_id                       : {str(attribute_edit_id)}
-            attribute_edit_ratio                    : {str(attribute_edit_ratio)}
         """
         ep_logger.info(template_idx_info)
         try:

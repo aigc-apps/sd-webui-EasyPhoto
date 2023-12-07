@@ -11,25 +11,33 @@ import modules.scripts as scripts
 from scripts.easyphoto_config import data_path
 
 
-Lora_extensions_path = os.path.join(data_path, "extensions", "Lora")
-Lora_extensions_builtin_path = os.path.join(data_path, "extensions-builtin", "Lora")
+# TODO: refactor the plugin dependency.
+lora_extensions_path = os.path.join(data_path, "extensions", "Lora")
+lora_extensions_builtin_path = os.path.join(data_path, "extensions-builtin", "Lora")
 
-if os.path.exists(Lora_extensions_path):
-    lora_path = Lora_extensions_path
-elif os.path.exists(Lora_extensions_builtin_path):
-    lora_path = Lora_extensions_builtin_path
+if os.path.exists(lora_extensions_path):
+    lora_path = lora_extensions_path
+elif os.path.exists(lora_extensions_builtin_path):
+    lora_path = lora_extensions_builtin_path
 else:
-    lora_path = None
-
-if lora_path is not None:
-    sys.path.insert(0, lora_path)
-    import extra_networks_lora
-    import network
-    sys.path.remove(lora_path)
+    raise ImportError("Lora extension is not found.")
+sys.path.insert(0, lora_path)
+import extra_networks_lora
+import network
+sys.path.remove(lora_path)
 
 lora_weights = {}
 hire_fix_flag = False
 loractl_active = True if lora_path is not None else False
+
+
+def check_loractl_conflict():
+    loractl_extensions_path = os.path.join(data_path, "extensions", "sd-webui-loractl")
+    if os.path.exists(loractl_extensions_path):
+        disabled_extensions = shared.opts.data.get("disabled_extensions", [])
+        if "sd-webui-loractl" not in disabled_extensions:
+            return True
+    return False
 
 
 def reset_lora_weights():
@@ -199,10 +207,6 @@ class LoraCtlScript(scripts.Script):
         return scripts.AlwaysVisible
 
 
-    def ui(self, is_img2img):
-        return []
-
-
     def process(self, p: StableDiffusionProcessing, **kwargs):
         if type(extra_networks.extra_network_registry["lora"]) != LoraCtlNetwork:
             self.original_network = extra_networks.extra_network_registry["lora"]
@@ -211,9 +215,9 @@ class LoraCtlScript(scripts.Script):
             extra_networks.register_extra_network_alias(network, "loractl")
 
         apply()
+        set_hire_fix(False)
         set_active(True)
         reset_lora_weights()
-        set_hire_fix(False)
 
 
     def before_hr(self, p, *args):
