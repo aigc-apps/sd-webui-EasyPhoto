@@ -574,7 +574,7 @@ def easyphoto_infer_forward(
             ep_logger.warning("Display score is forced to be true when IP-Adapter Control is enabled.")
 
     if lcm_accelerate:
-        lcm_lora_name_and_weight = "lcm_lora_sdxl:0.25" if sdxl_pipeline_flag else "lcm_lora_sd15:0.60"
+        lcm_lora_name_and_weight = "lcm_lora_sdxl:0.40" if sdxl_pipeline_flag else "lcm_lora_sd15:0.80"
 
     # get random seed
     if int(seed) == -1:
@@ -596,7 +596,6 @@ def easyphoto_infer_forward(
             else:
                 prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
 
-            prompt_generate_sd_model_checkpoint_flag = True if checkpoint_type == 3 else False
             if prompt_generate_sd_model_checkpoint_type == 3 and scene_id != "none":
                 return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
             ep_logger.info("Template images will be generated when you use text2photo")
@@ -739,7 +738,7 @@ def easyphoto_infer_forward(
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                 seed=seed,
-                sampler="Euler a" if not prompt_generate_sd_model_checkpoint_flag else "DPM++ 2M SDE Karras",
+                sampler="Euler a",
             )
             ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
             template_images = inpaint(
@@ -754,7 +753,7 @@ def easyphoto_infer_forward(
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                 seed=seed,
-                sampler="Euler a" if not prompt_generate_sd_model_checkpoint_flag else "DPM++ 2M SDE Karras",
+                sampler="Euler a",
             )
             template_images = [np.uint8(template_images)]
         else:
@@ -772,7 +771,7 @@ def easyphoto_infer_forward(
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                 seed=seed,
-                sampler="Euler a" if not prompt_generate_sd_model_checkpoint_flag else "DPM++ 2M SDE Karras",
+                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
             )
             template_images = [np.uint8(template_images)]
 
@@ -1210,7 +1209,7 @@ def easyphoto_infer_forward(
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras",
+                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
                 else:
                     if not sdxl_pipeline_flag:
@@ -1231,7 +1230,7 @@ def easyphoto_infer_forward(
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras",
+                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
 
                     # detect face area
@@ -1364,7 +1363,7 @@ def easyphoto_infer_forward(
                     denoising_strength=second_denoising_strength,
                     hr_scale=default_hr_scale,
                     seed=seed,
-                    sampler="DPM++ 2M SDE Karras",
+                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 )
 
                 # use original template face area to shift generated face color at last
@@ -1562,7 +1561,7 @@ def easyphoto_infer_forward(
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=seed,
-                            sampler="DPM++ 2M SDE Karras",
+                            sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
 
                         # Paste the image back to the background
@@ -1595,7 +1594,7 @@ def easyphoto_infer_forward(
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=seed,
-                            sampler="DPM++ 2M SDE Karras",
+                            sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
 
             except Exception as e:
