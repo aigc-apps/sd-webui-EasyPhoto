@@ -515,6 +515,11 @@ def easyphoto_infer_forward(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
                 return error_info, [], []
+    
+    if "sliders" in additional_prompt:
+        # download all sliders here.
+        check_files_exists_and_download(check_hash.get("sliders", True), download_mode="sliders")
+        check_hash["sliders"] = False
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -841,7 +846,7 @@ def easyphoto_infer_forward(
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
-                input_prompt += "<lora:ddpo_{}>".format(user_id)
+                input_prompt += "<lora:ddpo_{}>, ".format(user_id)
 
             # TODO: face_id_image_path may have to be picked with pitch yaw angle in video mode.
             if sdxl_pipeline_flag:
