@@ -161,7 +161,6 @@ def draw_box_on_image(image: np.ndarray, box: tuple, det_path: str):
 
 def prepare_tryon_train_data(reference_image, reference_mask, ref_image_path, images_save_path, json_save_path, validation_prompt):
     # crop
-    print(reference_mask.shape)
     _, mask_box = mask_to_box(reference_mask)
 
     # crop to get local img
@@ -475,8 +474,6 @@ def find_best_angle_ratio(
 
             iou = poly1.intersection(poly2).area / poly1.union(poly2).area
             in_iou = poly1.intersection(poly2).area / poly2.area
-
-        print(f"iou: {iou}, in_iou: {in_iou}, angle:{angle}, ratio:{ratio}")
 
         return iou, in_iou
 

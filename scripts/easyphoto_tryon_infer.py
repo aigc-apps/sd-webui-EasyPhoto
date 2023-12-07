@@ -644,7 +644,10 @@ def easyphoto_tryon_infer_forward(
 
 
 def easyphoto_tryon_mask_forward(input_image, img_type):
-    global sam_predictor
+    global check_hash, sam_predictor
+
+    check_files_exists_and_download(check_hash.get("add_tryon", True), "add_tryon")
+    check_hash["add_tryon"] = False
 
     if input_image is None:
         info = f"Please upload a {img_type} image."
@@ -669,6 +672,7 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
             os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
             "sam_vit_l_0b3195.pth",
         )
+
         sam = sam_model_registry["vit_l"]()
         sam.load_state_dict(torch.load(sam_checkpoint))
         sam_predictor = SamPredictor(sam.cuda())
