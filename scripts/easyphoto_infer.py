@@ -332,6 +332,7 @@ def inpaint(
     animatediff_fps=0,
     animatediff_reserve_scale=1,
     animatediff_last_image=None,
+    loractl_flag=False,
 ):
     assert input_image is not None, f"input_image must not be none"
     controlnet_units_list = []
@@ -387,6 +388,7 @@ def inpaint(
         animatediff_fps=animatediff_fps,
         animatediff_reserve_scale=animatediff_reserve_scale,
         animatediff_last_image=animatediff_last_image,
+        loractl_flag=loractl_flag
     )
 
     return image
@@ -516,10 +518,12 @@ def easyphoto_infer_forward(
                 )
                 return error_info, [], []
     
+    loractl_flag = False
     if "sliders" in additional_prompt:
         # download all sliders here.
         check_files_exists_and_download(check_hash.get("sliders", True), download_mode="sliders")
         check_hash["sliders"] = False
+        loractl_flag = True
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -1216,7 +1220,11 @@ def easyphoto_infer_forward(
                         hr_scale=1.0,
                         seed=seed,
                         sampler="DPM++ 2M SDE Karras",
+                        loractl_flag=loractl_flag,
                     )
+                    # We only save the lora weight image in the first diffusion.
+                    if loractl_flag:
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
                 else:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
@@ -1237,7 +1245,11 @@ def easyphoto_infer_forward(
                         hr_scale=1.0,
                         seed=seed,
                         sampler="DPM++ 2M SDE Karras",
+                        loractl_flag=loractl_flag,
                     )
+                    # We only save the lora weight image in the first diffusion.
+                    if loractl_flag:
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
 
                     # detect face area
                     face_skin_mask = face_skin(
@@ -1638,6 +1650,8 @@ def easyphoto_infer_forward(
                 output_image = template_image
 
             outputs.append(output_image)
+            if loractl_flag:
+                outputs.append(lora_weight_image)
             save_image(
                 output_image,
                 easyphoto_outpath_samples,

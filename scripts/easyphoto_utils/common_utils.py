@@ -716,7 +716,7 @@ def seed_everything(seed=11):
 
 
 def get_controlnet_version() -> str:
-    """Adapte from sd-webui-controlnet/patch_version.py."""
+    """Borrowed from sd-webui-controlnet/patch_version.py."""
     version_file = "scripts/controlnet_version.py"
     version_file_path = os.path.join(controlnet_extensions_path, version_file)
     if not os.path.exists(version_file_path):

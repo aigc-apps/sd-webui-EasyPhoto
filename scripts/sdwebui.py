@@ -64,6 +64,19 @@ class switch_sd_model_vae(ContextDecorator):
         sd_vae.reload_vae_weights()
 
 
+class switch_return_opt(ContextDecorator):
+    """Context-manager that supports switch `return_mask` and `return_mask_composite`."""
+
+    def __enter__(self):
+        self.origin_return_mask = shared.opts.return_mask
+        self.origin_return_mask_composite = shared.opts.return_mask_composite
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        shared.opts.return_mask = self.origin_return_mask
+        shared.opts.return_mask_composite = self.origin_return_mask_composite
+
+
 class ControlMode(Enum):
     """
     The improved guess mode.
@@ -472,6 +485,7 @@ def t2i_call(
     return gen_image
 
 
+@switch_return_opt()
 def i2i_inpaint_call(
     images=[],
     resize_mode=0,
@@ -521,6 +535,7 @@ def i2i_inpaint_call(
     animatediff_fps=0,
     animatediff_reserve_scale=1,
     animatediff_last_image=None,
+    loractl_flag=False
 ):
     """
     Perform image-to-image inpainting.
@@ -582,6 +597,10 @@ def i2i_inpaint_call(
         sampler = "Euler a"
     if steps is None:
         steps = 20
+    
+    # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
+    opts.return_mask = False
+    opts.return_mask_composite = False
 
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
@@ -640,7 +659,7 @@ def i2i_inpaint_call(
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
         animate_diff_process = None
-
+    
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
@@ -649,6 +668,10 @@ def i2i_inpaint_call(
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.name == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+            if "dynamic lora weights" in alwayson_scripts.name:
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
@@ -656,8 +679,15 @@ def i2i_inpaint_call(
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.title().lower() == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-
+            if "dynamic lora weights" in alwayson_scripts.title().lower():
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
+    
+    # TODO: refactor.
     processed = processing.process_images(p_img2img)
+    if loractl_flag:
+        return (processed.images[0], processed.images[1])
     if animatediff_flag:
         opts.return_mask = before_opts
 
