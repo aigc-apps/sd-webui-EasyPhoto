@@ -96,7 +96,7 @@ def easyphoto_tryon_infer_forward(
 
     cloth_gallery_dir = os.path.join(tryon_gallery_dir, "cloth")
     gallery_lists = glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob(os.path.join(cloth_gallery_dir, "*.png"))
-    user_ids = [i.split("/")[-1].split(".")[0] for i in gallery_lists]
+    user_ids = [os.path.basename(i).split(".")[0] for i in gallery_lists]
     ep_logger.info(f"user_ids: {user_ids}")
 
     # Template Input
@@ -120,7 +120,7 @@ def easyphoto_tryon_infer_forward(
         # choose from template
         try:
             input_ref_img_path = eval(selected_cloth_images)[0]
-            cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
+            cloth_uuid = os.path.basename(input_ref_img_path).split(".")[0]
 
             # clean previous reference mask result
             reference_mask = None
