@@ -440,6 +440,8 @@ def t2i_call(
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
                 continue
+            if alwayson_scripts.name == "seed":
+                p_txt2img.script_args[alwayson_scripts.args_from] = int(seed)
             if alwayson_scripts.name == "controlnet":
                 p_txt2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.name == "animatediff_easyphoto" and animate_diff_process is not None:
@@ -447,11 +449,13 @@ def t2i_call(
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
+            if alwayson_scripts.title().lower() == "seed":
+                p_txt2img.script_args[alwayson_scripts.args_from] = int(seed)
             if alwayson_scripts.title().lower() == "controlnet":
                 p_txt2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.title().lower() == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-    p_txt2img.seed = int(seed)
+    # p_txt2img.seed = int(seed)
     processed = processing.process_images(p_txt2img)
     if animatediff_flag:
         opts.return_mask = before_opts
@@ -645,6 +649,8 @@ def i2i_inpaint_call(
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
                 continue
+            if alwayson_scripts.name == "seed":
+                p_img2img.script_args[alwayson_scripts.args_from] = int(seed)
             if alwayson_scripts.name == "controlnet":
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.name == "animatediff_easyphoto" and animate_diff_process is not None:
@@ -652,11 +658,13 @@ def i2i_inpaint_call(
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
+            if alwayson_scripts.title().lower() == "seed":
+                p_img2img.script_args[alwayson_scripts.args_from] = int(seed)
             if alwayson_scripts.title().lower() == "controlnet":
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.title().lower() == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
-    p_img2img.seed = int(seed)
+    # p_img2img.seed = int(seed)
     processed = processing.process_images(p_img2img)
     if animatediff_flag:
         opts.return_mask = before_opts
