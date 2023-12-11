@@ -10,6 +10,7 @@ from scripts.easyphoto_config import (
     DEFAULT_SCENE_LORA,
     DEFAULT_CLOTH_LORA,
     DEFAULT_TRYON_TEMPLATE,
+    DEFAULT_SLIDERS,
     cache_log_file_path,
     easyphoto_models_path,
     easyphoto_video_outpath_samples,
@@ -725,7 +726,7 @@ def on_ui_tabs():
 
                                 with gr.Row():
                                     attribute_edit_id = gr.Dropdown(
-                                        value="none",
+                                        value="none" + DEFAULT_SLIDERS,
                                         elem_id="dropdown",
                                         choices=["none"] + get_attribute_edit_ids(),
                                         label="Attribute Edit Sliders"

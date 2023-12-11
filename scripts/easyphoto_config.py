@@ -54,5 +54,8 @@ DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
 # cloth lora
 DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "demo_dress_200", "demo_short_200"]
 
+# sliders
+DEFAULT_SLIDERS = ["age_sd1_sliders", "smiling_sd1_sliders", "age_sdxl_sliders", "smiling_sdxl_sliders"]
+
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"
