@@ -1556,9 +1556,11 @@ def on_ui_tabs():
                                         ) or "mask" in tryon_cloth:
                                             continue
                                         if with_info:
-                                            tryon_cloth_gallery_list.append((tryon_cloth, tryon_cloth.split("/")[-1].split(".")[0]))
+                                            tryon_cloth_gallery_list.append((tryon_cloth, os.path.basename(tryon_cloth).split(".")[0]))
                                         else:
                                             tryon_cloth_gallery_list.append(tryon_cloth)
+
+                                    tryon_cloth_gallery_list = sorted(tryon_cloth_gallery_list, key=lambda x: x[1])
 
                                     return tryon_cloth_gallery_list
 
@@ -1586,11 +1588,7 @@ def on_ui_tabs():
 
                                             # update with high quality image
                                             new_tryon_cloth_path = old_tryon_cloth_path.replace(tryon_preview_dir, tryon_gallery_dir)
-                                            new_tryon_cloth_gallery_list = [
-                                                (new_tryon_cloth_path, y) if x == old_tryon_cloth_path else (x, y)
-                                                for x, y in tryon_cloth_gallery_list
-                                            ]
-
+                                            new_tryon_cloth_gallery_list = prepare_tryon_cloth_gallery()
                                             return [(new_tryon_cloth_path, tryon_cloth_id), gr.update(value=new_tryon_cloth_gallery_list)]
                                         else:
                                             cloth_gallery_list = prepare_tryon_cloth_gallery()

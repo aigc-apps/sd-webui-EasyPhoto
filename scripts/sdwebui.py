@@ -486,6 +486,7 @@ def t2i_call(
                 p_txt2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_txt2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
 
+    p_txt2img.seed = int(seed)
     # TODO: refactor.
     processed = processing.process_images(p_txt2img)
     if loractl_flag:
@@ -711,7 +712,8 @@ def i2i_inpaint_call(
                 # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
                 p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
-    
+
+    p_img2img.seed = int(seed)
     # TODO: refactor.
     processed = processing.process_images(p_img2img)
     if loractl_flag:

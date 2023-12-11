@@ -96,7 +96,7 @@ def easyphoto_tryon_infer_forward(
 
     cloth_gallery_dir = os.path.join(tryon_gallery_dir, "cloth")
     gallery_lists = glob(os.path.join(cloth_gallery_dir, "*.jpg")) + glob(os.path.join(cloth_gallery_dir, "*.png"))
-    user_ids = [i.split("/")[-1].split(".")[0] for i in gallery_lists]
+    user_ids = [os.path.basename(i).split(".")[0] for i in gallery_lists]
     ep_logger.info(f"user_ids: {user_ids}")
 
     # Template Input
@@ -120,7 +120,7 @@ def easyphoto_tryon_infer_forward(
         # choose from template
         try:
             input_ref_img_path = eval(selected_cloth_images)[0]
-            cloth_uuid = input_ref_img_path.split("/")[-1].split(".")[0]
+            cloth_uuid = os.path.basename(input_ref_img_path).split(".")[0]
 
             # clean previous reference mask result
             reference_mask = None
@@ -644,7 +644,10 @@ def easyphoto_tryon_infer_forward(
 
 
 def easyphoto_tryon_mask_forward(input_image, img_type):
-    global sam_predictor
+    global check_hash, sam_predictor
+
+    check_files_exists_and_download(check_hash.get("add_tryon", True), "add_tryon")
+    check_hash["add_tryon"] = False
 
     if input_image is None:
         info = f"Please upload a {img_type} image."
@@ -669,6 +672,7 @@ def easyphoto_tryon_mask_forward(input_image, img_type):
             os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
             "sam_vit_l_0b3195.pth",
         )
+
         sam = sam_model_registry["vit_l"]()
         sam.load_state_dict(torch.load(sam_checkpoint))
         sam_predictor = SamPredictor(sam.cuda())
