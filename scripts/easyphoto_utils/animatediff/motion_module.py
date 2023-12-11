@@ -15,6 +15,7 @@ import math
 class MotionModuleType(Enum):
     AnimateDiffV1 = "AnimateDiff V1, Yuwei GUo, Shanghai AI Lab"
     AnimateDiffV2 = "AnimateDiff V2, Yuwei Guo, Shanghai AI Lab"
+    AnimateDiffXL = "AnimateDiff SDXL, Yuwei Guo, Shanghai AI Lab"
     HotShotXL = "HotShot-XL, John Mullan, Natural Synthetics Inc"
 
 
@@ -25,8 +26,10 @@ class MotionModuleType(Enum):
             return MotionModuleType.AnimateDiffV2
         elif any(["temporal_attentions" in k for k in keys]):
             return MotionModuleType.HotShotXL
-        else:
+        elif any(["down_blocks.3" in k for k in keys]):
             return MotionModuleType.AnimateDiffV1
+        else:
+            return MotionModuleType.AnimateDiffXL
 
 
 def zero_module(module):
@@ -40,14 +43,16 @@ class MotionWrapper(nn.Module):
     def __init__(self, mm_name: str, mm_hash: str, mm_type: MotionModuleType):
         super().__init__()
         self.is_v2 = mm_type == MotionModuleType.AnimateDiffV2
-        self.is_sdxl = mm_type == MotionModuleType.HotShotXL
-        max_len = 32 if self.is_v2 else 24
-        in_channels = (320, 640, 1280) if self.is_sdxl else (320, 640, 1280, 1280)
+        self.is_hotshot = mm_type == MotionModuleType.HotShotXL
+        self.is_adxl = mm_type == MotionModuleType.AnimateDiffXL
+        self.is_xl = self.is_hotshot or self.is_adxl
+        max_len = 32 if (self.is_v2 or self.is_adxl) else 24
+        in_channels = (320, 640, 1280) if (self.is_hotshot or self.is_adxl) else (320, 640, 1280, 1280)
         self.down_blocks = nn.ModuleList([])
         self.up_blocks = nn.ModuleList([])
         for c in in_channels:
-            self.down_blocks.append(MotionModule(c, num_mm=2, max_len=max_len, is_sdxl=self.is_sdxl))
-            self.up_blocks.insert(0,MotionModule(c, num_mm=3, max_len=max_len, is_sdxl=self.is_sdxl))
+            self.down_blocks.append(MotionModule(c, num_mm=2, max_len=max_len, is_hotshot=self.is_hotshot))
+            self.up_blocks.insert(0,MotionModule(c, num_mm=3, max_len=max_len, is_hotshot=self.is_hotshot))
         if self.is_v2:
             self.mid_block = MotionModule(1280, num_mm=1, max_len=max_len)
         self.mm_name = mm_name
@@ -56,19 +61,19 @@ class MotionWrapper(nn.Module):
 
 
 class MotionModule(nn.Module):
-    def __init__(self, in_channels, num_mm, max_len, is_sdxl=False):
+    def __init__(self, in_channels, num_mm, max_len, is_hotshot=False):
         super().__init__()
-        motion_modules = nn.ModuleList([get_motion_module(in_channels, max_len, is_sdxl) for _ in range(num_mm)])
-        if is_sdxl:
+        motion_modules = nn.ModuleList([get_motion_module(in_channels, max_len, is_hotshot) for _ in range(num_mm)])
+        if is_hotshot:
             self.temporal_attentions = motion_modules
         else:
             self.motion_modules = motion_modules
 
 
 
-def get_motion_module(in_channels, max_len, is_sdxl):
-    vtm = VanillaTemporalModule(in_channels=in_channels, temporal_position_encoding_max_len=max_len, is_sdxl=is_sdxl)
-    return vtm.temporal_transformer if is_sdxl else vtm
+def get_motion_module(in_channels, max_len, is_hotshot):
+    vtm = VanillaTemporalModule(in_channels=in_channels, temporal_position_encoding_max_len=max_len, is_hotshot=is_hotshot)
+    return vtm.temporal_transformer if is_hotshot else vtm
 
 
 class VanillaTemporalModule(nn.Module):
@@ -83,7 +88,7 @@ class VanillaTemporalModule(nn.Module):
         temporal_position_encoding_max_len = 24,
         temporal_attention_dim_div         = 1,
         zero_initialize                    = True,
-        is_sdxl                            = False,
+        is_hotshot                            = False,
     ):
         super().__init__()
         
@@ -96,7 +101,7 @@ class VanillaTemporalModule(nn.Module):
             cross_frame_attention_mode=cross_frame_attention_mode,
             temporal_position_encoding=temporal_position_encoding,
             temporal_position_encoding_max_len=temporal_position_encoding_max_len,
-            is_sdxl=is_sdxl,
+            is_hotshot=is_hotshot,
         )
         
         if zero_initialize:
@@ -126,7 +131,7 @@ class TemporalTransformer3DModel(nn.Module):
         cross_frame_attention_mode         = None,
         temporal_position_encoding         = False,
         temporal_position_encoding_max_len = 24,
-        is_sdxl                            = False,
+        is_hotshot                            = False,
     ):
         super().__init__()
 
@@ -151,7 +156,7 @@ class TemporalTransformer3DModel(nn.Module):
                     cross_frame_attention_mode=cross_frame_attention_mode,
                     temporal_position_encoding=temporal_position_encoding,
                     temporal_position_encoding_max_len=temporal_position_encoding_max_len,
-                    is_sdxl=is_sdxl,
+                    is_hotshot=is_hotshot,
                 )
                 for d in range(num_layers)
             ]
@@ -163,7 +168,7 @@ class TemporalTransformer3DModel(nn.Module):
         batch, channel, height, weight = hidden_states.shape
         residual = hidden_states
 
-        hidden_states = self.norm(hidden_states)
+        hidden_states = self.norm(hidden_states).type(hidden_states.dtype)
         inner_dim = hidden_states.shape[1]
         hidden_states = hidden_states.permute(0, 2, 3, 1).reshape(batch, height * weight, inner_dim)
         hidden_states = self.proj_in(hidden_states)
@@ -196,7 +201,7 @@ class TemporalTransformerBlock(nn.Module):
         cross_frame_attention_mode         = None,
         temporal_position_encoding         = False,
         temporal_position_encoding_max_len = 24,
-        is_sdxl                            = False,
+        is_hotshot                            = False,
     ):
         super().__init__()
 
@@ -219,7 +224,7 @@ class TemporalTransformerBlock(nn.Module):
                     cross_frame_attention_mode=cross_frame_attention_mode,
                     temporal_position_encoding=temporal_position_encoding,
                     temporal_position_encoding_max_len=temporal_position_encoding_max_len,
-                    is_sdxl=is_sdxl,
+                    is_hotshot=is_hotshot,
                 )
             )
             norms.append(nn.LayerNorm(dim))
@@ -233,14 +238,14 @@ class TemporalTransformerBlock(nn.Module):
 
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, video_length=None):
         for attention_block, norm in zip(self.attention_blocks, self.norms):
-            norm_hidden_states = norm(hidden_states)
+            norm_hidden_states = norm(hidden_states).type(hidden_states.dtype)
             hidden_states = attention_block(
                 norm_hidden_states,
                 encoder_hidden_states=encoder_hidden_states if attention_block.is_cross_attention else None,
                 video_length=video_length,
             ) + hidden_states
             
-        hidden_states = self.ff(self.ff_norm(hidden_states)) + hidden_states
+        hidden_states = self.ff(self.ff_norm(hidden_states).type(hidden_states.dtype)) + hidden_states
         
         output = hidden_states  
         return output
@@ -252,7 +257,7 @@ class PositionalEncoding(nn.Module):
         d_model, 
         dropout = 0., 
         max_len = 24,
-        is_sdxl = False,
+        is_hotshot = False,
     ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -261,11 +266,11 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(1, max_len, d_model)
         pe[0, :, 0::2] = torch.sin(position * div_term)
         pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('positional_encoding' if is_sdxl else 'pe', pe)
-        self.is_sdxl = is_sdxl
+        self.register_buffer('positional_encoding' if is_hotshot else 'pe', pe)
+        self.is_hotshot = is_hotshot
 
     def forward(self, x):
-        x = x + (self.positional_encoding[:, :x.size(1)] if self.is_sdxl else self.pe[:, :x.size(1)])
+        x = x + (self.positional_encoding[:, :x.size(1)] if self.is_hotshot else self.pe[:, :x.size(1)])
         return self.dropout(x)
 
 
@@ -357,7 +362,7 @@ class CrossAttention(nn.Module):
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
-            hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
+            hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2).type(hidden_states.dtype)
 
         query = self.to_q(hidden_states)
         dim = query.shape[-1]
@@ -488,31 +493,60 @@ class CrossAttention(nn.Module):
         k = k.contiguous()
         v = v.contiguous()
 
-        if current_optimizer_name == "xformers":
-            import xformers.ops
-            from modules.sd_hijack_optimizations import get_xformers_flash_attention_op
-            hidden_states = xformers.ops.memory_efficient_attention(
-                q, k, v, attn_bias=mask,
-                op=get_xformers_flash_attention_op(q, k, v))
-        elif current_optimizer_name == "sdp":
-            hidden_states = torch.nn.functional.scaled_dot_product_attention(
-                q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False
-            )
-        elif current_optimizer_name == "sdp-no-mem":
-            with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=True, enable_mem_efficient=False):
+        fallthrough = False
+
+        if current_optimizer_name == "xformers" or fallthrough:
+            fallthrough = False
+            try:
+                import xformers.ops
+                from modules.sd_hijack_optimizations import get_xformers_flash_attention_op
+                hidden_states = xformers.ops.memory_efficient_attention(
+                    q, k, v, attn_bias=mask,
+                    op=get_xformers_flash_attention_op(q, k, v))
+            except (ImportError, RuntimeError, AttributeError):
+                fallthrough = True
+
+        if current_optimizer_name == "sdp" or fallthrough:
+            fallthrough = False
+            try:
                 hidden_states = torch.nn.functional.scaled_dot_product_attention(
                     q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False
                 )
-        elif current_optimizer_name == "sub-quadratic":
-            from modules.sd_hijack_optimizations import sub_quad_attention
-            from modules import shared
-            hidden_states = sub_quad_attention(
-                q, k, v, 
-                q_chunk_size=shared.cmd_opts.sub_quad_q_chunk_size, 
-                kv_chunk_size=shared.cmd_opts.sub_quad_kv_chunk_size, 
-                chunk_threshold=shared.cmd_opts.sub_quad_chunk_threshold, 
-                use_checkpoint=self.training
-            )
+            except (ImportError, RuntimeError, AttributeError):
+                fallthrough = True
+        
+        if current_optimizer_name == "sdp-no-mem" or fallthrough:
+            fallthrough = False
+            try:
+                with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=True, enable_mem_efficient=False):
+                    hidden_states = torch.nn.functional.scaled_dot_product_attention(
+                        q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False
+                    )
+            except (ImportError, RuntimeError, AttributeError):
+                fallthrough = True
+
+        if current_optimizer_name == "sub-quadratic" or fallthrough:
+            fallthrough = False
+            try:
+                from modules.sd_hijack_optimizations import sub_quad_attention
+                from modules import shared
+                hidden_states = sub_quad_attention(
+                    q, k, v, 
+                    q_chunk_size=shared.cmd_opts.sub_quad_q_chunk_size, 
+                    kv_chunk_size=shared.cmd_opts.sub_quad_kv_chunk_size, 
+                    chunk_threshold=shared.cmd_opts.sub_quad_chunk_threshold, 
+                    use_checkpoint=self.training
+                )
+            except (ImportError, RuntimeError, AttributeError):
+                fallthrough = True
+
+        if fallthrough:
+            fallthrough = False
+            if self._slice_size is None or query.shape[0] // self._slice_size == 1:
+                hidden_states = self._attention(query, key, value, attention_mask)
+            else:
+                hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
+            return hidden_states
 
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)        
         return hidden_states
@@ -525,7 +559,7 @@ class VersatileAttention(CrossAttention):
             cross_frame_attention_mode         = None,
             temporal_position_encoding         = False,
             temporal_position_encoding_max_len = 24,
-            is_sdxl                            = False,       
+            is_hotshot                            = False,       
             *args, **kwargs
         ):
         super().__init__(*args, **kwargs)
@@ -538,7 +572,7 @@ class VersatileAttention(CrossAttention):
             kwargs["query_dim"],
             dropout=0., 
             max_len=temporal_position_encoding_max_len,
-            is_sdxl=is_sdxl,
+            is_hotshot=is_hotshot,
         ) if (temporal_position_encoding and attention_mode == "Temporal") else None
 
     def extra_repr(self):
@@ -561,7 +595,7 @@ class VersatileAttention(CrossAttention):
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
-            hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
+            hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2).dtype(hidden_states.dtype)
 
         query = self.to_q(hidden_states)
         dim = query.shape[-1]

@@ -8,6 +8,7 @@ from modules.processing import StableDiffusionProcessing
 
 from .animatediff_mm import mm_animatediff as motion_module
 from .animatediff_i2ibatch import animatediff_i2ibatch
+from .animatediff_lcm import AnimateDiffLCM
 
 
 class ToolButton(gr.Button, gr.components.FormComponent):
@@ -44,6 +45,7 @@ class AnimateDiffProcess:
         last_frame=None,
         latent_power_last=1,
         latent_scale_last=32,
+        request_id = '',
     ):
         self.model = model
         self.enable = enable
@@ -64,10 +66,11 @@ class AnimateDiffProcess:
         self.last_frame = last_frame
         self.latent_power_last = latent_power_last
         self.latent_scale_last = latent_scale_last
+        self.request_id = request_id
 
 
     def get_list(self, is_img2img: bool):
-        list_var = list(vars(self).values())
+        list_var = list(vars(self).values())[:-1]
         if is_img2img:
             animatediff_i2ibatch.hack()
         else:
@@ -89,6 +92,8 @@ class AnimateDiffProcess:
             "interp": self.interp,
             "interp_x": self.interp_x,
         }
+        if self.request_id:
+            infotext['request_id'] = self.request_id
         if motion_module.mm is not None and motion_module.mm.mm_hash is not None:
             infotext['mm_hash'] = motion_module.mm.mm_hash[:8]
         if is_img2img:
@@ -106,7 +111,7 @@ class AnimateDiffProcess:
         assert (
             self.video_length >= 0 and self.fps > 0
         ), "Video length and FPS should be positive."
-        assert not set(["GIF", "MP4", "PNG", "WEBP"]).isdisjoint(
+        assert not set(["GIF", "MP4", "PNG", "WEBP", "WEBM"]).isdisjoint(
             self.format
         ), "At least one saving format should be selected."
 
@@ -170,7 +175,7 @@ class AnimateDiffUiGroup:
                     refresh_model.click(refresh_models, self.params.model, self.params.model)
 
                 self.params.format = gr.CheckboxGroup(
-                    choices=["GIF", "MP4", "WEBP", "PNG", "TXT"],
+                    choices=["GIF", "MP4", "WEBP", "WEBM", "PNG", "TXT"],
                     label="Save format",
                     type="value",
                     elem_id=f"{elemid_prefix}save-format",
@@ -337,3 +342,8 @@ class AnimateDiffUiGroup:
         if elem_id == "img2img_generate":
             AnimateDiffUiGroup.img2img_submit_button = component
             return
+
+
+    @staticmethod
+    def on_before_ui():
+        AnimateDiffLCM.hack_kdiff_ui()

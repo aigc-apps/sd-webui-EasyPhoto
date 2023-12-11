@@ -247,6 +247,7 @@ if video_visible:
             self.cfg_hacker = None
             self.cn_hacker = None
             self.prompt_scheduler = None
+            self.hacked = False
             self.name = self.title()
             print("AnimateDiffScript init")
 
@@ -260,8 +261,9 @@ if video_visible:
             return (AnimateDiffUiGroup().render(),)
 
         def before_process(self, p: StableDiffusionProcessing, params: AnimateDiffProcess):
-            if isinstance(params, dict):
-                params = AnimateDiffProcess(**params)
+            if p.is_api and isinstance(params, dict):
+                self.ad_params = AnimateDiffProcess(**params)
+                params = self.ad_params
             if params.enable:
                 ep_logger.info("AnimateDiff process start.")
                 params.set_p(p)
@@ -274,24 +276,31 @@ if video_visible:
                 self.cn_hacker = AnimateDiffControl(p, self.prompt_scheduler)
                 self.cn_hacker.hack(params)
                 update_infotext(p, params)
+                self.hacked = True
+            elif self.hacked:
+                self.cn_hacker.restore()
+                self.cfg_hacker.restore()
+                self.lora_hacker.restore()
+                motion_module.restore(p.sd_model)
+                self.hacked = False
 
         def before_process_batch(self, p: StableDiffusionProcessing, params: AnimateDiffProcess, **kwargs):
-            if isinstance(params, dict):
-                params = AnimateDiffProcess(**params)
+            if p.is_api and isinstance(params, dict):
+                params = self.ad_params
             if params.enable and isinstance(p, StableDiffusionProcessingImg2Img) and not hasattr(p, "_animatediff_i2i_batch"):
                 AnimateDiffI2VLatent().randomize(p, params)
 
         def postprocess(self, p: StableDiffusionProcessing, res: Processed, params: AnimateDiffProcess):
-            if isinstance(params, dict):
-                params = AnimateDiffProcess(**params)
+            if p.is_api and isinstance(params, dict):
+                params = self.ad_params
             if params.enable:
                 self.prompt_scheduler.save_infotext_txt(res)
                 self.cn_hacker.restore()
                 self.cfg_hacker.restore()
                 self.lora_hacker.restore()
                 motion_module.restore(p.sd_model)
+                self.hacked = False
                 AnimateDiffOutput().output(p, res, params)
-                motion_module.remove()
                 ep_logger.info("AnimateDiff process end.")
 
 
@@ -428,8 +437,9 @@ def t2i_call(
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
     if animatediff_flag:
-        before_opts = copy.deepcopy(opts.return_mask)
+        before_opts, before_pad_cond_uncond = copy.deepcopy(opts.return_mask), copy.deepcopy(opts.pad_cond_uncond)
         opts.return_mask = False
+        opts.pad_cond_uncond = True
 
         animate_diff_process = AnimateDiffProcess(enable=True, video_length=animatediff_video_length, fps=animatediff_fps)
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
@@ -455,6 +465,7 @@ def t2i_call(
     processed = processing.process_images(p_txt2img)
     if animatediff_flag:
         opts.return_mask = before_opts
+        opts.pad_cond_uncond = before_pad_cond_uncond
 
     if animatediff_flag:
         gen_image = processed.images

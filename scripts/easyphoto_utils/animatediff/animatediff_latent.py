@@ -15,17 +15,27 @@ class AnimateDiffI2VLatent:
         self, p: StableDiffusionProcessingImg2Img, params: AnimateDiffProcess
     ):
         # Get init_alpha
-        init_alpha = [
-            1 - pow(i, params.latent_power) / params.latent_scale
-            for i in range(params.video_length)
+        reserve_scale = [
+            0.75 for i in range(params.video_length)
         ]
-        logger.info(f"Randomizing init_latent according to {init_alpha}.")
-        init_alpha = torch.tensor(init_alpha, dtype=torch.float32, device=device)[
+        logger.info(f"Randomizing reserve_scale according to {reserve_scale}.")
+        reserve_scale = torch.tensor(reserve_scale, dtype=torch.float32, device=device)[
             :, None, None, None
         ]
-        init_alpha[init_alpha < 0] = 0
+        reserve_scale[reserve_scale < 0] = 0
 
         if params.last_frame is not None:
+            # Get init_alpha
+            init_alpha = [
+                1 - pow(i, params.latent_power) / params.latent_scale
+                for i in range(params.video_length)
+            ]
+            logger.info(f"Randomizing init_latent according to {init_alpha}.")
+            init_alpha = torch.tensor(init_alpha, dtype=torch.float32, device=device)[
+                :, None, None, None
+            ]
+            init_alpha[init_alpha < 0] = 0
+            
             last_frame = params.last_frame
             if type(last_frame) == str:
                 from modules.api.api import decode_base64_to_image
@@ -76,9 +86,10 @@ class AnimateDiffI2VLatent:
                 )
             # Modify init_latent
             p.init_latent = (
-                p.init_latent * init_alpha
+                (p.init_latent * init_alpha
                 + last_latent * last_alpha
-                + p.rng.next() * (1 - init_alpha - last_alpha)
+                + p.rng.next() * (1 - init_alpha - last_alpha)) * reserve_scale
+                + p.rng.next() * (1 - reserve_scale)
             )
         else:
-            p.init_latent = p.init_latent * init_alpha + p.rng.next() * (1 - init_alpha)
+            p.init_latent = p.init_latent * reserve_scale + p.rng.next() * (1 - reserve_scale)

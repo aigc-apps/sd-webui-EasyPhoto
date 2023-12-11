@@ -8,6 +8,8 @@ import copy
 import os
 import shutil
 from pathlib import Path
+from types import MethodType
+from typing import Optional
 
 import cv2
 import gradio as gr
@@ -16,16 +18,20 @@ import numpy as np
 import piexif
 import PIL.features
 import torch
-from modules import hashes, images, processing, sd_models, shared
+from modules import (devices, hashes, images, img2img, masking, processing,
+                     scripts, sd_models, sd_samplers, shared)
 from modules.devices import device, dtype_vae, torch_gc
 from modules.paths import data_path
-from modules.processing import Processed, StableDiffusionProcessing, StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
-from PIL import PngImagePlugin
-
+from modules.processing import (Processed, StableDiffusionProcessing,
+                                StableDiffusionProcessingImg2Img,
+                                StableDiffusionProcessingTxt2Img)
+from PIL import Image, ImageFilter, ImageOps, PngImagePlugin
 from scripts.easyphoto_config import easyphoto_models_path
+from tqdm import tqdm
 
 try:
-    from modules.sd_samplers_common import approximation_indexes, images_tensor_to_samples
+    from modules.sd_samplers_common import (approximation_indexes,
+                                            images_tensor_to_samples)
 
     from .animatediff.animatediff_i2ibatch import animatediff_i2ibatch
     from .animatediff.animatediff_infotext import update_infotext
@@ -35,7 +41,8 @@ try:
     from .animatediff.animatediff_mm import AnimateDiffMM
     from .animatediff.animatediff_output import AnimateDiffOutput
     from .animatediff.animatediff_prompt import AnimateDiffPromptSchedule
-    from .animatediff.animatediff_ui import AnimateDiffProcess, AnimateDiffUiGroup
+    from .animatediff.animatediff_ui import (AnimateDiffProcess,
+                                             AnimateDiffUiGroup)
 
     video_visible = True
 except Exception as e:
@@ -57,16 +64,15 @@ except Exception as e:
 if video_visible:
 
     class AnimateDiffControl:
+        original_processing_process_images_hijack = None
+        original_controlnet_main_entry = None
+        original_postprocess_batch = None
+
         def __init__(self, p: StableDiffusionProcessing, prompt_scheduler: AnimateDiffPromptSchedule):
-            self.original_processing_process_images_hijack = None
-            self.original_controlnet_main_entry = None
-            self.original_postprocess_batch = None
             try:
                 from scripts.external_code import find_cn_script
-
                 self.cn_script = find_cn_script(p.scripts)
-            except Exception:
-                print("No cn script in AnimateDiff")
+            except:
                 self.cn_script = None
             self.prompt_scheduler = prompt_scheduler
 
@@ -105,47 +111,57 @@ if video_visible:
                 update_infotext(p, params)
                 return getattr(processing, "__controlnet_original_process_images_inner")(p, *args, **kwargs)
 
-            self.original_processing_process_images_hijack = BatchHijack.processing_process_images_hijack
+            if AnimateDiffControl.original_processing_process_images_hijack is not None:
+                logger.info('BatchHijack already hacked.')
+                return
+        
+            AnimateDiffControl.original_processing_process_images_hijack = BatchHijack.processing_process_images_hijack
             BatchHijack.processing_process_images_hijack = hacked_processing_process_images_hijack
             processing.process_images_inner = instance.processing_process_images_hijack
 
         def restore_batchhijack(self):
-            from scripts.batch_hijack import BatchHijack, instance
-
-            BatchHijack.processing_process_images_hijack = self.original_processing_process_images_hijack
-            self.original_processing_process_images_hijack = None
-            processing.process_images_inner = instance.processing_process_images_hijack
+            if AnimateDiffControl.original_processing_process_images_hijack is not None:
+                from scripts.batch_hijack import BatchHijack, instance
+                BatchHijack.processing_process_images_hijack = AnimateDiffControl.original_processing_process_images_hijack
+                AnimateDiffControl.original_processing_process_images_hijack = None
+                processing.process_images_inner = instance.processing_process_images_hijack
 
         def hack_cn(self):
             cn_script = self.cn_script
 
-            from types import MethodType
-            from typing import Optional
-
-            from modules import images, masking
-            from PIL import Image, ImageFilter, ImageOps
-
-            from scripts import external_code, global_state, hook
-
-            # from scripts.controlnet_lora import bind_control_lora # do not support control lora for sdxl
-            from scripts.adapter import Adapter, Adapter_light, StyleAdapter
-            from scripts.batch_hijack import InputMode
-
-            # from scripts.controlnet_lllite import PlugableControlLLLite, clear_all_lllite # do not support controlllite for sdxl
-            from scripts.hook import ControlModelType, ControlParams, UnetHook
-            from scripts.logging import logger
-            from scripts.processor import model_free_preprocessors
 
             def hacked_main_entry(self, p: StableDiffusionProcessing):
-                def image_has_mask(input_image: np.ndarray) -> bool:
-                    return input_image.ndim == 3 and input_image.shape[2] == 4 and np.max(input_image[:, :, 3]) > 127
+                from scripts import external_code, global_state, hook
+                from scripts.adapter import (Adapter, Adapter_light,
+                                             StyleAdapter)
+                from scripts.batch_hijack import InputMode
+                from scripts.controlmodel_ipadapter import (
+                    PlugableIPAdapter, clear_all_ip_adapter)
+                from scripts.controlnet_lllite import (PlugableControlLLLite,
+                                                       clear_all_lllite)
+                from scripts.controlnet_lora import bind_control_lora
+                from scripts.hook import (ControlModelType, ControlParams,
+                                          UnetHook)
+                from scripts.logging import logger
+                from scripts.processor import model_free_preprocessors
 
-                def prepare_mask(mask: Image.Image, p: processing.StableDiffusionProcessing) -> Image.Image:
+                # TODO: i2i-batch mode, what should I change?
+                def image_has_mask(input_image: np.ndarray) -> bool:
+                    return (
+                        input_image.ndim == 3 and 
+                        input_image.shape[2] == 4 and 
+                        np.max(input_image[:, :, 3]) > 127
+                    )
+
+
+                def prepare_mask(
+                    mask: Image.Image, p: processing.StableDiffusionProcessing
+                ) -> Image.Image:
                     mask = mask.convert("L")
                     if getattr(p, "inpainting_mask_invert", False):
                         mask = ImageOps.invert(mask)
-
-                    if hasattr(p, "mask_blur_x"):
+                    
+                    if hasattr(p, 'mask_blur_x'):
                         if getattr(p, "mask_blur_x", 0) > 0:
                             np_mask = np.array(mask)
                             kernel_size = 2 * int(2.5 * p.mask_blur_x + 0.5) + 1
@@ -159,8 +175,9 @@ if video_visible:
                     else:
                         if getattr(p, "mask_blur", 0) > 0:
                             mask = mask.filter(ImageFilter.GaussianBlur(p.mask_blur))
-
+                    
                     return mask
+
 
                 def set_numpy_seed(p: processing.StableDiffusionProcessing) -> Optional[int]:
                     try:
@@ -171,20 +188,22 @@ if video_visible:
                         return seed
                     except Exception as e:
                         logger.warning(e)
-                        logger.warning("Warning: Failed to use consistent random seed.")
+                        logger.warning('Warning: Failed to use consistent random seed.')
                         return None
 
                 sd_ldm = p.sd_model
                 unet = sd_ldm.model.diffusion_model
                 self.noise_modifier = None
 
-                # setattr(p, 'controlnet_control_loras', []) # do not support control lora for sdxl
+                setattr(p, 'controlnet_control_loras', [])
 
                 if self.latest_network is not None:
                     # always restore (~0.05s)
                     self.latest_network.restore()
 
                 # always clear (~0.05s)
+                clear_all_lllite()
+                clear_all_ip_adapter()
 
                 self.enabled_units = cn_script.get_enabled_units(p)
 
@@ -207,7 +226,7 @@ if video_visible:
                 module_list = [unit.module for unit in self.enabled_units]
                 for key in self.unloadable:
                     if key not in module_list:
-                        self.unloadable.get(key, lambda: None)()
+                        self.unloadable.get(key, lambda:None)()
 
                 self.latest_model_hash = p.sd_model.sd_model_hash
                 for idx, unit in enumerate(self.enabled_units):
@@ -221,21 +240,27 @@ if video_visible:
                     else:
                         model_net = cn_script.load_control_model(p, unet, unit.model)
                         model_net.reset()
+                        if model_net is not None and getattr(devices, "fp8", False) and not isinstance(model_net, PlugableIPAdapter):
+                            for _module in model_net.modules():
+                                if isinstance(_module, (torch.nn.Conv2d, torch.nn.Linear)):
+                                    _module.to(torch.float8_e4m3fn)
 
-                        # if getattr(model_net, 'is_control_lora', False): # do not support control lora for sdxl
-                        #     control_lora = model_net.control_model
-                        #     bind_control_lora(unet, control_lora)
-                        #     p.controlnet_control_loras.append(control_lora)
+                        if getattr(model_net, 'is_control_lora', False):
+                            control_lora = model_net.control_model
+                            bind_control_lora(unet, control_lora)
+                            p.controlnet_control_loras.append(control_lora)
 
                     input_images = []
                     for img in unit.batch_images:
-                        unit.image = img  # TODO: SAM extension should use new API
+                        unit.image = img
                         input_image, _ = cn_script.choose_input_image(p, unit, idx)
                         input_images.append(input_image)
 
                     for idx, input_image in enumerate(input_images):
-                        a1111_mask_image: Optional[Image.Image] = getattr(p, "image_mask", None)
-                        if "inpaint" in unit.module and not image_has_mask(input_image) and a1111_mask_image is not None:
+                        a1111_mask_image : Optional[Image.Image] = getattr(p, "image_mask", None)
+                        if a1111_mask_image and isinstance(a1111_mask_image, list):
+                            a1111_mask_image = a1111_mask_image[idx]
+                        if 'inpaint' in unit.module and not image_has_mask(input_image) and a1111_mask_image is not None:
                             a1111_mask = np.array(prepare_mask(a1111_mask_image, p))
                             if a1111_mask.ndim == 2:
                                 if a1111_mask.shape[0] == input_image.shape[0]:
@@ -245,7 +270,8 @@ if video_visible:
                                         if a1111_i2i_resize_mode is not None:
                                             resize_mode = external_code.resize_mode_from_value(a1111_i2i_resize_mode)
 
-                        if "reference" not in unit.module and issubclass(type(p), StableDiffusionProcessingImg2Img) and p.inpaint_full_res and a1111_mask_image is not None:
+                        if 'reference' not in unit.module and issubclass(type(p), StableDiffusionProcessingImg2Img) \
+                                and p.inpaint_full_res and a1111_mask_image is not None:
                             logger.debug("A1111 inpaint mask START")
                             input_image = [input_image[:, :, i] for i in range(input_image.shape[2])]
                             input_image = [Image.fromarray(x) for x in input_image]
@@ -255,10 +281,16 @@ if video_visible:
                             crop_region = masking.get_crop_region(np.array(mask), p.inpaint_full_res_padding)
                             crop_region = masking.expand_crop_region(crop_region, p.width, p.height, mask.width, mask.height)
 
-                            input_image = [images.resize_image(resize_mode.int_value(), i, mask.width, mask.height) for i in input_image]
+                            input_image = [
+                                images.resize_image(resize_mode.int_value(), i, mask.width, mask.height) 
+                                for i in input_image
+                            ]
 
                             input_image = [x.crop(crop_region) for x in input_image]
-                            input_image = [images.resize_image(external_code.ResizeMode.OUTER_FIT.int_value(), x, p.width, p.height) for x in input_image]
+                            input_image = [
+                                images.resize_image(external_code.ResizeMode.OUTER_FIT.int_value(), x, p.width, p.height) 
+                                for x in input_image
+                            ]
 
                             input_image = [np.asarray(x)[:, :, 0] for x in input_image]
                             input_image = np.stack(input_image, axis=2)
@@ -271,14 +303,14 @@ if video_visible:
 
                         input_images[idx] = input_image
 
-                    if "inpaint_only" == unit.module and issubclass(type(p), StableDiffusionProcessingImg2Img) and p.image_mask is not None:
-                        logger.warning("A1111 inpaint and ControlNet inpaint duplicated. ControlNet support enabled.")
-                        unit.module = "inpaint"
+                    if 'inpaint_only' == unit.module and issubclass(type(p), StableDiffusionProcessingImg2Img) and p.image_mask is not None:
+                        logger.warning('A1111 inpaint and ControlNet inpaint duplicated. ControlNet support enabled.')
+                        unit.module = 'inpaint'
 
                     logger.info(f"Loading preprocessor: {unit.module}")
                     preprocessor = self.preprocessor[unit.module]
 
-                    high_res_fix = isinstance(p, StableDiffusionProcessingTxt2Img) and getattr(p, "enable_hr", False)
+                    high_res_fix = isinstance(p, StableDiffusionProcessingTxt2Img) and getattr(p, 'enable_hr', False)
 
                     h = (p.height // 8) * 8
                     w = (p.width // 8) * 8
@@ -295,7 +327,7 @@ if video_visible:
                         hr_y = h
                         hr_x = w
 
-                    if unit.module == "inpaint_only+lama" and resize_mode == external_code.ResizeMode.OUTER_FIT:
+                    if unit.module == 'inpaint_only+lama' and resize_mode == external_code.ResizeMode.OUTER_FIT:
                         # inpaint_only+lama is special and required outpaint fix
                         for idx, input_image in enumerate(input_images):
                             _, input_image = cn_script.detectmap_proc(input_image, unit.module, resize_mode, hr_y, hr_x)
@@ -304,27 +336,34 @@ if video_visible:
                     control_model_type = ControlModelType.ControlNet
                     global_average_pooling = False
 
-                    if "reference" in unit.module:
+                    if 'reference' in unit.module:
                         control_model_type = ControlModelType.AttentionInjection
-                    elif "revision" in unit.module:
+                    elif 'revision' in unit.module:
                         control_model_type = ControlModelType.ReVision
-                    elif hasattr(model_net, "control_model") and (isinstance(model_net.control_model, Adapter) or isinstance(model_net.control_model, Adapter_light)):
+                    elif hasattr(model_net, 'control_model') and (isinstance(model_net.control_model, Adapter) or isinstance(model_net.control_model, Adapter_light)):
                         control_model_type = ControlModelType.T2I_Adapter
-                    elif hasattr(model_net, "control_model") and isinstance(model_net.control_model, StyleAdapter):
+                    elif hasattr(model_net, 'control_model') and isinstance(model_net.control_model, StyleAdapter):
                         control_model_type = ControlModelType.T2I_StyleAdapter
-                    # elif isinstance(model_net, PlugableControlLLLite): # do not support controlllite for sdxl
-                    #     control_model_type = ControlModelType.Controlllite
+                    elif isinstance(model_net, PlugableIPAdapter):
+                        control_model_type = ControlModelType.IPAdapter
+                    elif isinstance(model_net, PlugableControlLLLite):
+                        control_model_type = ControlModelType.Controlllite
 
                     if control_model_type is ControlModelType.ControlNet:
                         global_average_pooling = model_net.control_model.global_average_pooling
 
                     preprocessor_resolution = unit.processor_res
                     if unit.pixel_perfect:
-                        preprocessor_resolution = external_code.pixel_perfect_resolution(input_images[0], target_H=h, target_W=w, resize_mode=resize_mode)
+                        preprocessor_resolution = external_code.pixel_perfect_resolution(
+                            input_images[0],
+                            target_H=h,
+                            target_W=w,
+                            resize_mode=resize_mode
+                        )
 
-                    logger.info(f"preprocessor resolution = {preprocessor_resolution}")
+                    logger.info(f'preprocessor resolution = {preprocessor_resolution}')
                     # Preprocessor result may depend on numpy random operations, use the
-                    # random seed in `StableDiffusionProcessing` to make the
+                    # random seed in `StableDiffusionProcessing` to make the 
                     # preprocessor result reproducable.
                     # Currently following preprocessors use numpy random:
                     # - shuffle
@@ -333,12 +372,12 @@ if video_visible:
 
                     controls = []
                     hr_controls = []
-                    controls_ipadapter = {"hidden_states": [], "image_embeds": []}
-                    hr_controls_ipadapter = {"hidden_states": [], "image_embeds": []}
-                    for idx, input_image in enumerate(input_images):
+                    controls_ipadapter = {'hidden_states': [], 'image_embeds': []}
+                    hr_controls_ipadapter = {'hidden_states': [], 'image_embeds': []}
+                    for idx, input_image in tqdm(enumerate(input_images), total=len(input_images)):
                         detected_map, is_image = preprocessor(
-                            input_image,
-                            res=preprocessor_resolution,
+                            input_image, 
+                            res=preprocessor_resolution, 
                             thr_a=unit.threshold_a,
                             thr_b=unit.threshold_b,
                         )
@@ -360,33 +399,33 @@ if video_visible:
                             detected_maps.append((input_image, unit.module))
 
                         if control_model_type == ControlModelType.T2I_StyleAdapter:
-                            control = control["last_hidden_state"]
+                            control = control['last_hidden_state']
 
                         if control_model_type == ControlModelType.ReVision:
-                            control = control["image_embeds"]
+                            control = control['image_embeds']
 
                         if control_model_type == ControlModelType.IPAdapter:
                             if model_net.is_plus:
-                                controls_ipadapter["hidden_states"].append(control["hidden_states"][-2])
+                                controls_ipadapter['hidden_states'].append(control['hidden_states'][-2].cpu())
                             else:
-                                controls_ipadapter["image_embeds"].append(control["image_embeds"])
+                                controls_ipadapter['image_embeds'].append(control['image_embeds'].cpu())
                             if hr_control is not None:
                                 if model_net.is_plus:
-                                    hr_controls_ipadapter["hidden_states"].append(hr_control["hidden_states"][-2])
+                                    hr_controls_ipadapter['hidden_states'].append(hr_control['hidden_states'][-2].cpu())
                                 else:
-                                    hr_controls_ipadapter["image_embeds"].append(hr_control["image_embeds"])
+                                    hr_controls_ipadapter['image_embeds'].append(hr_control['image_embeds'].cpu())
                             else:
                                 hr_controls_ipadapter = None
                                 hr_controls = None
                         else:
-                            controls.append(control)
+                            controls.append(control.cpu())
                             if hr_control is not None:
-                                hr_controls.append(hr_control)
+                                hr_controls.append(hr_control.cpu())
                             else:
                                 hr_controls = None
-
+                    
                     if control_model_type == ControlModelType.IPAdapter:
-                        ipadapter_key = "hidden_states" if model_net.is_plus else "image_embeds"
+                        ipadapter_key = 'hidden_states' if model_net.is_plus else 'image_embeds'
                         controls = {ipadapter_key: torch.cat(controls_ipadapter[ipadapter_key], dim=0)}
                         if controls[ipadapter_key].shape[0] > 1:
                             controls[ipadapter_key] = torch.cat([controls[ipadapter_key], controls[ipadapter_key]], dim=0)
@@ -407,7 +446,12 @@ if video_visible:
                             if hr_controls.shape[0] > 1:
                                 hr_controls = torch.cat([hr_controls, hr_controls], dim=0)
 
-                    preprocessor_dict = dict(name=unit.module, preprocessor_resolution=preprocessor_resolution, threshold_a=unit.threshold_a, threshold_b=unit.threshold_b)
+                    preprocessor_dict = dict(
+                        name=unit.module,
+                        preprocessor_resolution=preprocessor_resolution,
+                        threshold_a=unit.threshold_a,
+                        threshold_b=unit.threshold_b
+                    )
 
                     forward_param = ControlParams(
                         control_model=model_net,
@@ -426,8 +470,8 @@ if video_visible:
                     )
                     forward_params.append(forward_param)
 
-                    unit_is_batch = getattr(unit, "input_mode", InputMode.SIMPLE) == InputMode.BATCH
-                    if "inpaint_only" in unit.module:
+                    unit_is_batch = InputMode.BATCH
+                    if 'inpaint_only' in unit.module:
                         final_inpaint_raws = []
                         final_inpaint_masks = []
                         for i in range(len(controls)):
@@ -448,7 +492,7 @@ if video_visible:
                         def inpaint_only_post_processing(x, i):
                             _, H, W = x.shape
                             if Hmask != H or Wmask != W:
-                                logger.error("Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.")
+                                logger.error('Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.')
                                 return x
                             idx = i if unit_is_batch else 0
                             r = final_inpaint_raw[idx].to(x.dtype).to(x.device)
@@ -459,7 +503,7 @@ if video_visible:
 
                         post_processors.append(inpaint_only_post_processing)
 
-                    if "recolor" in unit.module:
+                    if 'recolor' in unit.module:
                         final_feeds = []
                         for i in range(len(controls)):
                             final_feed = hr_control if hr_control is not None else control
@@ -470,12 +514,12 @@ if video_visible:
                             Hfeed, Wfeed = final_feed.shape
                             final_feeds.append(final_feed)
 
-                        if "luminance" in unit.module:
+                        if 'luminance' in unit.module:
 
                             def recolor_luminance_post_processing(x, i):
                                 C, H, W = x.shape
                                 if Hfeed != H or Wfeed != W or C != 3:
-                                    logger.error("Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.")
+                                    logger.error('Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.')
                                     return x
                                 h = x.detach().cpu().numpy().transpose((1, 2, 0))
                                 h = (h * 255).clip(0, 255).astype(np.uint8)
@@ -488,12 +532,12 @@ if video_visible:
 
                             post_processors.append(recolor_luminance_post_processing)
 
-                        if "intensity" in unit.module:
+                        if 'intensity' in unit.module:
 
                             def recolor_intensity_post_processing(x, i):
                                 C, H, W = x.shape
                                 if Hfeed != H or Wfeed != W or C != 3:
-                                    logger.error("Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.")
+                                    logger.error('Error: ControlNet find post-processing resolution mismatch. This could be related to other extensions hacked processing.')
                                     return x
                                 h = x.detach().cpu().numpy().transpose((1, 2, 0))
                                 h = (h * 255).clip(0, 255).astype(np.uint8)
@@ -506,7 +550,7 @@ if video_visible:
 
                             post_processors.append(recolor_intensity_post_processing)
 
-                    if "+lama" in unit.module:
+                    if '+lama' in unit.module:
                         forward_param.used_hint_cond_latent = hook.UnetHook.call_vae_using_process(p, control)
                         self.noise_modifier = forward_param.used_hint_cond_latent
 
@@ -519,40 +563,52 @@ if video_visible:
 
                 for param in forward_params:
                     if param.control_model_type == ControlModelType.IPAdapter:
-                        param.control_model.hook(model=unet, clip_vision_output=param.hint_cond, weight=param.weight, dtype=torch.float32, start=param.start_guidance_percent, end=param.stop_guidance_percent)
-                    # Do not support controlllite for sdxl
-                    # if param.control_model_type == ControlModelType.Controlllite:
-                    #     param.control_model.hook(
-                    #         model=unet,
-                    #         cond=param.hint_cond,
-                    #         weight=param.weight,
-                    #         start=param.start_guidance_percent,
-                    #         end=param.stop_guidance_percent
-                    #     )
+                        param.control_model.hook(
+                            model=unet,
+                            clip_vision_output=param.hint_cond,
+                            weight=param.weight,
+                            dtype=torch.float32,
+                            start=param.start_guidance_percent,
+                            end=param.stop_guidance_percent
+                        ) 
+                    if param.control_model_type == ControlModelType.Controlllite:
+                        param.control_model.hook(
+                            model=unet,
+                            cond=param.hint_cond,
+                            weight=param.weight,
+                            start=param.start_guidance_percent,
+                            end=param.stop_guidance_percent
+                        )
 
                 self.detected_map = detected_maps
                 self.post_processors = post_processors
 
-                if os.path.exists(f"{data_path}/tmp/animatediff-frames/"):
-                    shutil.rmtree(f"{data_path}/tmp/animatediff-frames/")
+                if os.path.exists(f'{data_path}/tmp/animatediff-frames/'):
+                    shutil.rmtree(f'{data_path}/tmp/animatediff-frames/')
 
             def hacked_postprocess_batch(self, p, *args, **kwargs):
-                images = kwargs.get("images", [])
+                images = kwargs.get('images', [])
                 for post_processor in self.post_processors:
                     for i in range(len(images)):
                         images[i] = post_processor(images[i], i)
                 return
 
-            self.original_controlnet_main_entry = self.cn_script.controlnet_main_entry
-            self.original_postprocess_batch = self.cn_script.postprocess_batch
+            if AnimateDiffControl.original_controlnet_main_entry is not None:
+                logger.info('ControlNet Main Entry already hacked.')
+                return
+
+            AnimateDiffControl.original_controlnet_main_entry = self.cn_script.controlnet_main_entry
+            AnimateDiffControl.original_postprocess_batch = self.cn_script.postprocess_batch
             self.cn_script.controlnet_main_entry = MethodType(hacked_main_entry, self.cn_script)
             self.cn_script.postprocess_batch = MethodType(hacked_postprocess_batch, self.cn_script)
-
+            
         def restore_cn(self):
-            self.cn_script.controlnet_main_entry = self.original_controlnet_main_entry
-            self.original_controlnet_main_entry = None
-            self.cn_script.postprocess_batch = self.original_postprocess_batch
-            self.original_postprocess_batch = None
+            if AnimateDiffControl.original_controlnet_main_entry is not None:
+                self.cn_script.controlnet_main_entry = AnimateDiffControl.original_controlnet_main_entry
+                AnimateDiffControl.original_controlnet_main_entry = None
+            if AnimateDiffControl.original_postprocess_batch is not None:
+                self.cn_script.postprocess_batch = AnimateDiffControl.original_postprocess_batch
+                AnimateDiffControl.original_postprocess_batch = None
 
         def hack(self, params: AnimateDiffProcess):
             if self.cn_script is not None:
@@ -701,9 +757,10 @@ if video_visible:
                     logger.warn("WebP animation in Pillow requires system WebP library v0.5.0 or later")
             return video_paths
 
-    class AnimateDiffMM_Remake(AnimateDiffMM):
+    class AnimateDiffMM(AnimateDiffMM):
         def _load(self, model_name):
-            from .animatediff.motion_module import MotionModuleType, MotionWrapper
+            from .animatediff.motion_module import (MotionModuleType,
+                                                    MotionWrapper)
 
             model_path = os.path.join(self.script_dir, model_name)
             if not os.path.isfile(model_path):
@@ -721,7 +778,7 @@ if video_visible:
             if not shared.cmd_opts.no_half:
                 self.mm.half()
 
-    motion_module = AnimateDiffMM_Remake()
+    motion_module = AnimateDiffMM()
     motion_module.set_script_dir(easyphoto_models_path)
 
     class AnimateDiffUiGroup:

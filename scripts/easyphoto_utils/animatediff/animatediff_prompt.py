@@ -24,6 +24,10 @@ class AnimateDiffPromptSchedule:
             parts = res.info.split('\nNegative prompt: ', 1)
             if len(parts) > 1:
                 res.info = f"{self.original_prompt}\nNegative prompt: {parts[1]}"
+                for i in range(len(res.infotexts)):
+                    parts = res.infotexts[i].split('\nNegative prompt: ', 1)
+                    if len(parts) > 1:
+                        res.infotexts[i] = f"{self.original_prompt}\nNegative prompt: {parts[1]}"
                 write_params_txt(res.info)
 
 

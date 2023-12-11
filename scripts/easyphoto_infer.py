@@ -250,7 +250,7 @@ def get_controlnet_unit(
             model="control_v11p_sd15_canny",
         )
 
-    if unit != "color" and not unit.startswith("sdxl") and not unit.startswith("ipa"):
+    if unit != "color" and not unit.startswith("sdxl"):
         if is_batch:
             control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         else:
@@ -575,10 +575,6 @@ def easyphoto_infer_forward(
 
     if lcm_accelerate:
         lcm_lora_name_and_weight = "lcm_lora_sdxl:0.40" if sdxl_pipeline_flag else "lcm_lora_sd15:0.80"
-
-    # get random seed
-    if int(seed) == -1:
-        seed = np.random.randint(0, 65536)
 
     try:
         # choose tabs select
@@ -1672,6 +1668,7 @@ def easyphoto_video_infer_forward(
     t2v_input_prompt,
     t2v_input_width,
     t2v_input_height,
+    scene_id,
     init_image,
     init_image_prompt,
     last_image,
@@ -1699,6 +1696,10 @@ def easyphoto_video_infer_forward(
     video_interpolation,
     video_interpolation_ext,
     tabs,
+    ipa_control,
+    ipa_weight,
+    ipa_image_path,
+    lcm_accelerate,
     *user_ids,
 ):
     # global
@@ -1707,14 +1708,11 @@ def easyphoto_video_infer_forward(
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
-    if check_hash.get("base", True) or check_hash.get("portrait", True):
+    check_files_exists_and_download(check_hash.get("add_video", True), download_mode="add_video")
+    if check_hash.get("base", True) or check_hash.get("portrait", True) or check_hash.get("add_video", True):
         refresh_model_vae()
     check_hash["base"] = False
     check_hash["portrait"] = False
-
-    check_files_exists_and_download(check_hash.get("add_video", True), download_mode="add_video")
-    if check_hash.get("add_video", True):
-        refresh_model_vae()
     check_hash["add_video"] = False
 
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
@@ -1730,6 +1728,15 @@ def easyphoto_video_infer_forward(
     ):
         return "EasyPhoto video infer does not support the SD2 checkpoint and sdxl.", None, None, []
 
+    if ipa_control:
+        check_files_exists_and_download(check_hash.get("add_ipa_sdxl", True), download_mode="add_ipa_sdxl")
+        if check_hash.get("add_ipa_sdxl", True):
+            refresh_model_vae()
+        check_hash["add_ipa_sdxl"] = False
+    if lcm_accelerate:
+        check_files_exists_and_download(check_hash.get("lcm", True), download_mode="lcm")
+        check_hash["lcm"] = False
+
     for user_id in user_ids:
         if user_id != "none":
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
@@ -1737,12 +1744,59 @@ def easyphoto_video_infer_forward(
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
+    last_user_id_none_num = 0
     for idx, user_id in enumerate(user_ids):
         if user_id == "none":
+            last_user_id_none_num += 1
             passed_userid_list.append(idx)
+        else:
+            last_user_id_none_num = 0
 
-    if len(user_ids) == len(passed_userid_list):
+    if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", None, None, []
+
+    # check the version of controlnets
+    controlnet_version = get_controlnet_version()
+    major, minor, patch = map(int, controlnet_version.split("."))
+    if major == 0 and minor == 0 and patch == 0:
+        return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", None, None, []
+    if ipa_control:
+        if major < 1 or minor < 1 or patch < 417:
+            return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", None, None, []
+
+    # check the number of controlnets
+    max_control_net_unit_count = 3 if not ipa_control else 4
+    control_net_unit_count = shared.opts.data.get("control_net_unit_count", 3)
+    ep_logger.info("ControlNet unit number: {}".format(control_net_unit_count))
+    if control_net_unit_count < max_control_net_unit_count:
+        error_info = (
+            "Please go to Settings/ControlNet and at least set {} for "
+            "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)
+        )
+        return error_info, None, None, []
+
+    if ipa_control:
+        ipa_image_paths = ["none"] * 5  # consistent with user_ids
+        ipa_flag = False
+        valid_user_id_num, valid_ipa_image_path_num = 0, 0
+        for index, user_id in enumerate(user_ids):
+            if not ipa_flag and user_id != "none" and ipa_image_path is not None:
+                ipa_image_paths[index] = ipa_image_path
+                ipa_flag = True
+                valid_ipa_image_path_num += 1
+            if user_id != "none":
+                valid_user_id_num += 1
+
+        if valid_user_id_num > 1:
+            ep_logger.error("EasyPhoto does not support IP-Adapter Control with multiple user ids currently.")
+            return "EasyPhoto does not support IP-Adapter Control with multiple user ids currently.", None, None, []
+        if ipa_control and valid_user_id_num != valid_ipa_image_path_num:
+            ep_logger.warning(
+                "Found {} user id(s), but only {} image prompt(s) for IP-Adapter Control. Use the reference image "
+                "corresponding to the user instead.".format(valid_user_id_num, valid_ipa_image_path_num)
+            )
+    if lcm_accelerate:
+        lcm_lora_name_and_weight = "lcm_lora_sd15:0.60"
 
     try:
         # choose tabs select
@@ -1842,7 +1896,107 @@ def easyphoto_video_infer_forward(
     crop_at_last = True
     crop_at_last_ratio = 3
 
+    if ipa_control:
+        ipa_images = []
+        ipa_retinaface_boxes = []
+        ipa_retinaface_keypoints = []
+        ipa_retinaface_masks = []
+        ipa_face_part_only = False
+
     ep_logger.info("Start templates and user_ids preprocess.")
+
+    if tabs == 0:
+        if scene_id != "none":
+            # scene lora path
+            scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+            if not os.path.exists(scene_lora_model_path):
+                return "Please check scene lora is exist or not.", None, None, []
+            is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
+            if not is_scene_lora:
+                return "Please use the lora trained by ep.", None, None, []
+
+            t2v_input_prompt = t2v_input_prompt + f"<lora:{scene_id}:0.80>, "
+            if lcm_accelerate:
+                t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
+
+            # text to image with scene lora
+            ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
+            template_images = txt2img(
+                [],
+                input_prompt=t2v_input_prompt,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
+                width=t2v_input_width,
+                height=t2v_input_height,
+                default_positive_prompt=DEFAULT_POSITIVE_AD,
+                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                seed=seed,
+                sampler="Euler a",
+                animatediff_flag=True,
+                animatediff_video_length=int(max_frames),
+                animatediff_fps=int(actual_fps),
+            )
+            template_images = [template_images]
+        else:
+            reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
+            if lcm_accelerate:
+                t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
+            template_images = txt2img(
+                [],
+                input_prompt=t2v_input_prompt,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
+                width=t2v_input_width,
+                height=t2v_input_height,
+                default_positive_prompt=DEFAULT_POSITIVE_AD,
+                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                seed=seed,
+                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                animatediff_flag=True,
+                animatediff_video_length=int(max_frames),
+                animatediff_fps=int(actual_fps),
+            )
+            template_images = [template_images]
+    elif tabs == 1:
+        reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
+        image = Image.fromarray(np.uint8(template_images)).convert("RGB")
+        if last_image is not None:
+            last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
+            animatediff_reserve_scale = 1.00
+            denoising_strength = 0.55
+        else:
+            animatediff_reserve_scale = 0.75
+            denoising_strength = 0.65
+        if lcm_accelerate:
+            init_image_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
+        # Resize the template image with short edges on 512
+        short_side = min(image.width, image.height)
+        resize = float(short_side / 512.0)
+        new_size = (int(image.width // resize), int(image.height // resize))
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
+
+        template_images = inpaint(
+            image,
+            None,
+            [],
+            input_prompt=init_image_prompt,
+            diffusion_steps=30 if not lcm_accelerate else 8,
+            cfg_scale=7 if not lcm_accelerate else 2,
+            denoising_strength=denoising_strength,
+            hr_scale=1,
+            default_positive_prompt=DEFAULT_POSITIVE_AD,
+            default_negative_prompt=DEFAULT_NEGATIVE_AD,
+            seed=seed,
+            sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+            animatediff_video_length=int(max_frames),
+            animatediff_fps=int(actual_fps),
+            animatediff_reserve_scale=animatediff_reserve_scale,
+            animatediff_last_image=last_image,
+        )
+        template_images = [template_images]
+
+    reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
+
     # TODO ： multiuser in VideoModel is unable to use at 23/11/03, we keep code for future test
     for user_id in user_ids:
         if user_id == "none":
@@ -1853,6 +2007,11 @@ def easyphoto_video_infer_forward(
             face_id_retinaface_boxes.append([])
             face_id_retinaface_keypoints.append([])
             face_id_retinaface_masks.append([])
+            if ipa_control:
+                ipa_images.append("none")
+                ipa_retinaface_boxes.append([])
+                ipa_retinaface_keypoints.append([])
+                ipa_retinaface_masks.append([])
         else:
             # get prompt
             input_prompt = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
@@ -1861,6 +2020,8 @@ def easyphoto_video_infer_forward(
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
                 input_prompt += "<lora:ddpo_{}>".format(user_id)
 
+            if lcm_accelerate:
+                input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             # get best image after training
             best_outputs_paths = glob.glob(os.path.join(user_id_outpath_samples, user_id, "user_weights", "best_outputs", "*.jpg"))
             # get roop image
@@ -1872,6 +2033,25 @@ def easyphoto_video_infer_forward(
 
             face_id_image = Image.open(face_id_image_path).convert("RGB")
             roop_image = Image.open(roop_image_path).convert("RGB")
+
+            if ipa_control:
+                if ipa_image_paths[index] != "none":
+                    ipa_image = Image.open(ipa_image_paths[index])
+                    ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
+                else:
+                    ipa_image = copy.deepcopy(roop_image)
+
+                _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(
+                    retinaface_detection, ipa_image, 1, "crop"
+                )
+                if len(_ipa_retinaface_boxes) == 0:
+                    ep_logger.error("No face is detected in the uploaded image prompt.")
+                    return "Please upload a image prompt with face.", None, None, []
+                if len(_ipa_retinaface_boxes) > 1:
+                    ep_logger.warning(
+                        "{} faces are detected in the uploaded image prompt. "
+                        "Only the left one will be used.".format(len(_ipa_retinaface_boxes))
+                    )
 
             # Crop user images to obtain portrait boxes, facial keypoints, and masks
             _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(
@@ -1887,63 +2067,12 @@ def easyphoto_video_infer_forward(
             face_id_retinaface_boxes.append(_face_id_retinaface_box)
             face_id_retinaface_keypoints.append(_face_id_retinaface_keypoint)
             face_id_retinaface_masks.append(_face_id_retinaface_mask)
+            if ipa_control:
+                ipa_images.append(ipa_image)
+                ipa_retinaface_boxes.append(_ipa_retinaface_boxes[0])
+                ipa_retinaface_keypoints.append(_ipa_retinaface_keypoints[0])
+                ipa_retinaface_masks.append(_ipa_retinaface_masks[0])
 
-    if tabs == 0:
-        reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
-
-        template_images = txt2img(
-            [],
-            input_prompt=t2v_input_prompt,
-            diffusion_steps=30,
-            width=t2v_input_width,
-            height=t2v_input_height,
-            default_positive_prompt=DEFAULT_POSITIVE_AD,
-            default_negative_prompt=DEFAULT_NEGATIVE_AD,
-            seed=seed,
-            sampler="DPM++ 2M SDE Karras",
-            animatediff_flag=True,
-            animatediff_video_length=int(max_frames),
-            animatediff_fps=int(actual_fps),
-        )
-        template_images = [template_images]
-    elif tabs == 1:
-        reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
-        image = Image.fromarray(np.uint8(template_images)).convert("RGB")
-        if last_image is not None:
-            last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
-            animatediff_reserve_scale = 1.00
-            denoising_strength = 0.55
-        else:
-            animatediff_reserve_scale = 0.75
-            denoising_strength = 0.65
-
-        # Resize the template image with short edges on 512
-        short_side = min(image.width, image.height)
-        resize = float(short_side / 512.0)
-        new_size = (int(image.width // resize), int(image.height // resize))
-        image = image.resize(new_size, Image.Resampling.LANCZOS)
-
-        template_images = inpaint(
-            image,
-            None,
-            [],
-            input_prompt=init_image_prompt,
-            diffusion_steps=30,
-            denoising_strength=denoising_strength,
-            hr_scale=1,
-            default_positive_prompt=DEFAULT_POSITIVE_AD,
-            default_negative_prompt=DEFAULT_NEGATIVE_AD,
-            seed=seed,
-            sampler="DPM++ 2M SDE Karras",
-            animatediff_flag=True,
-            animatediff_video_length=int(max_frames),
-            animatediff_fps=int(actual_fps),
-            animatediff_reserve_scale=animatediff_reserve_scale,
-            animatediff_last_image=last_image,
-        )
-        template_images = [template_images]
-
-    reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
     outputs = []
     loop_message = ""
     for template_idx, template_image in enumerate(template_images):
@@ -1960,6 +2089,9 @@ def easyphoto_video_infer_forward(
             apply_face_fusion_after                 : {str(apply_face_fusion_after)}
             color_shift_middle                      : {str(color_shift_middle)}
             super_resolution                        : {str(super_resolution)}
+            ipa_control                             : {str(ipa_control)}
+            ipa_weight                              : {str(ipa_weight)}
+            ipa_image_path                          : {str(ipa_image_path)}
         """
         ep_logger.info(template_idx_info)
 
@@ -2014,6 +2146,7 @@ def easyphoto_video_infer_forward(
                     input_masks.append(_input_mask)
 
             replaced_input_image = []
+            ipa_image_face = []
             new_input_image = []
             new_input_mask = []
             template_image_original_face_area = []
@@ -2040,6 +2173,75 @@ def easyphoto_video_infer_forward(
                 )
                 _replaced_input_image = Image.fromarray(np.uint8(_replaced_input_image))
                 replaced_input_image.append(_replaced_input_image)
+
+                # The cropped face area (square) in the reference image will be used in IP-Adapter.
+                if ipa_control:
+                    try:
+                        _ipa_retinaface_box = ipa_retinaface_boxes[0]
+                        _ipa_retinaface_keypoint = ipa_retinaface_keypoints[0]
+                        _ipa_retinaface_mask = ipa_retinaface_masks[0]
+                        _ipa_face_width = _ipa_retinaface_box[2] - _ipa_retinaface_box[0]
+
+                        if not ipa_face_part_only:
+                            _ipa_mask, _brow_mask = face_skin(
+                                ipa_images[0], retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [2, 3]]
+                            )
+                            _ipa_kernel_size = np.ones((int(_ipa_face_width // 10), int(_ipa_face_width // 10)), np.uint8)
+                            # Fill small holes with a close operation (w/o cv2.dilate)
+                            _ipa_mask = Image.fromarray(np.uint8(cv2.morphologyEx(np.array(_ipa_mask), cv2.MORPH_CLOSE, _ipa_kernel_size)))
+                        else:
+                            # Expand the reference image in the x-axis direction to include the ears.
+                            h, w, c = np.shape(_ipa_retinaface_mask)
+                            _ipa_mask = np.zeros_like(np.array(_ipa_retinaface_mask, np.uint8))
+                            _ipa_retinaface_box[0] = np.clip(np.array(_ipa_retinaface_box[0], np.int32) - _ipa_face_width * 0.15, 0, w - 1)
+                            _ipa_retinaface_box[2] = np.clip(np.array(_ipa_retinaface_box[2], np.int32) + _ipa_face_width * 0.15, 0, w - 1)
+                            _ipa_mask[
+                                _ipa_retinaface_box[1] : _ipa_retinaface_box[3], _ipa_retinaface_box[0] : _ipa_retinaface_box[2]
+                            ] = 255
+                            _ipa_mask = Image.fromarray(np.uint8(_ipa_mask))
+                            _brow_mask = None
+
+                        # Since the image encoder of IP-Adapter will crop/resize the image prompt to (224, 224),
+                        # we pad the face w.r.t the long side for an aspect ratio of 1.
+                        _ipa_mask = np.array(_ipa_mask, np.uint8) / 255
+                        _ipa_image_face = np.ones_like(np.array(ipa_images[0])) * 255
+                        _ipa_image_face = Image.fromarray(np.uint8(np.array(ipa_images[0]) * _ipa_mask + _ipa_image_face * (1 - _ipa_mask)))
+                        _ipa_image_face = _ipa_image_face.crop(_ipa_retinaface_box)
+
+                        # Align the ipa face
+                        _ipa_retinaface_keypoint[:, 0] -= _ipa_retinaface_box[0]
+                        _ipa_retinaface_keypoint[:, 1] -= _ipa_retinaface_box[1]
+                        _ipa_image_face = Image.fromarray(
+                            np.uint8(alignment_photo(np.array(_ipa_image_face), np.array(_ipa_retinaface_keypoint, np.int))[0])
+                        )
+
+                        # If brow_mask is not None, remove the skin above brows
+                        # Only edit the facial area here, hair is useless
+                        if _brow_mask is not None:
+                            _brow_mask = _brow_mask.crop(_ipa_retinaface_box)
+                            _brow_mask = Image.fromarray(
+                                np.uint8(
+                                    alignment_photo(
+                                        np.array(_brow_mask), np.array(_ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0)
+                                    )[0]
+                                )
+                            )
+                            y_coords, _, _ = np.where(np.array(_brow_mask) > 0)
+                            min_y = max(int(np.min(y_coords)), 1)
+                            _ipa_image_face = np.array(_ipa_image_face, np.uint8)
+                            _ipa_image_face[:min_y, :, :] = 255
+                            _ipa_image_face = Image.fromarray(_ipa_image_face)
+
+                        _padded_size = (max(_ipa_image_face.size), max(_ipa_image_face.size))
+                        _ipa_image_face = ImageOps.pad(_ipa_image_face, _padded_size, color=(255, 255, 255))
+                        ipa_image_face.append(_ipa_image_face)
+                    except Exception as e:
+                        ipa_image_face.append(None)
+
+                        torch.cuda.empty_cache()
+                        traceback.print_exc()
+                        ep_logger.error(f"Crop ipa image error. Continue. Error Info: {e}")
+                        continue
 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[0] is not None and apply_face_fusion_before:
@@ -2144,8 +2346,12 @@ def easyphoto_video_infer_forward(
                     ["openpose", replaced_input_image, 0.50, 1],
                     ["color", input_image, 0.85, 1],
                 ]
+                if ipa_control and not (None in ipa_image_face):
+                    controlnet_pairs.append(["ipa_full_face", ipa_image_face, ipa_weight])
             else:
                 controlnet_pairs = [["canny", input_image, 0.50, 1], ["openpose", replaced_input_image, 0.50, 1]]
+                if ipa_control and not (None in ipa_image_face):
+                    controlnet_pairs.append(["ipa_full_face", ipa_image_face, ipa_weight])
 
             sum_input_mask = []
             for _input_mask in input_mask:
@@ -2161,6 +2367,7 @@ def easyphoto_video_infer_forward(
                 sum_input_mask,
                 controlnet_pairs,
                 diffusion_steps=first_diffusion_steps,
+                cfg_scale=7 if not lcm_accelerate else 2,
                 denoising_strength=first_denoising_strength,
                 input_prompt=input_prompts[0],
                 hr_scale=1.0,
@@ -2168,6 +2375,7 @@ def easyphoto_video_infer_forward(
                 sd_model_checkpoint=sd_model_checkpoint,
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
                 default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 animatediff_flag=True,
                 animatediff_fps=int(actual_fps),
             )
