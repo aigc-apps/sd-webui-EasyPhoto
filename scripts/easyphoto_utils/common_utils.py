@@ -1,3 +1,4 @@
+import copy
 import gc
 import hashlib
 import logging
@@ -16,7 +17,7 @@ from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir
+from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -429,11 +430,12 @@ def check_scene_valid(lora_path, models_path):
 
 
 def get_attribute_edit_ids():
-    attribute_edit_ids = []
+    attribute_edit_ids = copy.deepcopy(DEFAULT_SLIDERS)
     for lora_name in os.listdir(os.path.join(models_path, "Lora")):
-        if (lora_name.endswith("sliders.safentensors") or lora_name.endswith("sliders.pt")):
-            attribute_edit_ids.append(os.path.splitext(lora_name)[0])
-    return attribute_edit_ids
+        if lora_name.endswith("sliders.safentensors") or lora_name.endswith("sliders.pt"):
+            if os.path.splitext(lora_name)[0] not in set(attribute_edit_ids):
+                attribute_edit_ids.append(os.path.splitext(lora_name)[0])
+    return sorted(attribute_edit_ids)
 
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):

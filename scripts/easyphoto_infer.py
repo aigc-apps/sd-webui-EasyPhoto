@@ -280,6 +280,7 @@ def txt2img(
     animatediff_flag=False,
     animatediff_video_length=0,
     animatediff_fps=0,
+    loractl_flag=False,
 ):
     controlnet_units_list = []
 
@@ -305,6 +306,7 @@ def txt2img(
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
+        loractl_flag=False,
     )
 
     return image
@@ -520,6 +522,12 @@ def easyphoto_infer_forward(
     
     loractl_flag = False
     if "sliders" in additional_prompt:
+        if ("sdxl_sliders" in additional_prompt and not sdxl_pipeline_flag) or ("sd1_sliders" in additional_prompt and sdxl_pipeline_flag):
+            error_info = "The type of the stable diffusion model {} and attribute edit sliders ({}) does not match.".format(
+                sd_model_checkpoint, additional_prompt
+            )
+            ep_logger.error(error_info)
+            return error_info, [], []
         # download all sliders here.
         check_files_exists_and_download(check_hash.get("sliders", True), download_mode="sliders")
         check_hash["sliders"] = False
@@ -795,7 +803,7 @@ def easyphoto_infer_forward(
     # or do txt2img with SDXL once before img2img.
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
     if sdxl_pipeline_flag and not sdxl_txt2img_flag:
-        txt2img([], diffusion_steps=2, do_not_save_samples=True)
+        txt2img([], diffusion_steps=3, do_not_save_samples=True)
         sdxl_txt2img_flag = True
     for index, user_id in enumerate(user_ids):
         if user_id == "none":
