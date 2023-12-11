@@ -70,11 +70,14 @@ class switch_return_opt(ContextDecorator):
     def __enter__(self):
         self.origin_return_mask = shared.opts.return_mask
         self.origin_return_mask_composite = shared.opts.return_mask_composite
+        self.origin_control_net_no_detectmap = shared.opts.data.get("control_net_no_detectmap", False)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         shared.opts.return_mask = self.origin_return_mask
         shared.opts.return_mask_composite = self.origin_return_mask_composite
+        if "control_net_no_detectmap" in shared.opts.data.keys():
+            shared.opts.data["control_net_no_detectmap"] = self.origin_control_net_no_detectmap
 
 
 class ControlMode(Enum):
@@ -587,11 +590,13 @@ def i2i_inpaint_call(
         animatediff_flag (bool): Animatediff flag.
         animatediff_video_length (int): Animatediff video length.
         animatediff_fps (int): Animatediff video FPS.
+        loractl_flag (bool): Whether to append LoRA weight in all steps to `gen_image` or not.
 
     Returns:
         gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
             When animatediff_flag is True, outputs is list.
             When animatediff_flag is False, outputs is PIL.Image.Image.
+            When loractl_flag is True, outputs is (PIL.Image.Image, PIL.Image.Image).
     """
     if sampler is None:
         sampler = "Euler a"
@@ -601,6 +606,8 @@ def i2i_inpaint_call(
     # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
     opts.return_mask = False
     opts.return_mask_composite = False
+    if "control_net_no_detectmap" in shared.opts.data.keys():
+        shared.opts.data["control_net_no_detectmap"] = True
 
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
