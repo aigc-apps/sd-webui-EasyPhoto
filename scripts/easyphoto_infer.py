@@ -197,7 +197,7 @@ def get_controlnet_unit(
 
     elif unit == "ipa_full_face":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            input_image=None,
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
