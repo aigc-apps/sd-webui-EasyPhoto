@@ -1292,7 +1292,8 @@ def on_ui_tabs():
                                         makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
                                         video_interpolation = gr.Checkbox(label="Video Interpolation", value=False)
                                         lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
-
+                                        
+                                        # reuse this file L796, change other value when click
                                         def lcm_change(lcm_accelerate):
                                             if lcm_accelerate:
                                                 return (

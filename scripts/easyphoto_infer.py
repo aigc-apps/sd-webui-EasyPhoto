@@ -1755,7 +1755,7 @@ def easyphoto_video_infer_forward(
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", None, None, []
 
-    # check the version of controlnets
+    # check the version of controlnets, reuse code at L538
     controlnet_version = get_controlnet_version()
     major, minor, patch = map(int, controlnet_version.split("."))
     if major == 0 and minor == 0 and patch == 0:
