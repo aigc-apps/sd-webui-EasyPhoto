@@ -1517,7 +1517,7 @@ def on_ui_tabs():
                                         ) or "mask" in tryon_cloth:
                                             continue
                                         if with_info:
-                                            tryon_cloth_gallery_list.append((tryon_cloth, tryon_cloth.split("/")[-1].split(".")[0]))
+                                            tryon_cloth_gallery_list.append((tryon_cloth, os.path.basename(tryon_cloth).split(".")[0]))
                                         else:
                                             tryon_cloth_gallery_list.append(tryon_cloth)
 
