@@ -1251,7 +1251,7 @@ def easyphoto_infer_forward(
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras",
+                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
                     # We only save the lora weight image in the first diffusion.
                     if loractl_flag:
