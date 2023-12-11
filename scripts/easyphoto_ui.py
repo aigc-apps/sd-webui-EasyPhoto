@@ -726,9 +726,9 @@ def on_ui_tabs():
 
                                 with gr.Row():
                                     attribute_edit_id = gr.Dropdown(
-                                        value="none" + DEFAULT_SLIDERS,
+                                        value="none",
                                         elem_id="dropdown",
-                                        choices=["none"] + get_attribute_edit_ids(),
+                                        choices=["none"] + DEFAULT_SLIDERS,
                                         label="Attribute Edit Sliders"
                                     )
                                     attribute_edit_id_refresh = ToolButton(value="\U0001f504")
