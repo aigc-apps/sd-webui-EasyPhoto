@@ -936,16 +936,7 @@ def on_ui_tabs():
                                 columns=[4], rows=[2], object_fit="contain", height="auto"
                             )
 
-                            def select_function(photo_infer_output_images, evt: gr.SelectData):
-                                # photo_infer_output_images [{'name':path,'data':'','is_file':True},{},...]
-                                return photo_infer_output_images[evt.index]["name"]
-
                             selected_photo_infer_output_image = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                            photo_infer_output_images.select(
-                                select_function,
-                                photo_infer_output_images,
-                                selected_photo_infer_output_image,
-                            )
 
                             with gr.Row():
                                 tabname = "easyphoto"
@@ -1910,16 +1901,7 @@ def on_ui_tabs():
                                 columns=[4], rows=[2], object_fit="contain", height="auto"
                             )
 
-                            def select_function(tryon_output_images, evt: gr.SelectData):
-                                # tryon_output_images [{'name':path,'data':'','is_file':True},{},...]
-                                return tryon_output_images[evt.index]["name"]
-
                             selected_tryon_output_image = gr.Text(show_label=False, visible=False, placeholder="Selected")
-                            tryon_output_images.select(
-                                select_function,
-                                tryon_output_images,
-                                selected_tryon_output_image,
-                            )
 
                             with gr.Row():
                                 tabname = "easyphoto"
@@ -2000,29 +1982,6 @@ def on_ui_tabs():
                                 interactive=False,
                             )
 
-                            buttons_photo_infer["tryon"].click(_js="switch_to_ep_tryon", fn=None)
-
-                            def select_single_image_upload():
-                                upload_way = "Single Image Upload"
-                                return [
-                                    upload_way,
-                                    gr.update(visible=False),
-                                    gr.update(visible=True),
-                                    gr.update(visible=False),
-                                ]
-
-                            buttons_tryon["easyphoto"].click(
-                                fn=select_single_image_upload,
-                                _js="switch_to_ep_photoinfer_upload",
-                                inputs=[],
-                                outputs=[
-                                    upload_way,
-                                    template_gallery,
-                                    single_image_upload,
-                                    batch_images_upload,
-                                ],
-                            )
-
                     def preview_mask(image_tryon, img_type):
                         return_info, refine_mask = easyphoto_tryon_mask_forward(image_tryon, img_type)
                         return return_info, refine_mask
@@ -2067,6 +2026,49 @@ def on_ui_tabs():
                         ],
                         outputs=[infer_progress, tryon_output_images, template_mask, reference_mask],
                     )
+
+                    def select_output_function(output_images, evt: gr.SelectData):
+                        # output_images [{'name':path,'data':'','is_file':True},{},...]
+                        return output_images[evt.index]["name"]
+
+                    tryon_output_images.select(
+                        select_output_function,
+                        tryon_output_images,
+                        selected_tryon_output_image,
+                    )
+
+                    photo_infer_output_images.select(
+                        select_output_function,
+                        photo_infer_output_images,
+                        selected_photo_infer_output_image,
+                    )
+
+                    buttons_photo_infer["tryon"].click(
+                        _js="switch_to_ep_tryon",
+                        fn=None,
+                    )
+
+                    def select_single_image_upload():
+                        upload_way = "Single Image Upload"
+                        return [
+                            upload_way,
+                            gr.update(visible=False),
+                            gr.update(visible=True),
+                            gr.update(visible=False),
+                        ]
+
+                    buttons_tryon["easyphoto"].click(
+                        fn=select_single_image_upload,
+                        _js="switch_to_ep_photoinfer_upload",
+                        inputs=[],
+                        outputs=[
+                            upload_way,
+                            template_gallery,
+                            single_image_upload,
+                            batch_images_upload,
+                        ],
+                    )
+
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]
 
 
