@@ -1708,6 +1708,7 @@ def easyphoto_video_infer_forward(
     t2v_input_height,
     scene_id,
     upload_openpose_control_video,
+    upload_control_video_type,
     openpose_control_video,
     init_image,
     init_image_prompt,
@@ -1974,7 +1975,14 @@ def easyphoto_video_infer_forward(
                 resize = float(short_side / 512.0)
                 new_size = (int(image.width // resize), int(image.height // resize))
 
-                controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+                if upload_control_video_type == 'depth':
+                    ep_logger.info(f"Using depth control for video control input")
+                    controlnet_pairs = [["depth", template_images[0], 1, 1]]
+
+                if upload_control_video_type == 'openpose':
+                    ep_logger.info(f"Using openpose control for video control input")
+                    controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+
                 template_images = txt2img(
                     controlnet_pairs,
                     input_prompt=t2v_input_prompt,

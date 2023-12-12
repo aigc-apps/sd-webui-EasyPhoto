@@ -38,7 +38,7 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New:
-- Support LCM-Lora based sampling acceleration, now you only need 12 step for both Image & Video generation.[🔥 🔥 🔥 🔥 2023.12.09]
+- Support LCM-Lora based sampling acceleration, now you only need 12 step (vs 50 steps) for both Image & Video generation, and we provide Scene Lora training and inference in both text2Image and text2Video.[🔥 🔥 🔥 🔥 2023.12.09]
 - Support Concepts-Sliders based attribute editing and Virtual TryOn， please refer to [sliders-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit) , [tryon-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/TryOn) for more details. [🔥 🔥 🔥 🔥 2023.12.08]
 - Thanks to [lanrui-ai](https://www.lanrui-ai.com/). It offers an SDWebUI image with built-in EasyPhoto, promising bi-weekly updates. Personally tested, it can pull up resources in 2 minutes and complete startup within 5 minutes. [ 2023.11.20 ]
 - We are already support Video Inference without more traning! Specific details can go [here](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Video)![🔥 🔥 🔥 🔥 2023.11.10]
