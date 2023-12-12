@@ -38,17 +38,19 @@ We now support quick pull-ups from different platforms, refer to [Quick Start](#
 Now you can experience EasyPhoto demo quickly on ModelScope, [demo](https://modelscope.cn/studios/PAI/EasyPhoto/summary).
 
 What's New:
-- Thanks to [lanrui-ai](https://www.lanrui-ai.com/). It offers an SDWebUI image with built-in EasyPhoto, promising bi-weekly updates. Personally tested, it can pull up resources in 2 minutes and complete startup within 5 minutes. [🔥 🔥 🔥 🔥 2023.11.20]
+- Support LCM-Lora based sampling acceleration, now you only need 12 step for both Image & Video generation.[🔥 🔥 🔥 🔥 2023.12.09]
+- Support Concepts-Sliders based attribute editing and Virtual TryOn， please refer to [sliders-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit) , [tryon-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/TryOn) for more details. [🔥 🔥 🔥 🔥 2023.12.08]
+- Thanks to [lanrui-ai](https://www.lanrui-ai.com/). It offers an SDWebUI image with built-in EasyPhoto, promising bi-weekly updates. Personally tested, it can pull up resources in 2 minutes and complete startup within 5 minutes. [ 2023.11.20 ]
 - We are already support Video Inference without more traning! Specific details can go [here](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Video)![🔥 🔥 🔥 🔥 2023.11.10]
 - SDXL Training and Inference Support. Specific details can go [here](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/SDXL)![🔥 🔥 🔥 🔥 2023.11.10]
 - ComfyUI Support at [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), thanks to [THtianhao](https://github.com/THtianhao) great work![🔥 🔥 🔥 2023.10.17]
 - EasyPhoto arxiv [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]
-- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory! Specific details can go [here](https://zhuanlan.zhihu.com/p/658940203)[🔥 🔥 🔥 2023.09.26]
-- We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [🔥 2023.09.25]
-- **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [🔥🔥 2023.09.15]
-- **Support different base models for training and inference.** [🔥🔥 2023.09.08]
-- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [🔥🔥 2023.09.06]
-- Create Code! Support for Windows and Linux Now. [🔥 2023.09.02]
+- Support SDXL to generate High resolution template, no more upload image need in this mode(SDXL), need 16GB GPU memory! Specific details can go [here](https://zhuanlan.zhihu.com/p/658940203)[ 2023.09.26 ]
+- We also support the [Diffusers Edition](https://github.com/aigc-apps/EasyPhoto/). [ 2023.09.25 ]
+- **Support fine-tuning the background and calculating the similarity score between the generated image and the user.** [ 2023.09.15 ]
+- **Support different base models for training and inference.** [ 2023.09.08 ]
+- **Support multi-people generation! Add cache option to optimize inference speed. Add log refreshing on UI.** [ 2023.09.06 ]
+- Create Code! Support for Windows and Linux Now. [ 2023.09.02 ]
 
 These are our generated results:
 ![results_1](images/results_1.jpg)
