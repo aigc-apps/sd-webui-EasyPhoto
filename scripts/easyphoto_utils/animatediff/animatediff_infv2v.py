@@ -122,7 +122,7 @@ class AnimateDiffInfV2V:
                         control.control_model.image_emb_backup = control.control_model.image_emb
                         control.control_model.image_emb = control.control_model.image_emb[context]
                         control.control_model.uncond_image_emb_backup = control.control_model.uncond_image_emb
-                        control.control_model.uncond_image_emb = control.control_model.uncond_image_emb
+                        control.control_model.uncond_image_emb = control.control_model.uncond_image_emb[context]
                     elif control.control_model_type == ControlModelType.Controlllite:
                         for module in control.control_model.modules.values():
                             if module.cond_image.shape[0] > len(context):
