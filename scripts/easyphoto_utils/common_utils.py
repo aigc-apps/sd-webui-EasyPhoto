@@ -1,3 +1,4 @@
+import copy
 import gc
 import hashlib
 import logging
@@ -16,7 +17,7 @@ from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir
+from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -227,6 +228,12 @@ download_urls = {
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image.jpg",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/tryon/cloth/demo_short/ref_image_mask.jpg",
     ],
+    "sliders": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/smiling_sd1_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sd14_sliders/age_sd1_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/xl_sliders/smiling_sdxl_sliders.pt",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/xl_sliders/age_sdxl_sliders.pt",
+    ],
 }
 save_filenames = {
     # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
@@ -400,6 +407,13 @@ save_filenames = {
         os.path.join(tryon_cloth_gallery_dir, "demo_short_200.jpg"),
         os.path.join(tryon_cloth_gallery_dir, "demo_short_200_mask.jpg"),
     ],
+    # Sliders
+    "sliders": [
+        os.path.join(models_path, f"Lora/smiling_sd1_sliders.pt"),
+        os.path.join(models_path, f"Lora/age_sd1_sliders.pt"),
+        os.path.join(models_path, f"Lora/smiling_sdxl_sliders.pt"),
+        os.path.join(models_path, f"Lora/age_sdxl_sliders.pt"),
+    ],
 }
 
 
@@ -413,6 +427,15 @@ def check_scene_valid(lora_path, models_path):
     if lora_type == 4:
         return True
     return False
+
+
+def get_attribute_edit_ids():
+    attribute_edit_ids = copy.deepcopy(DEFAULT_SLIDERS)
+    for lora_name in os.listdir(os.path.join(models_path, "Lora")):
+        if lora_name.endswith("sliders.safentensors") or lora_name.endswith("sliders.pt"):
+            if os.path.splitext(lora_name)[0] not in set(attribute_edit_ids):
+                attribute_edit_ids.append(os.path.splitext(lora_name)[0])
+    return sorted(attribute_edit_ids)
 
 
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
@@ -695,7 +718,7 @@ def seed_everything(seed=11):
 
 
 def get_controlnet_version() -> str:
-    """Adapte from sd-webui-controlnet/patch_version.py."""
+    """Borrowed from sd-webui-controlnet/patch_version.py."""
     version_file = "scripts/controlnet_version.py"
     version_file_path = os.path.join(controlnet_extensions_path, version_file)
     if not os.path.exists(version_file_path):

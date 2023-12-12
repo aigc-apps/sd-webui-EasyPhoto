@@ -280,6 +280,7 @@ def txt2img(
     animatediff_flag=False,
     animatediff_video_length=0,
     animatediff_fps=0,
+    loractl_flag=False,
 ):
     controlnet_units_list = []
 
@@ -305,6 +306,7 @@ def txt2img(
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
+        loractl_flag=False,
     )
 
     return image
@@ -332,6 +334,7 @@ def inpaint(
     animatediff_fps=0,
     animatediff_reserve_scale=1,
     animatediff_last_image=None,
+    loractl_flag=False,
 ):
     assert input_image is not None, f"input_image must not be none"
     controlnet_units_list = []
@@ -387,6 +390,7 @@ def inpaint(
         animatediff_fps=animatediff_fps,
         animatediff_reserve_scale=animatediff_reserve_scale,
         animatediff_last_image=animatediff_last_image,
+        loractl_flag=loractl_flag
     )
 
     return image
@@ -515,6 +519,19 @@ def easyphoto_infer_forward(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
                 return error_info, [], []
+    
+    loractl_flag = False
+    if "sliders" in additional_prompt:
+        if ("sdxl_sliders" in additional_prompt and not sdxl_pipeline_flag) or ("sd1_sliders" in additional_prompt and sdxl_pipeline_flag):
+            error_info = "The type of the stable diffusion model {} and attribute edit sliders ({}) does not match.".format(
+                sd_model_checkpoint, additional_prompt
+            )
+            ep_logger.error(error_info)
+            return error_info, [], []
+        # download all sliders here.
+        check_files_exists_and_download(check_hash.get("sliders", True), download_mode="sliders")
+        check_hash["sliders"] = False
+        loractl_flag = True
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -785,7 +802,7 @@ def easyphoto_infer_forward(
     # or do txt2img with SDXL once before img2img.
     # https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/6923#issuecomment-1713104376.
     if sdxl_pipeline_flag and not sdxl_txt2img_flag:
-        txt2img([], diffusion_steps=2, do_not_save_samples=True)
+        txt2img([], diffusion_steps=3, do_not_save_samples=True)
         sdxl_txt2img_flag = True
     for index, user_id in enumerate(user_ids):
         if user_id == "none":
@@ -840,7 +857,7 @@ def easyphoto_infer_forward(
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
-                input_prompt += "<lora:ddpo_{}>".format(user_id)
+                input_prompt += "<lora:ddpo_{}>, ".format(user_id)
 
             # TODO: face_id_image_path may have to be picked with pitch yaw angle in video mode.
             if sdxl_pipeline_flag:
@@ -1210,7 +1227,11 @@ def easyphoto_infer_forward(
                         hr_scale=1.0,
                         seed=seed,
                         sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                        loractl_flag=loractl_flag,
                     )
+                    # We only save the lora weight image in the first diffusion.
+                    if loractl_flag:
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
                 else:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
@@ -1232,6 +1253,9 @@ def easyphoto_infer_forward(
                         seed=seed,
                         sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
+                    # We only save the lora weight image in the first diffusion.
+                    if loractl_flag:
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
 
                     # detect face area
                     face_skin_mask = face_skin(
@@ -1632,6 +1656,8 @@ def easyphoto_infer_forward(
                 output_image = template_image
 
             outputs.append(output_image)
+            if loractl_flag:
+                outputs.append(lora_weight_image)
             save_image(
                 output_image,
                 easyphoto_outpath_samples,

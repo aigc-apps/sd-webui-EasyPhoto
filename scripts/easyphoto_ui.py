@@ -10,6 +10,7 @@ from scripts.easyphoto_config import (
     DEFAULT_SCENE_LORA,
     DEFAULT_CLOTH_LORA,
     DEFAULT_TRYON_TEMPLATE,
+    DEFAULT_SLIDERS,
     cache_log_file_path,
     easyphoto_models_path,
     easyphoto_video_outpath_samples,
@@ -21,8 +22,22 @@ from scripts.easyphoto_config import (
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_tryon_infer import easyphoto_tryon_infer_forward, easyphoto_tryon_mask_forward
-from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, check_scene_valid, video_visible, ep_logger
+from scripts.easyphoto_utils import (
+    check_files_exists_and_download,
+    check_id_valid,
+    check_scene_valid,
+    check_loractl_conflict,
+    ep_logger,
+    get_attribute_edit_ids,
+    video_visible
+)
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
+
+if not check_loractl_conflict():
+    from scripts.easyphoto_utils import LoraCtlScript
+else:
+    ep_logger.info("Import LoraCtlScript from sd-webui-loractl since the plugin already exists and is enabled.")
+
 
 gradio_compat = True
 
@@ -707,10 +722,34 @@ def on_ui_tabs():
                                 additional_prompt = gr.Textbox(
                                     label="Additional Prompt", lines=3, value="masterpiece, beauty", interactive=True
                                 )
-                                seed = gr.Textbox(
-                                    label="Seed",
-                                    value=-1,
-                                )
+                                seed = gr.Textbox(label="Seed", value=-1)
+
+                                with gr.Row():
+                                    attribute_edit_id = gr.Dropdown(
+                                        value="none",
+                                        elem_id="dropdown",
+                                        choices=["none"] + DEFAULT_SLIDERS,
+                                        label="Attribute Edit Sliders"
+                                    )
+                                    attribute_edit_id_refresh = ToolButton(value="\U0001f504")
+                                    attribute_edit_id_refresh.click(
+                                        fn=lambda: gr.update(choices=["none"] + get_attribute_edit_ids()),
+                                        inputs=[],
+                                        outputs=[attribute_edit_id]
+                                    )
+                                    attribute_edit_id.select(
+                                        fn=lambda additional_prompt, attribute_edit_id: gr.update(
+                                            value=additional_prompt + f" <lora:{attribute_edit_id}:0@0, 0@0.2, 2@0.2, 2@1>"
+                                        ),
+                                        inputs=[additional_prompt, attribute_edit_id],
+                                        outputs=[additional_prompt]
+                                    )
+                                with gr.Row():
+                                    attribute_edit_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit"
+                                    _ = gr.Markdown(
+                                        value="**Please check the [[wiki]]({}) before using attribute edit**.".format(attribute_edit_wiki_url)
+                                    )
+
                                 with gr.Row():
                                     before_face_fusion_ratio = gr.Slider(
                                         minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Face Fusion Ratio Before"

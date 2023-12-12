@@ -64,6 +64,22 @@ class switch_sd_model_vae(ContextDecorator):
         sd_vae.reload_vae_weights()
 
 
+class switch_return_opt(ContextDecorator):
+    """Context-manager that supports switch `return_mask` and `return_mask_composite`."""
+
+    def __enter__(self):
+        self.origin_return_mask = shared.opts.return_mask
+        self.origin_return_mask_composite = shared.opts.return_mask_composite
+        self.origin_control_net_no_detectmap = shared.opts.data.get("control_net_no_detectmap", False)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        shared.opts.return_mask = self.origin_return_mask
+        shared.opts.return_mask_composite = self.origin_return_mask_composite
+        if "control_net_no_detectmap" in shared.opts.data.keys():
+            shared.opts.data["control_net_no_detectmap"] = self.origin_control_net_no_detectmap
+
+
 class ControlMode(Enum):
     """
     The improved guess mode.
@@ -309,6 +325,7 @@ def refresh_model_vae():
     refresh_vae_list()
 
 
+@switch_return_opt()
 def t2i_call(
     resize_mode=0,
     prompt="",
@@ -346,6 +363,7 @@ def t2i_call(
     animatediff_flag=False,
     animatediff_video_length=0,
     animatediff_fps=0,
+    loractl_flag=False,
 ):
     """
     Perform text-to-image generation.
@@ -387,16 +405,24 @@ def t2i_call(
         animatediff_flag (bool): Animatediff flag.
         animatediff_video_length (int): Animatediff video length.
         animatediff_fps (int): Animatediff video FPS.
+        loractl_flag (bool): Whether to append LoRA weight in all steps to `gen_image` or not.
 
     Returns:
         gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
             When animatediff_flag is True, outputs is list.
             When animatediff_flag is False, outputs is PIL.Image.Image.
+            When loractl_flag is True, outputs is (PIL.Image.Image, PIL.Image.Image).
     """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
         steps = 20
+    
+    # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
+    opts.return_mask = False
+    opts.return_mask_composite = False
+    if "control_net_no_detectmap" in shared.opts.data.keys():
+        shared.opts.data["control_net_no_detectmap"] = True
 
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
@@ -444,6 +470,10 @@ def t2i_call(
                 p_txt2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.name == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+            if "dynamic lora weights" in alwayson_scripts.name:
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_txt2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_txt2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
@@ -451,8 +481,16 @@ def t2i_call(
                 p_txt2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.title().lower() == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_txt2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+            if "dynamic lora weights" in alwayson_scripts.title().lower():
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_txt2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_txt2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
+
     p_txt2img.seed = int(seed)
+    # TODO: refactor.
     processed = processing.process_images(p_txt2img)
+    if loractl_flag:
+        return (processed.images[0], processed.images[1])
     if animatediff_flag:
         opts.return_mask = before_opts
 
@@ -472,6 +510,7 @@ def t2i_call(
     return gen_image
 
 
+@switch_return_opt()
 def i2i_inpaint_call(
     images=[],
     resize_mode=0,
@@ -521,6 +560,7 @@ def i2i_inpaint_call(
     animatediff_fps=0,
     animatediff_reserve_scale=1,
     animatediff_last_image=None,
+    loractl_flag=False
 ):
     """
     Perform image-to-image inpainting.
@@ -572,16 +612,24 @@ def i2i_inpaint_call(
         animatediff_flag (bool): Animatediff flag.
         animatediff_video_length (int): Animatediff video length.
         animatediff_fps (int): Animatediff video FPS.
+        loractl_flag (bool): Whether to append LoRA weight in all steps to `gen_image` or not.
 
     Returns:
         gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
             When animatediff_flag is True, outputs is list.
             When animatediff_flag is False, outputs is PIL.Image.Image.
+            When loractl_flag is True, outputs is (PIL.Image.Image, PIL.Image.Image).
     """
     if sampler is None:
         sampler = "Euler a"
     if steps is None:
         steps = 20
+    
+    # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
+    opts.return_mask = False
+    opts.return_mask_composite = False
+    if "control_net_no_detectmap" in shared.opts.data.keys():
+        shared.opts.data["control_net_no_detectmap"] = True
 
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
@@ -640,7 +688,7 @@ def i2i_inpaint_call(
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
         animate_diff_process = None
-
+    
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
@@ -649,6 +697,10 @@ def i2i_inpaint_call(
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.name == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+            if "dynamic lora weights" in alwayson_scripts.name:
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
         else:
             if alwayson_scripts.title().lower() is None:
                 continue
@@ -656,8 +708,16 @@ def i2i_inpaint_call(
                 p_img2img.script_args[alwayson_scripts.args_from : alwayson_scripts.args_from + len(controlnet_units)] = controlnet_units
             if alwayson_scripts.title().lower() == "animatediff_easyphoto" and animate_diff_process is not None:
                 p_img2img.script_args[alwayson_scripts.args_from] = animate_diff_process
+            if "dynamic lora weights" in alwayson_scripts.title().lower():
+                # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
+                p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
+                p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
+
     p_img2img.seed = int(seed)
+    # TODO: refactor.
     processed = processing.process_images(p_img2img)
+    if loractl_flag:
+        return (processed.images[0], processed.images[1])
     if animatediff_flag:
         opts.return_mask = before_opts
 
