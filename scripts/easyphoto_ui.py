@@ -88,6 +88,95 @@ for root, dirs, files in os.walk(models_dir):
             checkpoints.append(rel_path)
 
 
+def scene_change_function(scene_id_gallery, evt: gr.SelectData):
+    scene_id = scene_id_gallery[evt.index][1]
+    # scene lora path
+    lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+    if scene_id == "none":
+        return gr.update(visible=True), gr.update(value="none")
+    if scene_id in DEFAULT_SCENE_LORA:
+        check_files_exists_and_download(False, download_mode=scene_id)
+    if not os.path.exists(lora_model_path):
+        return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
+    is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+
+    return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
+
+
+def scene_refresh_function():
+    scene = [
+        [
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                "scene_lora",
+                f"{_scene}.jpg",
+            ),
+            _scene,
+        ]
+        for _scene in DEFAULT_SCENE_LORA
+    ]
+    _scenes = os.listdir(os.path.join(models_path, "Lora"))
+    for _scene in _scenes:
+        if check_scene_valid(_scene, models_path):
+            if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+                continue
+            ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+            if not os.path.exists(ref_image):
+                ref_image = os.path.join(
+                    os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                    "no_found_image.jpg",
+                )
+            scene.append([ref_image, os.path.splitext(_scene)[0]])
+    scene = sorted(scene)
+    scene.insert(
+        0,
+        [
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                "no_found_image.jpg",
+            ),
+            "none",
+        ],
+    )
+    return gr.update(value=scene)
+
+
+scene = [
+    [
+        os.path.join(
+            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+            "scene_lora",
+            f"{_scene}.jpg",
+        ),
+        _scene,
+    ]
+    for _scene in DEFAULT_SCENE_LORA
+]
+_scenes = os.listdir(os.path.join(models_path, "Lora"))
+for _scene in _scenes:
+    if check_scene_valid(_scene, models_path):
+        if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
+            continue
+        ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
+        if not os.path.exists(ref_image):
+            ref_image = os.path.join(
+                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+                "no_found_image.jpg",
+            )
+        scene.append([ref_image, os.path.splitext(_scene)[0]])
+scene = sorted(scene)
+scene.insert(
+    0,
+    [
+        os.path.join(
+            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
+            "no_found_image.jpg",
+        ),
+        "none",
+    ],
+)
+
+
 def upload_file(files, current_files):
     file_paths = [file_d["name"] for file_d in current_files] + [file.name for file in files]
     return file_paths
@@ -466,97 +555,6 @@ def on_ui_tabs():
                                         )
                                         with gr.Accordion("Scene Lora (Click here to select Scene Lora)", open=False):
                                             with gr.Column():
-
-                                                def scene_change_function(scene_id_gallery, evt: gr.SelectData):
-                                                    scene_id = scene_id_gallery[evt.index][1]
-                                                    # scene lora path
-                                                    lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
-                                                    if scene_id == "none":
-                                                        return gr.update(visible=True), gr.update(value="none")
-                                                    if scene_id in DEFAULT_SCENE_LORA:
-                                                        check_files_exists_and_download(False, download_mode=scene_id)
-                                                    if not os.path.exists(lora_model_path):
-                                                        return gr.update(value="Please check scene lora is exist or not."), gr.update(
-                                                            value="none"
-                                                        )
-                                                    is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
-
-                                                    return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
-
-                                                def scene_refresh_function():
-                                                    scene = [
-                                                        [
-                                                            os.path.join(
-                                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                                "scene_lora",
-                                                                f"{_scene}.jpg",
-                                                            ),
-                                                            _scene,
-                                                        ]
-                                                        for _scene in DEFAULT_SCENE_LORA
-                                                    ]
-                                                    _scenes = os.listdir(os.path.join(models_path, "Lora"))
-                                                    for _scene in _scenes:
-                                                        if check_scene_valid(_scene, models_path):
-                                                            if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
-                                                                continue
-                                                            ref_image = os.path.join(
-                                                                models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg"
-                                                            )
-                                                            if not os.path.exists(ref_image):
-                                                                ref_image = os.path.join(
-                                                                    os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                                    "no_found_image.jpg",
-                                                                )
-                                                            scene.append([ref_image, os.path.splitext(_scene)[0]])
-                                                    scene = sorted(scene)
-                                                    scene.insert(
-                                                        0,
-                                                        [
-                                                            os.path.join(
-                                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                                "no_found_image.jpg",
-                                                            ),
-                                                            "none",
-                                                        ],
-                                                    )
-                                                    return gr.update(value=scene)
-
-                                                scene = [
-                                                    [
-                                                        os.path.join(
-                                                            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                            "scene_lora",
-                                                            f"{_scene}.jpg",
-                                                        ),
-                                                        _scene,
-                                                    ]
-                                                    for _scene in DEFAULT_SCENE_LORA
-                                                ]
-                                                _scenes = os.listdir(os.path.join(models_path, "Lora"))
-                                                for _scene in _scenes:
-                                                    if check_scene_valid(_scene, models_path):
-                                                        if os.path.splitext(_scene)[0] in DEFAULT_SCENE_LORA:
-                                                            continue
-                                                        ref_image = os.path.join(models_path, "Lora", f"{os.path.splitext(_scene)[0]}.jpg")
-                                                        if not os.path.exists(ref_image):
-                                                            ref_image = os.path.join(
-                                                                os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                                "no_found_image.jpg",
-                                                            )
-                                                        scene.append([ref_image, os.path.splitext(_scene)[0]])
-                                                scene = sorted(scene)
-                                                scene.insert(
-                                                    0,
-                                                    [
-                                                        os.path.join(
-                                                            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"),
-                                                            "no_found_image.jpg",
-                                                        ),
-                                                        "none",
-                                                    ],
-                                                )
-
                                                 scene_id = gr.Text(
                                                     value="none", show_label=False, visible=True, placeholder="Selected", interactive=False
                                                 )
@@ -1062,12 +1060,39 @@ def on_ui_tabs():
                                         value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ",
                                         visible=True,
                                     )
+
+                                    with gr.Accordion("Scene Lora for Video(Click here to select Scene Lora)", open=False):
+                                        with gr.Column():
+                                            scene_id = gr.Text(
+                                                value="none", show_label=False, visible=True, placeholder="Selected", interactive=False
+                                            )
+                                            _ = gr.Markdown(
+                                                value="**The preset Lora will be downloaded on the first click.**",
+                                                show_label=False,
+                                                visible=True,
+                                            )
+                                            with gr.Row():
+                                                scene_id_gallery = gr.Gallery(
+                                                    value=scene,
+                                                    label="Scene Lora Gallery for Video",
+                                                    allow_preview=False,
+                                                    elem_id="scene_id_select",
+                                                    show_share_button=False,
+                                                    visible=True,
+                                                ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
+                                                scene_id_gallery.select(
+                                                    scene_change_function, [scene_id_gallery], [t2v_input_prompt, scene_id]
+                                                )
+
+                                                scene_id_refresh = ToolButton(value="\U0001f504")
+                                                scene_id_refresh.click(fn=scene_refresh_function, inputs=[], outputs=[scene_id_gallery])
+
                                     with gr.Row():
                                         t2v_input_width = gr.Slider(
                                             minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width"
                                         )
                                         t2v_input_height = gr.Slider(
-                                            minimum=64, maximum=2048, step=8, label="Video Height", value=768, elem_id=f"height"
+                                            minimum=64, maximum=2048, step=8, label="Video Height", value=512, elem_id=f"height"
                                         )
 
                                     with gr.Row():
@@ -1300,10 +1325,39 @@ def on_ui_tabs():
                                         skin_retouching_bool = gr.Checkbox(label="Video Skin Retouching", value=False)
                                     with gr.Row():
                                         display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                        makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
+                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
                                         face_shape_match = gr.Checkbox(label="Video Face Shape Match", value=False)
                                     with gr.Row():
+                                        makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
                                         video_interpolation = gr.Checkbox(label="Video Interpolation", value=False)
+                                        lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
+                                        
+                                        # reuse this file L796, change other value when click
+                                        def lcm_change(lcm_accelerate):
+                                            if lcm_accelerate:
+                                                return (
+                                                    gr.update(value=12, minimum=4, maximum=20),
+                                                    gr.update(value=0.50),
+                                                    gr.update(value=0.60),
+                                                    gr.update(value=0.60),
+                                                )
+                                            return (
+                                                gr.update(value=50, minimum=15, maximum=50),
+                                                gr.update(value=0.45),
+                                                gr.update(value=0.50),
+                                                gr.update(value=0.50),
+                                            )
+
+                                        lcm_accelerate.change(
+                                            lcm_change,
+                                            inputs=[lcm_accelerate],
+                                            outputs=[
+                                                first_diffusion_steps,
+                                                first_denoising_strength,
+                                                before_face_fusion_ratio,
+                                                after_face_fusion_ratio,
+                                            ],
+                                        )
 
                                     with gr.Row():
                                         super_resolution_method = gr.Dropdown(
@@ -1320,6 +1374,15 @@ def on_ui_tabs():
                                             label="Video Makeup Transfer Ratio",
                                             visible=False,
                                         )
+                                        ipa_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="Video IP-Adapter Control Weight",
+                                            visible=False,
+                                        )
+
                                         super_resolution.change(
                                             lambda x: super_resolution_method.update(visible=x),
                                             inputs=[super_resolution],
@@ -1329,6 +1392,9 @@ def on_ui_tabs():
                                             lambda x: makeup_transfer_ratio.update(visible=x),
                                             inputs=[makeup_transfer],
                                             outputs=[makeup_transfer_ratio],
+                                        )
+                                        ipa_control.change(
+                                            lambda x: ipa_weight.update(visible=x), inputs=[ipa_control], outputs=[ipa_weight]
                                         )
 
                                     with gr.Row():
@@ -1345,6 +1411,30 @@ def on_ui_tabs():
                                             inputs=[video_interpolation],
                                             outputs=[video_interpolation_ext],
                                         )
+                                        ipa_control.change(
+                                            lambda x: ipa_weight.update(visible=x), inputs=[ipa_control], outputs=[ipa_weight]
+                                        )
+
+                                    ipa_note = gr.Markdown(
+                                        value="""
+                                            IP-Adapter Control notes:
+                                            1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
+                                            2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
+                                        """,
+                                        visible=False,
+                                    )
+                                    with gr.Row():
+                                        ipa_image_path = gr.Image(
+                                            label="Image Prompt for IP-Adapter Control For Video",
+                                            show_label=True,
+                                            source="upload",
+                                            type="filepath",
+                                            visible=False,
+                                        )
+                                    ipa_control.change(
+                                        lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path]
+                                    )
+                                    ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
 
                                     with gr.Box():
                                         gr.Markdown(
@@ -1443,6 +1533,7 @@ def on_ui_tabs():
                                 t2v_input_prompt,
                                 t2v_input_width,
                                 t2v_input_height,
+                                scene_id,
                                 init_image,
                                 init_image_prompt,
                                 last_image,
@@ -1470,6 +1561,10 @@ def on_ui_tabs():
                                 video_interpolation,
                                 video_interpolation_ext,
                                 video_model_selected_tab,
+                                ipa_control,
+                                ipa_weight,
+                                ipa_image_path,
+                                lcm_accelerate,
                                 *uuids,
                             ],
                             outputs=[infer_progress, output_video, output_gif, output_images],

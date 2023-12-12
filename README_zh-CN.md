@@ -36,6 +36,8 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 新特性：
+- 支持基于LCM-Lora的采样加速，现在您只需要进行12个steps(vs 50steps)来生成图像和视频, 并支持了场景化（风格化） Lora的训练和大量内置的模型。[🔥 🔥 🔥 🔥 2023.12.09]
+- 支持基于Concepts-Sliders的属性编辑和虚拟试穿，请参考[sliders-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit) , [tryon-wiki](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/TryOn)获取更多详细信息。[🔥 🔥 🔥 🔥 2023.12.08]
 - 感谢[揽睿星舟](https://www.lanrui-ai.com/) 提供了内置EasyPhoto的SDWebUI官方镜像，并承诺每两周更新一次。亲自测试，可以在2分钟内拉起资源，并在5分钟内完成启动。[🔥 🔥 🔥 🔥 2023.11.20]
 - ComfyUI 支持 [repo](https://github.com/THtianhao/ComfyUI-Portrait-Maker), 感谢[THtianhao](https://github.com/THtianhao)的精彩工作![🔥 🔥 🔥 2023.10.17]
 - EasyPhoto 论文地址 [arxiv](https://arxiv.org/abs/2310.04672)[🔥 🔥 🔥 2023.10.10]

@@ -16,9 +16,9 @@ from .animatediff_prompt import AnimateDiffPromptSchedule
 
 
 class AnimateDiffInfV2V:
+    cfg_original_forward = None
 
     def __init__(self, p, prompt_scheduler: AnimateDiffPromptSchedule):
-        self.cfg_original_forward = None
         try:
             from scripts.external_code import find_cn_script
             self.cn_script = find_cn_script(p.scripts)
@@ -93,45 +93,37 @@ class AnimateDiffInfV2V:
 
 
     def hack(self, params: AnimateDiffProcess):
+        if AnimateDiffInfV2V.cfg_original_forward is not None:
+            logger.info("CFGDenoiser already hacked")
+            return
+
         logger.info(f"Hacking CFGDenoiser forward function.")
-        self.cfg_original_forward = CFGDenoiser.forward
+        AnimateDiffInfV2V.cfg_original_forward = CFGDenoiser.forward
         cn_script = self.cn_script
         prompt_scheduler = self.prompt_scheduler
 
         def mm_cn_select(context: List[int]):
             # take control images for current context.
-            if cn_script is not None and cn_script.latest_network is not None:
+            if cn_script and cn_script.latest_network:
                 from scripts.hook import ControlModelType
                 for control in cn_script.latest_network.control_params:
-                    if control.control_model_type == ControlModelType.IPAdapter:
-                        ip_adapter_key = list(control.hint_cond)[0]
-                        if ip_adapter_key == "image_embeds":
-                            if control.hint_cond[ip_adapter_key].shape[0] > len(context):
-                                control.hint_cond_backup = control.hint_cond[ip_adapter_key]
-                                control.hint_cond[ip_adapter_key] = control.hint_cond[ip_adapter_key][context]
-                            if control.hr_hint_cond is not None and control.hr_hint_cond[ip_adapter_key].shape[0] > len(context):
-                                control.hr_hint_cond_backup = control.hr_hint_cond[ip_adapter_key]
-                                control.hr_hint_cond[ip_adapter_key] = control.hr_hint_cond[ip_adapter_key][context]
-                        elif ip_adapter_key == "hidden_states":
-                            if control.hint_cond[ip_adapter_key][-2].shape[0] > len(context):
-                                control.hint_cond_backup = control.hint_cond[ip_adapter_key][-2]
-                                control.hint_cond[ip_adapter_key][-2] = control.hint_cond[ip_adapter_key][-2][context]
-                            if control.hr_hint_cond is not None and control.hr_hint_cond[ip_adapter_key][-2].shape[0] > len(context):
-                                control.hr_hint_cond_backup = control.hr_hint_cond[ip_adapter_key][-2]
-                                control.hr_hint_cond[ip_adapter_key][-2] = control.hr_hint_cond[ip_adapter_key][-2][context]
-                    else:
+                    if control.control_model_type not in [ControlModelType.IPAdapter, ControlModelType.Controlllite]:
                         if control.hint_cond.shape[0] > len(context):
                             control.hint_cond_backup = control.hint_cond
                             control.hint_cond = control.hint_cond[context]
-                        if control.hr_hint_cond is not None and control.hr_hint_cond.shape[0] > len(context):
-                            control.hr_hint_cond_backup = control.hr_hint_cond
-                            control.hr_hint_cond = control.hr_hint_cond[context]
-                    if control.control_model_type == ControlModelType.IPAdapter and control.control_model.image_emb.shape[0] > len(context):
+                        control.hint_cond = control.hint_cond.to(device=devices.get_device_for("controlnet"))
+                        if control.hr_hint_cond is not None:
+                            if control.hr_hint_cond.shape[0] > len(context):
+                                control.hr_hint_cond_backup = control.hr_hint_cond
+                                control.hr_hint_cond = control.hr_hint_cond[context]
+                            control.hr_hint_cond = control.hr_hint_cond.to(device=devices.get_device_for("controlnet"))
+                    # IPAdapter and Controlllite are always on CPU.
+                    elif control.control_model_type == ControlModelType.IPAdapter and control.control_model.image_emb.shape[0] > len(context):
                         control.control_model.image_emb_backup = control.control_model.image_emb
                         control.control_model.image_emb = control.control_model.image_emb[context]
                         control.control_model.uncond_image_emb_backup = control.control_model.uncond_image_emb
                         control.control_model.uncond_image_emb = control.control_model.uncond_image_emb[context]
-                    if control.control_model_type == ControlModelType.Controlllite:
+                    elif control.control_model_type == ControlModelType.Controlllite:
                         for module in control.control_model.modules.values():
                             if module.cond_image.shape[0] > len(context):
                                 module.cond_image_backup = module.cond_image
@@ -139,41 +131,22 @@ class AnimateDiffInfV2V:
         
         def mm_cn_restore(context: List[int]):
             # restore control images for next context
-            if cn_script is not None and cn_script.latest_network is not None:
+            if cn_script and cn_script.latest_network:
                 from scripts.hook import ControlModelType
                 for control in cn_script.latest_network.control_params:
-                    if getattr(control, "hint_cond_backup", None) is not None:
-                        if control.control_model_type == ControlModelType.IPAdapter:
-                            ip_adapter_key = list(control.hint_cond_backup)[0]
-                            if ip_adapter_key == "image_embeds":
-                                control.hint_cond_backup[context] = control.hint_cond[ip_adapter_key]
-                                control.hint_cond[ip_adapter_key] = control.hint_cond_backup
-                            elif ip_adapter_key == "hidden_states":
-                                control.hint_cond_backup[context] = control.hint_cond[ip_adapter_key][-2]
-                                control.hint_cond[ip_adapter_key][-2] = control.hint_cond_backup
-                        else:
-                            control.hint_cond_backup[context] = control.hint_cond
+                    if control.control_model_type not in [ControlModelType.IPAdapter, ControlModelType.Controlllite]:
+                        if getattr(control, "hint_cond_backup", None) is not None:
+                            control.hint_cond_backup[context] = control.hint_cond.to(device="cpu")
                             control.hint_cond = control.hint_cond_backup
-                    if control.hr_hint_cond is not None and getattr(control, "hr_hint_cond_backup", None) is not None:
-                        if control.control_model_type == ControlModelType.IPAdapter:
-                            ip_adapter_key = list(control.hr_hint_cond_backup)[0]
-                            if ip_adapter_key == "image_embeds":
-                                control.hr_hint_cond_backup[ip_adapter_key][context] = control.hr_hint_cond[ip_adapter_key]
-                                control.hr_hint_cond[ip_adapter_key] = control.hr_hint_cond_backup[ip_adapter_key]
-                            elif ip_adapter_key == "hidden_states":
-                                control.hr_hint_cond_backup[context] = control.hr_hint_cond[ip_adapter_key][-2]
-                                control.hr_hint_cond[ip_adapter_key][-2] = control.hr_hint_cond_backup
-                        else:
-                            control.hr_hint_cond_backup[context] = control.hr_hint_cond
+                        if control.hr_hint_cond is not None and getattr(control, "hr_hint_cond_backup", None) is not None:
+                            control.hr_hint_cond_backup[context] = control.hr_hint_cond.to(device="cpu")
                             control.hr_hint_cond = control.hr_hint_cond_backup
-                    if control.control_model_type == ControlModelType.IPAdapter and getattr(control.control_model, "image_emb_backup", None) is not None:
-                        # control.control_model.image_emb_backup[context] = control.control_model.image_emb
-                        # control.control_model.uncond_image_emb_backup[context] = control.control_model.uncond_image_emb
+                    elif control.control_model_type == ControlModelType.IPAdapter and getattr(control.control_model, "image_emb_backup", None) is not None:
                         control.control_model.image_emb = control.control_model.image_emb_backup
                         control.control_model.uncond_image_emb = control.control_model.uncond_image_emb_backup
-                    if control.control_model_type == ControlModelType.Controlllite:
+                    elif control.control_model_type == ControlModelType.Controlllite:
                         for module in control.control_model.modules.values():
-                            if module.cond_image.shape[0] > len(context):
+                            if getattr(module, "cond_image_backup", None) is not None:
                                 module.set_cond_image(module.cond_image_backup)
 
         def mm_sd_forward(self, x_in, sigma_in, cond_in, image_cond_in, make_condition_dict):
@@ -340,5 +313,10 @@ class AnimateDiffInfV2V:
 
 
     def restore(self):
+        if AnimateDiffInfV2V.cfg_original_forward is None:
+            logger.info("CFGDenoiser already restored.")
+            return
+
         logger.info(f"Restoring CFGDenoiser forward function.")
-        CFGDenoiser.forward = self.cfg_original_forward
+        CFGDenoiser.forward = AnimateDiffInfV2V.cfg_original_forward
+        AnimateDiffInfV2V.cfg_original_forward = None
