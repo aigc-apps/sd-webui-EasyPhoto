@@ -1053,7 +1053,7 @@ def on_ui_tabs():
                                             minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width"
                                         )
                                         t2v_input_height = gr.Slider(
-                                            minimum=64, maximum=2048, step=8, label="Video Height", value=768, elem_id=f"height"
+                                            minimum=64, maximum=2048, step=8, label="Video Height", value=512, elem_id=f"height"
                                         )
 
                                     with gr.Row():
