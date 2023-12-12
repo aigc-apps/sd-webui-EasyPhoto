@@ -29,12 +29,12 @@ from scripts.easyphoto_utils import (
     check_loractl_conflict,
     ep_logger,
     get_attribute_edit_ids,
-    video_visible
+    video_visible,
 )
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 if not check_loractl_conflict():
-    from scripts.easyphoto_utils import LoraCtlScript
+    pass
 else:
     ep_logger.info("Import LoraCtlScript from sd-webui-loractl since the plugin already exists and is enabled.")
 
@@ -724,28 +724,27 @@ def on_ui_tabs():
 
                                 with gr.Row():
                                     attribute_edit_id = gr.Dropdown(
-                                        value="none",
-                                        elem_id="dropdown",
-                                        choices=["none"] + DEFAULT_SLIDERS,
-                                        label="Attribute Edit Sliders"
+                                        value="none", elem_id="dropdown", choices=["none"] + DEFAULT_SLIDERS, label="Attribute Edit Sliders"
                                     )
                                     attribute_edit_id_refresh = ToolButton(value="\U0001f504")
                                     attribute_edit_id_refresh.click(
                                         fn=lambda: gr.update(choices=["none"] + get_attribute_edit_ids()),
                                         inputs=[],
-                                        outputs=[attribute_edit_id]
+                                        outputs=[attribute_edit_id],
                                     )
                                     attribute_edit_id.select(
                                         fn=lambda additional_prompt, attribute_edit_id: gr.update(
                                             value=additional_prompt + f" <lora:{attribute_edit_id}:0@0, 0@0.2, 2@0.2, 2@1>"
                                         ),
                                         inputs=[additional_prompt, attribute_edit_id],
-                                        outputs=[additional_prompt]
+                                        outputs=[additional_prompt],
                                     )
                                 with gr.Row():
                                     attribute_edit_wiki_url = "https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki/Attribute-Edit"
                                     _ = gr.Markdown(
-                                        value="**Please check the [[wiki]]({}) before using attribute edit**.".format(attribute_edit_wiki_url)
+                                        value="**Please check the [[wiki]]({}) before using attribute edit**.".format(
+                                            attribute_edit_wiki_url
+                                        )
                                     )
 
                                 with gr.Row():
@@ -1331,7 +1330,7 @@ def on_ui_tabs():
                                         makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
                                         video_interpolation = gr.Checkbox(label="Video Interpolation", value=False)
                                         lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
-                                        
+
                                         # reuse this file L796, change other value when click
                                         def lcm_change(lcm_accelerate):
                                             if lcm_accelerate:
