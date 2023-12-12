@@ -1095,7 +1095,7 @@ def on_ui_tabs():
                                         )
 
                                     with gr.Row():
-                                        upload_openpose_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
+                                        upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
                                         
                                     with gr.Row(visible=False) as control_video_type_line:
                                         upload_control_video_type = gr.Dropdown(
@@ -1107,8 +1107,8 @@ def on_ui_tabs():
                                             min_width=40,
                                             label="video control type.",
                                         )
-                                        def upload_control_video_type_change(upload_openpose_control_video):
-                                            if upload_openpose_control_video:
+                                        def upload_control_video_type_change(upload_control_video):
+                                            if upload_control_video:
                                                 return (
                                                     gr.update(visible=True),
                                                     gr.update(visible=False),
@@ -1118,22 +1118,22 @@ def on_ui_tabs():
                                                 gr.update(visible=True),
                                             )
 
-                                        upload_openpose_control_video.change(
+                                        upload_control_video.change(
                                             upload_control_video_type_change,
-                                            inputs=[upload_openpose_control_video],
+                                            inputs=[upload_control_video],
                                             outputs=[control_video_type_line, width_height_line],
                                         )
 
-                                    with gr.Row(visible=False) as openpose_control_video_line:
-                                        openpose_control_video = gr.Video(
+                                    with gr.Row(visible=False) as control_video_line:
+                                        control_video = gr.Video(
                                             label="Video for Openpose Control",
                                             show_label=True,
                                             elem_id="{id_part}_video",
                                             source="upload",
                                         )
 
-                                        def upload_openpose_control_video_change(upload_openpose_control_video):
-                                            if upload_openpose_control_video:
+                                        def upload_control_video_change(upload_control_video):
+                                            if upload_control_video:
                                                 return (
                                                     gr.update(visible=True),
                                                     gr.update(visible=False),
@@ -1143,10 +1143,10 @@ def on_ui_tabs():
                                                 gr.update(visible=True),
                                             )
 
-                                        upload_openpose_control_video.change(
-                                            upload_openpose_control_video_change,
-                                            inputs=[upload_openpose_control_video],
-                                            outputs=[openpose_control_video_line, width_height_line],
+                                        upload_control_video.change(
+                                            upload_control_video_change,
+                                            inputs=[upload_control_video],
+                                            outputs=[control_video_line, width_height_line],
                                         )
 
                                     with gr.Row():
@@ -1588,9 +1588,9 @@ def on_ui_tabs():
                                 t2v_input_width,
                                 t2v_input_height,
                                 scene_id,
-                                upload_openpose_control_video,
+                                upload_control_video,
                                 upload_control_video_type,
-                                openpose_control_video,
+                                control_video,
                                 init_image,
                                 init_image_prompt,
                                 last_image,

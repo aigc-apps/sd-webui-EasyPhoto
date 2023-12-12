@@ -1707,9 +1707,9 @@ def easyphoto_video_infer_forward(
     t2v_input_width,
     t2v_input_height,
     scene_id,
-    upload_openpose_control_video,
+    upload_control_video,
     upload_control_video_type,
-    openpose_control_video,
+    openpose_video,
     init_image,
     init_image_prompt,
     last_image,
@@ -1850,9 +1850,9 @@ def easyphoto_video_infer_forward(
         if tabs == 0:  # t2v
             max_frames = int(max_frames)
 
-            if upload_openpose_control_video:
+            if upload_control_video:
                 max_fps = int(max_fps)
-                template_images, actual_fps = get_mov_all_images(openpose_control_video, max_fps)
+                template_images, actual_fps = get_mov_all_images(openpose_video, max_fps)
                 template_images = [template_images[:max_frames]] if max_frames != -1 else [template_images]
             else:
                 actual_fps = int(max_fps)
@@ -1968,7 +1968,7 @@ def easyphoto_video_infer_forward(
 
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
-            if upload_openpose_control_video:
+            if upload_control_video:
                 image = Image.fromarray(np.uint8(template_images[0][0]))
                 # Resize the template image with short edges on 512
                 short_side = min(image.width, image.height)
@@ -2019,7 +2019,7 @@ def easyphoto_video_infer_forward(
             reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
             if lcm_accelerate:
                 t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
-            if upload_openpose_control_video:
+            if upload_control_video:
                 image = Image.fromarray(np.uint8(template_images[0][0]))
                 # Resize the template image with short edges on 512
                 short_side = min(image.width, image.height)
