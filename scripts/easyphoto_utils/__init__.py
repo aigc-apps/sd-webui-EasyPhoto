@@ -58,7 +58,7 @@ try:
         switch_ms_model_cpu,
         unload_models,
         seed_everything,
-        get_attribute_edit_ids
+        get_attribute_edit_ids,
     )
     from .loractl_utils import check_loractl_conflict, LoraCtlScript
 except Exception as e:

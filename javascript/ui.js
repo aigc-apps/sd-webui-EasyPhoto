@@ -4,7 +4,6 @@ function ask_for_style_name(sd_model_checkpoint, dummy_component, _, train_mode_
 }
 
 function switch_to_ep_photoinfer_upload() {
-    gradioApp().querySelector('#tabs').querySelectorAll('button')[6].click();
     gradioApp().getElementById('mode_easyphoto').querySelectorAll('button')[1].click();
     gradioApp().getElementById('mode_easyphoto_photo_inference').querySelectorAll('button')[0].click();
 
@@ -12,7 +11,6 @@ function switch_to_ep_photoinfer_upload() {
 }
 
 function switch_to_ep_tryon() {
-    gradioApp().querySelector('#tabs').querySelectorAll('button')[6].click();
     gradioApp().getElementById('mode_easyphoto').querySelectorAll('button')[3].click();
 
     return Array.from(arguments);

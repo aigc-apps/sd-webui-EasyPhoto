@@ -390,7 +390,7 @@ def inpaint(
         animatediff_fps=animatediff_fps,
         animatediff_reserve_scale=animatediff_reserve_scale,
         animatediff_last_image=animatediff_last_image,
-        loractl_flag=loractl_flag
+        loractl_flag=loractl_flag,
     )
 
     return image
@@ -519,7 +519,7 @@ def easyphoto_infer_forward(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
                 return error_info, [], []
-    
+
     loractl_flag = False
     if "sliders" in additional_prompt:
         if ("sdxl_sliders" in additional_prompt and not sdxl_pipeline_flag) or ("sd1_sliders" in additional_prompt and sdxl_pipeline_flag):

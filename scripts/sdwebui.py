@@ -426,7 +426,7 @@ def t2i_call(
         sampler = "Euler a"
     if steps is None:
         steps = 20
-    
+
     # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
     opts.return_mask = False
     opts.return_mask_composite = False
@@ -571,7 +571,7 @@ def i2i_inpaint_call(
     animatediff_fps=0,
     animatediff_reserve_scale=1,
     animatediff_last_image=None,
-    loractl_flag=False
+    loractl_flag=False,
 ):
     """
     Perform image-to-image inpainting.
@@ -635,7 +635,7 @@ def i2i_inpaint_call(
         sampler = "Euler a"
     if steps is None:
         steps = 20
-    
+
     # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
     opts.return_mask = False
     opts.return_mask_composite = False
@@ -699,7 +699,7 @@ def i2i_inpaint_call(
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
         animate_diff_process = None
-    
+
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:

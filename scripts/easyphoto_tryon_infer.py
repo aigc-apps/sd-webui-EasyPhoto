@@ -236,6 +236,10 @@ def easyphoto_tryon_infer_forward(
         network_alpha = 64
         dataloader_num_workers = 16
 
+        ep_logger.info(f"Delete sam model before training to save CUDA memory.")
+        del sam_predictor
+        torch.cuda.empty_cache()
+
         if platform.system() == "Windows":
             pwd = os.getcwd()
             dataloader_num_workers = 0  # for solve multi process bug

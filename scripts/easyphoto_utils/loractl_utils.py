@@ -30,6 +30,7 @@ sys.path.insert(0, lora_path)
 import extra_networks_lora
 import network
 import networks
+
 sys.path.remove(lora_path)
 
 
@@ -170,6 +171,7 @@ def set_active(value):
 # to reapply the network each time we change its weights, while still taking advantage
 # of caching when weights are not updated.
 
+
 def get_weight(m):
     return calculate_weight(m, shared.state.sampling_step, shared.state.sampling_steps, step_offset=2)
 
@@ -212,24 +214,18 @@ class LoraCtlScript(scripts.Script):
         self.original_network = None
         super().__init__()
 
-
     def title(self):
         return "Dynamic Lora Weights (EasyPhoto built-in)"
 
-
     def show(self, is_img2img):
         return scripts.AlwaysVisible
-    
 
     def ui(self, is_img2img):
         with gr.Group():
             with gr.Accordion("Dynamic Lora Weights (EasyPhoto builtin)", open=False):
-                opt_enable = gr.Checkbox(
-                    value=True, label="Enable Dynamic Lora Weights")
-                opt_plot_lora_weight = gr.Checkbox(
-                    value=False, label="Plot the LoRA weight in all steps")
+                opt_enable = gr.Checkbox(value=True, label="Enable Dynamic Lora Weights")
+                opt_plot_lora_weight = gr.Checkbox(value=False, label="Plot the LoRA weight in all steps")
         return [opt_enable, opt_plot_lora_weight]
-
 
     def process(self, p: StableDiffusionProcessing, opt_enable=True, opt_plot_lora_weight=False, **kwargs):
         if opt_enable and type(extra_networks.extra_network_registry["lora"]) != LoraCtlNetwork:
@@ -247,10 +243,8 @@ class LoraCtlScript(scripts.Script):
         reset_weights()
         reset_plot()
 
-
     def before_hr(self, p, *args):
         set_hires(True)
-    
 
     def postprocess(self, p, processed, opt_enable=True, opt_plot_lora_weight=False, **kwargs):
         if opt_plot_lora_weight and opt_enable:
