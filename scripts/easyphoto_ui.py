@@ -34,7 +34,7 @@ from scripts.easyphoto_utils import (
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
 if not check_loractl_conflict():
-    pass
+    from scripts.easyphoto_utils import LoraCtlScript
 else:
     ep_logger.info("Import LoraCtlScript from sd-webui-loractl since the plugin already exists and is enabled.")
 

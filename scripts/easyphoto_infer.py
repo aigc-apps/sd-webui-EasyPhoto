@@ -1953,6 +1953,7 @@ def easyphoto_video_infer_forward(
     ep_logger.info("Start templates and user_ids preprocess.")
 
     if tabs == 0:
+        reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         if scene_id != "none":
             # scene lora path
             scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
@@ -2016,7 +2017,6 @@ def easyphoto_video_infer_forward(
                 )
             template_images = [template_images]
         else:
-            reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
             if lcm_accelerate:
                 t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             if upload_control_video:
