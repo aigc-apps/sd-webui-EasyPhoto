@@ -2199,6 +2199,8 @@ def easyphoto_video_infer_forward(
 
         try:
             # open the template image
+            if not isinstance(template_image, list):
+                template_image = [template_image]
             template_image = [Image.fromarray(np.uint8(_)).convert("RGB") for _ in template_image]
             loop_template_image = copy.deepcopy(template_image)
 
