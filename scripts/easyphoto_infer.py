@@ -285,7 +285,19 @@ def txt2img(
     controlnet_units_list = []
 
     for pair in controlnet_pairs:
-        controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2]))
+        if len(pair) == 4:
+            controlnet_units_list.append(
+                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
+            )
+        else:
+            controlnet_units_list.append(
+                get_controlnet_unit(
+                    pair[0],
+                    pair[1],
+                    pair[2],
+                    False if type(1) is not list else True,
+                )
+            )
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -1695,6 +1707,9 @@ def easyphoto_video_infer_forward(
     t2v_input_width,
     t2v_input_height,
     scene_id,
+    upload_control_video,
+    upload_control_video_type,
+    openpose_video,
     init_image,
     init_image_prompt,
     last_image,
@@ -1834,8 +1849,14 @@ def easyphoto_video_infer_forward(
         # in v2v, if the frame rate of video is less than max_fps, the frame rate of video will be used as the desired frame rate.
         if tabs == 0:  # t2v
             max_frames = int(max_frames)
-            actual_fps = int(max_fps)
-            template_images = None
+
+            if upload_control_video:
+                max_fps = int(max_fps)
+                template_images, actual_fps = get_mov_all_images(openpose_video, max_fps)
+                template_images = [template_images[:max_frames]] if max_frames != -1 else [template_images]
+            else:
+                actual_fps = int(max_fps)
+                template_images = None
         elif tabs == 1:  # i2v
             max_frames = int(max_frames)
             actual_fps = int(max_fps)
@@ -1932,6 +1953,7 @@ def easyphoto_video_infer_forward(
     ep_logger.info("Start templates and user_ids preprocess.")
 
     if tabs == 0:
+        reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         if scene_id != "none":
             # scene lora path
             scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
@@ -1947,41 +1969,95 @@ def easyphoto_video_infer_forward(
 
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
-            template_images = txt2img(
-                [],
-                input_prompt=t2v_input_prompt,
-                diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=7 if not lcm_accelerate else 2,
-                width=t2v_input_width,
-                height=t2v_input_height,
-                default_positive_prompt=DEFAULT_POSITIVE_AD,
-                default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                seed=seed,
-                sampler="Euler a",
-                animatediff_flag=True,
-                animatediff_video_length=int(max_frames),
-                animatediff_fps=int(actual_fps),
-            )
+            if upload_control_video:
+                image = Image.fromarray(np.uint8(template_images[0][0]))
+                # Resize the template image with short edges on 512
+                short_side = min(image.width, image.height)
+                resize = float(short_side / 512.0)
+                new_size = (int(image.width // resize), int(image.height // resize))
+
+                if upload_control_video_type == 'depth':
+                    ep_logger.info(f"Using depth control for video control input")
+                    controlnet_pairs = [["depth", template_images[0], 1, 1]]
+
+                if upload_control_video_type == 'openpose':
+                    ep_logger.info(f"Using openpose control for video control input")
+                    controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+
+                template_images = txt2img(
+                    controlnet_pairs,
+                    input_prompt=t2v_input_prompt,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=7 if not lcm_accelerate else 2,
+                    width=new_size[0],
+                    height=new_size[1],
+                    default_positive_prompt=DEFAULT_POSITIVE_AD,
+                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                    seed=seed,
+                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                    animatediff_flag=True,
+                    animatediff_video_length=len(template_images[0]),
+                    animatediff_fps=int(actual_fps),
+                )
+            else:
+                template_images = txt2img(
+                    [],
+                    input_prompt=t2v_input_prompt,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=7 if not lcm_accelerate else 2,
+                    width=t2v_input_width,
+                    height=t2v_input_height,
+                    default_positive_prompt=DEFAULT_POSITIVE_AD,
+                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                    seed=seed,
+                    sampler="Euler a",
+                    animatediff_flag=True,
+                    animatediff_video_length=int(max_frames),
+                    animatediff_fps=int(actual_fps),
+                )
             template_images = [template_images]
         else:
-            reload_sd_model_vae(sd_model_checkpoint_for_animatediff_text2video, "vae-ft-mse-840000-ema-pruned.ckpt")
             if lcm_accelerate:
                 t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
-            template_images = txt2img(
-                [],
-                input_prompt=t2v_input_prompt,
-                diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=7 if not lcm_accelerate else 2,
-                width=t2v_input_width,
-                height=t2v_input_height,
-                default_positive_prompt=DEFAULT_POSITIVE_AD,
-                default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                seed=seed,
-                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                animatediff_flag=True,
-                animatediff_video_length=int(max_frames),
-                animatediff_fps=int(actual_fps),
-            )
+            if upload_control_video:
+                image = Image.fromarray(np.uint8(template_images[0][0]))
+                # Resize the template image with short edges on 512
+                short_side = min(image.width, image.height)
+                resize = float(short_side / 512.0)
+                new_size = (int(image.width // resize), int(image.height // resize))
+
+                controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+                template_images = txt2img(
+                    controlnet_pairs,
+                    input_prompt=t2v_input_prompt,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=7 if not lcm_accelerate else 2,
+                    width=new_size[0],
+                    height=new_size[1],
+                    default_positive_prompt=DEFAULT_POSITIVE_AD,
+                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                    seed=seed,
+                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                    animatediff_flag=True,
+                    animatediff_video_length=len(template_images[0]),
+                    animatediff_fps=int(actual_fps),
+                )
+            else:
+                template_images = txt2img(
+                    [],
+                    input_prompt=t2v_input_prompt,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=7 if not lcm_accelerate else 2,
+                    width=t2v_input_width,
+                    height=t2v_input_height,
+                    default_positive_prompt=DEFAULT_POSITIVE_AD,
+                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                    seed=seed,
+                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                    animatediff_flag=True,
+                    animatediff_video_length=int(max_frames),
+                    animatediff_fps=int(actual_fps),
+                )
             template_images = [template_images]
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
