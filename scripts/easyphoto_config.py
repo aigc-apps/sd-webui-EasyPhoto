@@ -18,6 +18,8 @@ cache_log_file_path = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_
 tryon_preview_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "tryon")
 tryon_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
 
+infer_template_dir = os.path.join(easyphoto_models_path, "infer_templates")
+
 # prompts
 validation_prompt = "easyphoto_face, easyphoto, 1person"
 validation_prompt_scene = "special_scene, scene"
@@ -31,25 +33,15 @@ DEFAULT_NEGATIVE_T2I = "(nsfw:1.5), (huge breast:1.5), nude, breasts, penis, cum
 
 # scene lora
 DEFAULT_SCENE_LORA = [
-    "Christmas_1",
-    "Cyberpunk_1",
-    "FairMaidenStyle_1",
-    "Gentleman_1",
-    "GuoFeng_1",
-    "GuoFeng_2",
-    "GuoFeng_3",
-    "GuoFeng_4",
-    "Minimalism_1",
-    "NaturalWind_1",
-    "Princess_1",
-    "Princess_2",
-    "Princess_3",
-    "SchoolUniform_1",
-    "SchoolUniform_2",
+    "Christmas_boy",
+    "Christmas_girl",
+    "New_year_boy",
+    "New_year_girl", 
 ]
 
 # tryon template
 DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
+DEFAULT_INFER_TEMPLATE = ['christmas', 'new_year']
 
 # cloth lora
 DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "demo_dress_200", "demo_short_200"]

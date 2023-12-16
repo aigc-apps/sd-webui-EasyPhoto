@@ -10,6 +10,7 @@ from scripts.easyphoto_config import (
     DEFAULT_SCENE_LORA,
     DEFAULT_CLOTH_LORA,
     DEFAULT_TRYON_TEMPLATE,
+    DEFAULT_INFER_TEMPLATE,
     DEFAULT_SLIDERS,
     cache_log_file_path,
     easyphoto_models_path,
@@ -18,6 +19,7 @@ from scripts.easyphoto_config import (
     user_id_outpath_samples,
     tryon_preview_dir,
     tryon_gallery_dir,
+    infer_template_dir
 )
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
@@ -481,9 +483,17 @@ def on_ui_tabs():
 
             with gr.TabItem("Photo Inference"):
                 dummy_component = gr.Label(visible=False)
-                training_templates = glob.glob(os.path.join(easyphoto_models_path, "training_templates/*.jpg"))
-                infer_templates = glob.glob(os.path.join(easyphoto_models_path, "infer_templates/*.jpg"))
-                preset_template = list(training_templates) + list(infer_templates)
+
+                # download infer templates
+                for template_name in DEFAULT_INFER_TEMPLATE:
+                    try:
+                        ep_logger.info(f"Start downloading/check infer template")
+                        check_files_exists_and_download(False, template_name)
+                    except Exception as e:
+                        ep_logger.error(f"Download infer template Error. Error Info {e}")
+
+                infer_templates = glob.glob(os.path.join(infer_template_dir, "*.png"))
+                preset_template = list(infer_templates)
 
                 with gr.Blocks():
                     with gr.Row():
@@ -961,6 +971,11 @@ def on_ui_tabs():
                                         elem_id=f"{tabname}_send_to_tryon",
                                         tooltip="Send image and generation parameters to tryon tab.",
                                     ),
+                                    "animate": ToolButton_webui(
+                                        "💃",
+                                        elem_id=f"{tabname}_send_to_animate",
+                                        tooltip="Send image and generation parameters to video inference tab.",
+                                    ),
                                 }
 
                             display_button = gr.Button("Start Generation", variant="primary")
@@ -1041,211 +1056,212 @@ def on_ui_tabs():
                         with gr.Row():
                             with gr.Column():
                                 video_model_selected_tab = gr.State(0)
+                                with gr.Tabs(elem_id="mode_easyphoto_video_inference"):
+                                    
+                                    with gr.TabItem("Text2Video") as video_template_images_tab:
+                                        t2v_input_prompt = gr.Textbox(
+                                            label="Text2Video Input Prompt.",
+                                            interactive=True,
+                                            lines=3,
+                                            value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ",
+                                            visible=True,
+                                        )
 
-                                with gr.TabItem("Text2Video") as video_template_images_tab:
-                                    t2v_input_prompt = gr.Textbox(
-                                        label="Text2Video Input Prompt.",
-                                        interactive=True,
-                                        lines=3,
-                                        value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ",
-                                        visible=True,
-                                    )
+                                        with gr.Accordion("Scene Lora for Video(Click here to select Scene Lora)", open=False):
+                                            with gr.Column():
+                                                scene_id = gr.Text(
+                                                    value="none", show_label=False, visible=True, placeholder="Selected", interactive=False
+                                                )
+                                                _ = gr.Markdown(
+                                                    value="**The preset Lora will be downloaded on the first click.**",
+                                                    show_label=False,
+                                                    visible=True,
+                                                )
+                                                with gr.Row():
+                                                    scene_id_gallery = gr.Gallery(
+                                                        value=scene,
+                                                        label="Scene Lora Gallery for Video",
+                                                        allow_preview=False,
+                                                        elem_id="scene_id_select",
+                                                        show_share_button=False,
+                                                        visible=True,
+                                                    ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
+                                                    scene_id_gallery.select(
+                                                        scene_change_function, [scene_id_gallery], [t2v_input_prompt, scene_id]
+                                                    )
 
-                                    with gr.Accordion("Scene Lora for Video(Click here to select Scene Lora)", open=False):
-                                        with gr.Column():
-                                            scene_id = gr.Text(
-                                                value="none", show_label=False, visible=True, placeholder="Selected", interactive=False
+                                                    scene_id_refresh = ToolButton(value="\U0001f504")
+                                                    scene_id_refresh.click(fn=scene_refresh_function, inputs=[], outputs=[scene_id_gallery])
+
+                                        with gr.Row() as width_height_line:
+                                            t2v_input_width = gr.Slider(
+                                                minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width"
                                             )
-                                            _ = gr.Markdown(
-                                                value="**The preset Lora will be downloaded on the first click.**",
-                                                show_label=False,
+                                            t2v_input_height = gr.Slider(
+                                                minimum=64, maximum=2048, step=8, label="Video Height", value=512, elem_id=f"height"
+                                            )
+
+                                        with gr.Row():
+                                            upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
+                                            
+                                        with gr.Row(visible=False) as control_video_type_line:
+                                            upload_control_video_type = gr.Dropdown(
+                                                value="openpose",
+                                                choices=list(
+                                                    set(['openpose', 'depth'] )
+                                                ),
+                                                elem_id="dropdown",
+                                                min_width=40,
+                                                label="video control type.",
+                                            )
+                                            def upload_control_video_type_change(upload_control_video):
+                                                if upload_control_video:
+                                                    return (
+                                                        gr.update(visible=True),
+                                                        gr.update(visible=False),
+                                                    )
+                                                return (
+                                                    gr.update(visible=False),
+                                                    gr.update(visible=True),
+                                                )
+
+                                            upload_control_video.change(
+                                                upload_control_video_type_change,
+                                                inputs=[upload_control_video],
+                                                outputs=[control_video_type_line, width_height_line],
+                                            )
+
+                                        with gr.Row(visible=False) as control_video_line:
+                                            control_video = gr.Video(
+                                                label="Video for Openpose Control",
+                                                show_label=True,
+                                                elem_id="{id_part}_video",
+                                                source="upload",
+                                            )
+
+                                            def upload_control_video_change(upload_control_video):
+                                                if upload_control_video:
+                                                    return (
+                                                        gr.update(visible=True),
+                                                        gr.update(visible=False),
+                                                    )
+                                                return (
+                                                    gr.update(visible=False),
+                                                    gr.update(visible=True),
+                                                )
+
+                                            upload_control_video.change(
+                                                upload_control_video_change,
+                                                inputs=[upload_control_video],
+                                                outputs=[control_video_line, width_height_line],
+                                            )
+
+                                        with gr.Row():
+                                            sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(
+                                                value="majicmixRealistic_v7.safetensors",
+                                                choices=list(
+                                                    set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
+                                                ),
+                                                elem_id="dropdown",
+                                                min_width=40,
+                                                label="The base checkpoint you use for Text2Video(For animatediff only).",
                                                 visible=True,
                                             )
-                                            with gr.Row():
-                                                scene_id_gallery = gr.Gallery(
-                                                    value=scene,
-                                                    label="Scene Lora Gallery for Video",
-                                                    allow_preview=False,
-                                                    elem_id="scene_id_select",
-                                                    show_share_button=False,
-                                                    visible=True,
-                                                ).style(columns=[5], rows=[2], object_fit="contain", height="auto")
-                                                scene_id_gallery.select(
-                                                    scene_change_function, [scene_id_gallery], [t2v_input_prompt, scene_id]
-                                                )
 
-                                                scene_id_refresh = ToolButton(value="\U0001f504")
-                                                scene_id_refresh.click(fn=scene_refresh_function, inputs=[], outputs=[scene_id_gallery])
-
-                                    with gr.Row() as width_height_line:
-                                        t2v_input_width = gr.Slider(
-                                            minimum=64, maximum=2048, step=8, label="Video Width", value=512, elem_id=f"width"
-                                        )
-                                        t2v_input_height = gr.Slider(
-                                            minimum=64, maximum=2048, step=8, label="Video Height", value=512, elem_id=f"height"
-                                        )
-
-                                    with gr.Row():
-                                        upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
-                                        
-                                    with gr.Row(visible=False) as control_video_type_line:
-                                        upload_control_video_type = gr.Dropdown(
-                                            value="openpose",
-                                            choices=list(
-                                                set(['openpose', 'depth'] )
-                                            ),
-                                            elem_id="dropdown",
-                                            min_width=40,
-                                            label="video control type.",
-                                        )
-                                        def upload_control_video_type_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
-                                            return (
-                                                gr.update(visible=False),
-                                                gr.update(visible=True),
+                                            checkpoint_refresh = ToolButton(value="\U0001f504")
+                                            checkpoint_refresh.click(
+                                                fn=checkpoint_refresh_function,
+                                                inputs=[],
+                                                outputs=[sd_model_checkpoint_for_animatediff_text2video],
                                             )
 
-                                        upload_control_video.change(
-                                            upload_control_video_type_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_type_line, width_height_line],
-                                        )
-
-                                    with gr.Row(visible=False) as control_video_line:
-                                        control_video = gr.Video(
-                                            label="Video for Openpose Control",
-                                            show_label=True,
-                                            elem_id="{id_part}_video",
-                                            source="upload",
-                                        )
-
-                                        def upload_control_video_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
-                                            return (
-                                                gr.update(visible=False),
-                                                gr.update(visible=True),
-                                            )
-
-                                        upload_control_video.change(
-                                            upload_control_video_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_line, width_height_line],
-                                        )
-
-                                    with gr.Row():
-                                        sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(
-                                            value="majicmixRealistic_v7.safetensors",
-                                            choices=list(
-                                                set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
-                                            ),
-                                            elem_id="dropdown",
-                                            min_width=40,
-                                            label="The base checkpoint you use for Text2Video(For animatediff only).",
+                                        gr.Markdown(
+                                            value="""
+                                            Generate from prompts notes:
+                                            - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results !!!
+                                            - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
+                                            """,
                                             visible=True,
                                         )
 
-                                        checkpoint_refresh = ToolButton(value="\U0001f504")
-                                        checkpoint_refresh.click(
-                                            fn=checkpoint_refresh_function,
-                                            inputs=[],
-                                            outputs=[sd_model_checkpoint_for_animatediff_text2video],
-                                        )
-
-                                    gr.Markdown(
-                                        value="""
-                                        Generate from prompts notes:
-                                        - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results !!!
-                                        - The Generate from prompts is an experimental feature aiming to generate great portrait without template for users.
-                                        """,
-                                        visible=True,
-                                    )
-
-                                with gr.TabItem("Image2Video") as video_upload_image_tab:
-                                    i2v_mode_choose = gr.Radio(
-                                        value="Base on One Image",
-                                        elem_id="Radio",
-                                        choices=["Base on One Image", "From One Image to another"],
-                                        label="Generate video from one image or more images",
-                                        show_label=False,
-                                        visible=True,
-                                    )
-
-                                    with gr.Row():
-                                        init_image = gr.Image(
-                                            label="Image for easyphoto to Image2Video",
-                                            show_label=True,
-                                            elem_id="{id_part}_image",
-                                            source="upload",
-                                        )
-                                        last_image = gr.Image(
-                                            label="Last image for easyphoto to Image2Video",
-                                            show_label=True,
-                                            elem_id="{id_part}_image",
-                                            source="upload",
-                                            visible=False,
-                                        )
-                                    init_image_prompt = gr.Textbox(
-                                        label="Prompt For Image2Video",
-                                        value="",
-                                        show_label=True,
-                                        visible=True,
-                                        placeholder="Please write the corresponding prompts using the template.",
-                                    )
-
-                                    def update_i2v_mode(i2v_mode_choose):
-                                        if i2v_mode_choose == "Base on One Image":
-                                            return [
-                                                gr.update(label="Image for easyphoto to Image2Video", value=None, visible=True),
-                                                gr.update(value=None, visible=False),
-                                            ]
-                                        else:
-                                            return [
-                                                gr.update(label="First Image for easyphoto to Image2Video", value=None, visible=True),
-                                                gr.update(value=None, visible=True),
-                                            ]
-
-                                    i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
-
-                                    with gr.Row():
-                                        sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(
-                                            value="majicmixRealistic_v7.safetensors",
-                                            choices=list(
-                                                set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
-                                            ),
-                                            elem_id="dropdown",
-                                            min_width=40,
-                                            label="The base checkpoint you use for Image2Video(For animatediff only).",
+                                    with gr.TabItem("Image2Video") as video_upload_image_tab:
+                                        i2v_mode_choose = gr.Radio(
+                                            value="Base on One Image",
+                                            elem_id="Radio",
+                                            choices=["Base on One Image", "From One Image to another"],
+                                            label="Generate video from one image or more images",
+                                            show_label=False,
                                             visible=True,
                                         )
 
-                                        checkpoint_refresh = ToolButton(value="\U0001f504")
-                                        checkpoint_refresh.click(
-                                            fn=checkpoint_refresh_function,
-                                            inputs=[],
-                                            outputs=[sd_model_checkpoint_for_animatediff_image2video],
+                                        with gr.Row():
+                                            init_image = gr.Image(
+                                                label="Image for easyphoto to Image2Video",
+                                                show_label=True,
+                                                elem_id="{id_part}_image",
+                                                source="upload",
+                                            )
+                                            last_image = gr.Image(
+                                                label="Last image for easyphoto to Image2Video",
+                                                show_label=True,
+                                                elem_id="{id_part}_image",
+                                                source="upload",
+                                                visible=False,
+                                            )
+                                        init_image_prompt = gr.Textbox(
+                                            label="Prompt For Image2Video",
+                                            value="",
+                                            show_label=True,
+                                            visible=True,
+                                            placeholder="Please write the corresponding prompts using the template.",
                                         )
-                                    gr.Markdown(
-                                        value="""
-                                        Generate from image notes:
-                                        - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results!!!
-                                        - **Please write the corresponding prompts using the template**.
-                                        - The Generate from prompts is an experimental feature aiming to generate great portrait with template for users.
-                                        """,
-                                        visible=True,
-                                    )
 
-                                with gr.TabItem("Video2Video") as video_upload_video_tab:
-                                    init_video = gr.Video(
-                                        label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload"
-                                    )
+                                        def update_i2v_mode(i2v_mode_choose):
+                                            if i2v_mode_choose == "Base on One Image":
+                                                return [
+                                                    gr.update(label="Image for easyphoto to Image2Video", value=None, visible=True),
+                                                    gr.update(value=None, visible=False),
+                                                ]
+                                            else:
+                                                return [
+                                                    gr.update(label="First Image for easyphoto to Image2Video", value=None, visible=True),
+                                                    gr.update(value=None, visible=True),
+                                                ]
+
+                                        i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
+
+                                        with gr.Row():
+                                            sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(
+                                                value="majicmixRealistic_v7.safetensors",
+                                                choices=list(
+                                                    set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)
+                                                ),
+                                                elem_id="dropdown",
+                                                min_width=40,
+                                                label="The base checkpoint you use for Image2Video(For animatediff only).",
+                                                visible=True,
+                                            )
+
+                                            checkpoint_refresh = ToolButton(value="\U0001f504")
+                                            checkpoint_refresh.click(
+                                                fn=checkpoint_refresh_function,
+                                                inputs=[],
+                                                outputs=[sd_model_checkpoint_for_animatediff_image2video],
+                                            )
+                                        gr.Markdown(
+                                            value="""
+                                            Generate from image notes:
+                                            - We recommend using a more attractive portrait model such as **majicmixRealistic_v7** for video generation, which will result in better results!!!
+                                            - **Please write the corresponding prompts using the template**.
+                                            - The Generate from prompts is an experimental feature aiming to generate great portrait with template for users.
+                                            """,
+                                            visible=True,
+                                        )
+
+                                    with gr.TabItem("Video2Video") as video_upload_video_tab:
+                                        init_video = gr.Video(
+                                            label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload"
+                                        )
 
                                 model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
                                 for i, tab in enumerate(model_selected_tabs):
@@ -1989,6 +2005,7 @@ def on_ui_tabs():
                             tryon_button = gr.Button("Start Generation", variant="primary")
 
                             parameters_copypaste.add_paste_fields("tryon", template_image_tryon, None)
+                            parameters_copypaste.add_paste_fields("animate", init_image, None)
                             for paste_tabname, paste_button in buttons_photo_infer.items():
                                 if paste_tabname in ["img2img", "inpaint"]:
                                     parameters_copypaste.register_paste_params_button(
@@ -2104,6 +2121,31 @@ def on_ui_tabs():
                     buttons_photo_infer["tryon"].click(
                         _js="switch_to_ep_tryon",
                         fn=None,
+                    )
+
+                    # buttons_photo_infer["animate"].click(
+                    #     _js="switch_to_ep_videoinfer_upload",
+                    #     fn=None,
+                    # )
+
+
+                    def select_video_image_upload():
+                        i2v_mode_choose = "Base on One Image"
+                        return [
+                            i2v_mode_choose,
+                            gr.update(label="Image for easyphoto to Image2Video", value=None, visible=True),
+                            gr.update(value=None, visible=False),
+                        ]
+
+                    buttons_photo_infer["animate"].click(
+                        _js="switch_to_ep_videoinfer_upload",
+                        fn=select_video_image_upload,
+                        inputs=[],
+                        outputs=[
+                            i2v_mode_choose,
+                            init_image,
+                            last_image
+                        ],
                     )
 
                     def select_single_image_upload():

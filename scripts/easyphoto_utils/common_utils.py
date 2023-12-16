@@ -17,7 +17,7 @@ from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
+from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, infer_template_dir, DEFAULT_SLIDERS
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -139,54 +139,35 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/sam_vit_l_0b3195.pth",
     ],
     # Scene Lora Collection
-    "Christmas_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors",
+    "Christmas_boy": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/christmas_boy.safetensors",
     ],
-    "Cyberpunk_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Cyberpunk_1.safetensors",
+    "Christmas_girl": [
+        # "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/christmas_girl.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors"
     ],
-    "FairMaidenStyle_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/FairMaidenStyle_1.safetensors",
+    "New_year_boy": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/scene_lora/newyear_girl.safetensors",
     ],
-    "Gentleman_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Gentleman_1.safetensors",
+    "New_year_girl": [
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/scene_lora/newyear_girl.safetensors",
     ],
-    "GuoFeng_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_1.safetensors",
-    ],
-    "GuoFeng_2": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_2.safetensors",
-    ],
-    "GuoFeng_3": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_3.safetensors",
-    ],
-    "GuoFeng_4": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/GuoFeng_4.safetensors",
-    ],
-    "Minimalism_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Minimalism_1.safetensors",
-    ],
-    "NaturalWind_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/NaturalWind_1.safetensors",
-    ],
-    "Princess_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_1.safetensors",
-    ],
-    "Princess_2": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_2.safetensors",
-    ],
-    "Princess_3": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Princess_3.safetensors",
-    ],
-    "SchoolUniform_1": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_1.safetensors",
-    ],
-    "SchoolUniform_2": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/SchoolUniform_2.safetensors",
-    ],
+    
     "lcm": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sdxl.safetensors",
+    ],
+    # Infer Template
+    "christmas": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy1.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy2.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy3.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy4.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_girl1.png"
+    ],
+    "new_year": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_boy1.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_girl1.png"
     ],
     # Tryon Gallery Collections
     # template
@@ -326,57 +307,35 @@ save_filenames = {
         os.path.join(easyphoto_models_path, "sam_vit_l_0b3195.pth"),
     ],
     # Scene Lora Collection
-    "Christmas_1": [
-        os.path.join(models_path, f"Lora/Christmas_1.safetensors"),
+    "Christmas_boy": [
+        os.path.join(models_path, f"Lora/Christmas_boy.safetensors"),
     ],
-    "Cyberpunk_1": [
-        os.path.join(models_path, f"Lora/Cyberpunk_1.safetensors"),
+    "Christmas_girl": [
+        os.path.join(models_path, f"Lora/Christmas_girl.safetensors"),
     ],
-    "FairMaidenStyle_1": [
-        os.path.join(models_path, f"Lora/FairMaidenStyle_1.safetensors"),
+    "New_year_boy": [
+        os.path.join(models_path, f"Lora/New_year_boy.safetensors"),
     ],
-    "Gentleman_1": [
-        os.path.join(models_path, f"Lora/Gentleman_1.safetensors"),
-    ],
-    "GuoFeng_1": [
-        os.path.join(models_path, f"Lora/GuoFeng_1.safetensors"),
-    ],
-    "GuoFeng_2": [
-        os.path.join(models_path, f"Lora/GuoFeng_2.safetensors"),
-    ],
-    "GuoFeng_3": [
-        os.path.join(models_path, f"Lora/GuoFeng_3.safetensors"),
-    ],
-    "GuoFeng_4": [
-        os.path.join(models_path, f"Lora/GuoFeng_4.safetensors"),
-    ],
-    "Minimalism_1": [
-        os.path.join(models_path, f"Lora/Minimalism_1.safetensors"),
-    ],
-    "NaturalWind_1": [
-        os.path.join(models_path, f"Lora/NaturalWind_1.safetensors"),
-    ],
-    "Princess_1": [
-        os.path.join(models_path, f"Lora/Princess_1.safetensors"),
-    ],
-    "Princess_2": [
-        os.path.join(models_path, f"Lora/Princess_2.safetensors"),
-    ],
-    "Princess_3": [
-        os.path.join(models_path, f"Lora/Princess_3.safetensors"),
-    ],
-    "SchoolUniform_1": [
-        os.path.join(models_path, f"Lora/SchoolUniform_1.safetensors"),
-    ],
-    "SchoolUniform_2": [
-        os.path.join(models_path, f"Lora/SchoolUniform_2.safetensors"),
+    "New_year_girl": [
+        os.path.join(models_path, f"Lora/New_year_girl.safetensors"),
     ],
     "lcm": [
         os.path.join(models_path, f"Lora/lcm_lora_sd15.safetensors"),
         os.path.join(models_path, f"Lora/lcm_lora_sdxl.safetensors"),
     ],
-    # Tryon Gallery Collections
-    # template
+    # infer templaye
+    "christmas": [
+        os.path.join(infer_template_dir, "c_boy1.png"),
+        os.path.join(infer_template_dir, "c_boy2.png"),
+        os.path.join(infer_template_dir, "c_boy3.png"),
+        os.path.join(infer_template_dir, "c_boy4.png"),
+        os.path.join(infer_template_dir, "c_girl1.png"),
+    ],
+    "new_year": [
+        os.path.join(infer_template_dir, "n_boy1.png"),
+        os.path.join(infer_template_dir, "n_girl1.png"),
+    ],
+    # tryon template
     "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg")],
     "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg")],
     "dress": [os.path.join(tryon_template_gallery_dir, "dress.jpg")],

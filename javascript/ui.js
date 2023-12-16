@@ -10,6 +10,13 @@ function switch_to_ep_photoinfer_upload() {
     return Array.from(arguments);
 }
 
+function switch_to_ep_videoinfer_upload() {
+    gradioApp().getElementById('mode_easyphoto').querySelectorAll('button')[2].click();
+    gradioApp().getElementById('mode_easyphoto_video_inference').querySelectorAll('button')[1].click();
+
+    return Array.from(arguments);
+}
+
 function switch_to_ep_tryon() {
     gradioApp().getElementById('mode_easyphoto').querySelectorAll('button')[3].click();
 
