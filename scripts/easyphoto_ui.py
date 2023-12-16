@@ -793,7 +793,7 @@ def on_ui_tabs():
                                     makeup_transfer = gr.Checkbox(label="MakeUp Transfer", value=False)
                                 with gr.Row():
                                     display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                    ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
+                                    ipa_control = gr.Checkbox(label="IP-Adapter Control", value=True)
                                     face_shape_match = gr.Checkbox(label="Face Shape Match", value=False)
 
                                     def ipa_update_score(ipa_control):
@@ -882,7 +882,7 @@ def on_ui_tabs():
                                         minimum=0.00, maximum=1.00, value=0.50, step=0.05, label="Makeup Transfer Ratio", visible=False
                                     )
                                     ipa_weight = gr.Slider(
-                                        minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Control Weight", visible=False
+                                        minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Control Weight", visible=True
                                     )
 
                                     super_resolution.change(
@@ -908,7 +908,7 @@ def on_ui_tabs():
                                         1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
                                         2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
                                     """,
-                                    visible=False,
+                                    visible=True,
                                 )
                                 with gr.Row():
                                     ipa_image_path = gr.Image(
@@ -916,7 +916,7 @@ def on_ui_tabs():
                                         show_label=True,
                                         source="upload",
                                         type="filepath",
-                                        visible=False,
+                                        visible=True,
                                     )
                                 ipa_control.change(
                                     lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path]
@@ -1358,20 +1358,20 @@ def on_ui_tabs():
 
                                     with gr.Row():
                                         before_face_fusion_ratio = gr.Slider(
-                                            minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Video Face Fusion Ratio Before"
+                                            minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Video Face Fusion Ratio Before"
                                         )
                                         after_face_fusion_ratio = gr.Slider(
-                                            minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Video Face Fusion Ratio After"
+                                            minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Video Face Fusion Ratio After"
                                         )
 
                                     with gr.Row():
                                         first_diffusion_steps = gr.Slider(
-                                            minimum=15, maximum=50, value=50, step=1, label="Video First Diffusion steps"
+                                            minimum=4, maximum=20, value=12, step=1, label="Video First Diffusion steps"
                                         )
                                         first_denoising_strength = gr.Slider(
                                             minimum=0.30,
                                             maximum=0.60,
-                                            value=0.45,
+                                            value=0.5,
                                             step=0.05,
                                             label="Video First Diffusion denoising strength",
                                         )
@@ -1381,16 +1381,16 @@ def on_ui_tabs():
                                         apply_face_fusion_after = gr.Checkbox(label="Video Apply Face Fusion After", value=True)
                                     with gr.Row():
                                         color_shift_middle = gr.Checkbox(label="Video Apply color shift first", value=True)
-                                        super_resolution = gr.Checkbox(label="Video Super Resolution at last", value=True)
+                                        super_resolution = gr.Checkbox(label="Video Super Resolution at last", value=False)
                                         skin_retouching_bool = gr.Checkbox(label="Video Skin Retouching", value=False)
                                     with gr.Row():
                                         display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
+                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=True)
                                         face_shape_match = gr.Checkbox(label="Video Face Shape Match", value=False)
                                     with gr.Row():
                                         makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
                                         video_interpolation = gr.Checkbox(label="Video Interpolation", value=False)
-                                        lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
+                                        lcm_accelerate_video = gr.Checkbox(label="Video LCM Accelerate", value=True)
 
                                         # reuse this file L796, change other value when click
                                         def lcm_change(lcm_accelerate):
@@ -1408,9 +1408,9 @@ def on_ui_tabs():
                                                 gr.update(value=0.50),
                                             )
 
-                                        lcm_accelerate.change(
+                                        lcm_accelerate_video.change(
                                             lcm_change,
-                                            inputs=[lcm_accelerate],
+                                            inputs=[lcm_accelerate_video],
                                             outputs=[
                                                 first_diffusion_steps,
                                                 first_denoising_strength,
@@ -1418,6 +1418,7 @@ def on_ui_tabs():
                                                 after_face_fusion_ratio,
                                             ],
                                         )
+
 
                                     with gr.Row():
                                         super_resolution_method = gr.Dropdown(
@@ -1440,7 +1441,7 @@ def on_ui_tabs():
                                             value=0.50,
                                             step=0.05,
                                             label="Video IP-Adapter Control Weight",
-                                            visible=False,
+                                            visible=True,
                                         )
 
                                         super_resolution.change(
@@ -1481,7 +1482,7 @@ def on_ui_tabs():
                                             1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
                                             2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
                                         """,
-                                        visible=False,
+                                        visible=True,
                                     )
                                     with gr.Row():
                                         ipa_image_path = gr.Image(
@@ -1489,7 +1490,7 @@ def on_ui_tabs():
                                             show_label=True,
                                             source="upload",
                                             type="filepath",
-                                            visible=False,
+                                            visible=True,
                                         )
                                     ipa_control.change(
                                         lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path]
@@ -1627,7 +1628,7 @@ def on_ui_tabs():
                                 ipa_control,
                                 ipa_weight,
                                 ipa_image_path,
-                                lcm_accelerate,
+                                lcm_accelerate_video,
                                 *uuids,
                             ],
                             outputs=[infer_progress, output_video, output_gif, output_images],
@@ -2121,11 +2122,6 @@ def on_ui_tabs():
                         _js="switch_to_ep_tryon",
                         fn=None,
                     )
-
-                    # buttons_photo_infer["animate"].click(
-                    #     _js="switch_to_ep_videoinfer_upload",
-                    #     fn=None,
-                    # )
 
                     def select_video_image_upload():
                         i2v_mode_choose = "Base on One Image"
