@@ -36,12 +36,12 @@ DEFAULT_SCENE_LORA = [
     "Christmas_boy",
     "Christmas_girl",
     "New_year_boy",
-    "New_year_girl", 
+    "New_year_girl",
 ]
 
 # tryon template
 DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
-DEFAULT_INFER_TEMPLATE = ['christmas', 'new_year']
+DEFAULT_INFER_TEMPLATE = ["christmas", "new_year"]
 
 # cloth lora
 DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "demo_dress_200", "demo_short_200"]

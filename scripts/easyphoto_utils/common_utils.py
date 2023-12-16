@@ -152,7 +152,6 @@ download_urls = {
     "New_year_girl": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/scene_lora/newyear_girl.safetensors",
     ],
-    
     "lcm": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sdxl.safetensors",
@@ -163,11 +162,11 @@ download_urls = {
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy2.png",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy3.png",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy4.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_girl1.png"
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_girl1.png",
     ],
     "new_year": [
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_boy1.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_girl1.png"
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_girl1.png",
     ],
     # Tryon Gallery Collections
     # template

@@ -19,7 +19,7 @@ from scripts.easyphoto_config import (
     user_id_outpath_samples,
     tryon_preview_dir,
     tryon_gallery_dir,
-    infer_template_dir
+    infer_template_dir,
 )
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
@@ -1057,7 +1057,7 @@ def on_ui_tabs():
                             with gr.Column():
                                 video_model_selected_tab = gr.State(0)
                                 with gr.Tabs(elem_id="mode_easyphoto_video_inference"):
-                                    
+
                                     with gr.TabItem("Text2Video") as video_template_images_tab:
                                         t2v_input_prompt = gr.Textbox(
                                             label="Text2Video Input Prompt.",
@@ -1103,17 +1103,16 @@ def on_ui_tabs():
 
                                         with gr.Row():
                                             upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
-                                            
+
                                         with gr.Row(visible=False) as control_video_type_line:
                                             upload_control_video_type = gr.Dropdown(
                                                 value="openpose",
-                                                choices=list(
-                                                    set(['openpose', 'depth'] )
-                                                ),
+                                                choices=list(set(["openpose", "depth"])),
                                                 elem_id="dropdown",
                                                 min_width=40,
                                                 label="video control type.",
                                             )
+
                                             def upload_control_video_type_change(upload_control_video):
                                                 if upload_control_video:
                                                     return (
@@ -2128,7 +2127,6 @@ def on_ui_tabs():
                     #     fn=None,
                     # )
 
-
                     def select_video_image_upload():
                         i2v_mode_choose = "Base on One Image"
                         return [
@@ -2141,11 +2139,7 @@ def on_ui_tabs():
                         _js="switch_to_ep_videoinfer_upload",
                         fn=select_video_image_upload,
                         inputs=[],
-                        outputs=[
-                            i2v_mode_choose,
-                            init_image,
-                            last_image
-                        ],
+                        outputs=[i2v_mode_choose, init_image, last_image],
                     )
 
                     def select_single_image_upload():
