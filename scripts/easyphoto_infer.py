@@ -1976,11 +1976,11 @@ def easyphoto_video_infer_forward(
                 resize = float(short_side / 512.0)
                 new_size = (int(image.width // resize), int(image.height // resize))
 
-                if upload_control_video_type == 'depth':
+                if upload_control_video_type == "depth":
                     ep_logger.info(f"Using depth control for video control input")
                     controlnet_pairs = [["depth", template_images[0], 1, 1]]
 
-                if upload_control_video_type == 'openpose':
+                if upload_control_video_type == "openpose":
                     ep_logger.info(f"Using openpose control for video control input")
                     controlnet_pairs = [["openpose", template_images[0], 1, 1]]
 
@@ -2090,6 +2090,7 @@ def easyphoto_video_infer_forward(
             default_negative_prompt=DEFAULT_NEGATIVE_AD,
             seed=seed,
             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+            animatediff_flag=True,
             animatediff_video_length=int(max_frames),
             animatediff_fps=int(actual_fps),
             animatediff_reserve_scale=animatediff_reserve_scale,
@@ -2199,6 +2200,8 @@ def easyphoto_video_infer_forward(
 
         try:
             # open the template image
+            if not isinstance(template_image, list):
+                template_image = [template_image]
             template_image = [Image.fromarray(np.uint8(_)).convert("RGB") for _ in template_image]
             loop_template_image = copy.deepcopy(template_image)
 
