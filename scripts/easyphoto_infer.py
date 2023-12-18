@@ -127,6 +127,17 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
+    
+    elif unit == "dwpose":
+        control_unit = dict(
+            image=None,
+            module="dw_openpose_full",
+            weight=weight,
+            guidance_end=1,
+            control_mode=1,
+            resize_mode="Just Resize",
+            model="control_v11p_sd15_openpose",
+        )
 
     elif unit == "sdxl_openpose":
         control_unit = dict(
@@ -1770,10 +1781,10 @@ def easyphoto_video_infer_forward(
         return "EasyPhoto video infer does not support the SD2 checkpoint and sdxl.", None, None, []
 
     if ipa_control:
-        check_files_exists_and_download(check_hash.get("add_ipa_sdxl", True), download_mode="add_ipa_sdxl")
-        if check_hash.get("add_ipa_sdxl", True):
+        check_files_exists_and_download(check_hash.get("add_ipa_base", True), download_mode="add_ipa_base")
+        if check_hash.get("add_ipa_base", True):
             refresh_model_vae()
-        check_hash["add_ipa_sdxl"] = False
+        check_hash["add_ipa_base"] = False
     if lcm_accelerate:
         check_files_exists_and_download(check_hash.get("lcm", True), download_mode="lcm")
         check_hash["lcm"] = False
@@ -1983,6 +1994,10 @@ def easyphoto_video_infer_forward(
                 if upload_control_video_type == "openpose":
                     ep_logger.info(f"Using openpose control for video control input")
                     controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+                
+                if upload_control_video_type == "dwpose":
+                    ep_logger.info(f"Using dwpose control for video control input")
+                    controlnet_pairs = [["dwpose", template_images[0], 1, 1]]
 
                 template_images = txt2img(
                     controlnet_pairs,
