@@ -130,6 +130,8 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/majicmixRealistic_v7.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/mm_sd_v15_v2.ckpt",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/flownet.pkl",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/dw-ll_ucoco_384.onnx",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/yolox_l.onnx",
     ],
     "add_tryon": [
         # controlnets
@@ -319,6 +321,8 @@ save_filenames = {
         os.path.join(models_path, f"Stable-diffusion/majicmixRealistic_v7.safetensors"),
         os.path.join(easyphoto_models_path, "mm_sd_v15_v2.ckpt"),
         os.path.join(easyphoto_models_path, "flownet.pkl"),
+        os.path.join(controlnet_annotator_cache_path, "dw-ll_ucoco_384.onnx"),
+        os.path.join(controlnet_annotator_cache_path, "yolox_l.onnx"),
     ],
     "add_tryon": [
         os.path.join(controlnet_depth_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
