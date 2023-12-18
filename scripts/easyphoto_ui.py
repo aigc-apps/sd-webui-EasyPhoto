@@ -1090,9 +1090,9 @@ def on_ui_tabs():
                                         
                                     with gr.Row(visible=False) as control_video_type_line:
                                         upload_control_video_type = gr.Dropdown(
-                                            value="openpose",
+                                            value="dwpose",
                                             choices=list(
-                                                set(['openpose', 'depth'] )
+                                                set(['dwpose', 'openpose', 'depth'] )
                                             ),
                                             elem_id="dropdown",
                                             min_width=40,
