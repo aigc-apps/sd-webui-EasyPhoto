@@ -127,7 +127,7 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
-    
+
     elif unit == "dwpose":
         control_unit = dict(
             image=None,
@@ -445,6 +445,7 @@ def easyphoto_infer_forward(
     scene_id,
     prompt_generate_sd_model_checkpoint,
     additional_prompt,
+    lora_weights,
     before_face_fusion_ratio,
     after_face_fusion_ratio,
     first_diffusion_steps,
@@ -705,7 +706,6 @@ def easyphoto_infer_forward(
     face_id_retinaface_keypoints = []
     face_id_retinaface_masks = []
     input_prompt_without_lora = additional_prompt
-    best_lora_weights = str(0.9)
     multi_user_facecrop_ratio = 1.5
     multi_user_safecrop_ratio = 1.0
     # Second diffusion hr scale
@@ -793,12 +793,22 @@ def easyphoto_infer_forward(
             )
             template_images = [np.uint8(template_images)]
         else:
+            text_to_image_input_prompt += ", look at viewer"
+            # get lora scene prompt
+            if user_ids[0] != "ipa_control_only":
+                text_to_image_input_prompt = text_to_image_input_prompt + f", {validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+
             # text to image for template
             if lcm_accelerate:
                 text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
+            pose_templates = glob.glob(os.path.join(easyphoto_models_path, "pose_templates/*.jpg")) + glob.glob(
+                os.path.join(easyphoto_models_path, "pose_templates/*.png")
+            )
+
+            pose_template = Image.open(np.random.choice(pose_templates))
             template_images = txt2img(
-                [],
+                [["openpose", pose_template, 0.50, 1]],
                 input_prompt=text_to_image_input_prompt,
                 diffusion_steps=30 if not lcm_accelerate else 8,
                 cfg_scale=7 if not lcm_accelerate else 2,
@@ -872,7 +882,7 @@ def easyphoto_infer_forward(
                 ipa_retinaface_masks.append(_ipa_retinaface_masks[0])
         else:
             # get prompt
-            input_prompt = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            input_prompt = f"{validation_prompt}, <lora:{user_id}:{lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):
@@ -1724,8 +1734,10 @@ def easyphoto_video_infer_forward(
     init_image,
     init_image_prompt,
     last_image,
+    i2v_denoising_strength,
     init_video,
     additional_prompt,
+    lora_weights,
     max_frames,
     max_fps,
     save_as,
@@ -1947,9 +1959,9 @@ def easyphoto_video_infer_forward(
     face_id_retinaface_boxes = []
     face_id_retinaface_keypoints = []
     face_id_retinaface_masks = []
-    best_lora_weights = str(0.9)
     multi_user_facecrop_ratio = 1.5
     input_mask_face_part_only = True
+    animatediff_reserve_scale = 1.00
     # safe params
     crop_at_last = True
     crop_at_last_ratio = 3
@@ -1994,7 +2006,7 @@ def easyphoto_video_infer_forward(
                 if upload_control_video_type == "openpose":
                     ep_logger.info(f"Using openpose control for video control input")
                     controlnet_pairs = [["openpose", template_images[0], 1, 1]]
-                
+
                 if upload_control_video_type == "dwpose":
                     ep_logger.info(f"Using dwpose control for video control input")
                     controlnet_pairs = [["dwpose", template_images[0], 1, 1]]
@@ -2079,11 +2091,6 @@ def easyphoto_video_infer_forward(
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
         if last_image is not None:
             last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
-            animatediff_reserve_scale = 1.00
-            denoising_strength = 0.55
-        else:
-            animatediff_reserve_scale = 0.75
-            denoising_strength = 0.65
         if lcm_accelerate:
             init_image_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
         # Resize the template image with short edges on 512
@@ -2099,7 +2106,7 @@ def easyphoto_video_infer_forward(
             input_prompt=init_image_prompt,
             diffusion_steps=30 if not lcm_accelerate else 8,
             cfg_scale=7 if not lcm_accelerate else 2,
-            denoising_strength=denoising_strength,
+            denoising_strength=i2v_denoising_strength,
             hr_scale=1,
             default_positive_prompt=DEFAULT_POSITIVE_AD,
             default_negative_prompt=DEFAULT_NEGATIVE_AD,
@@ -2132,7 +2139,7 @@ def easyphoto_video_infer_forward(
                 ipa_retinaface_masks.append([])
         else:
             # get prompt
-            input_prompt = f"{validation_prompt}, <lora:{user_id}:{best_lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
+            input_prompt = f"{validation_prompt}, <lora:{user_id}:{lora_weights}>" + "<lora:FilmVelvia3:0.65>" + additional_prompt
             # Add the ddpo LoRA into the input prompt if available.
             lora_model_path = os.path.join(models_path, "Lora")
             if os.path.exists(os.path.join(lora_model_path, "ddpo_{}.safetensors".format(user_id))):

@@ -30,6 +30,7 @@ from scripts.easyphoto_utils import (
     ep_logger,
     get_attribute_edit_ids,
     video_visible,
+    unload_models,
 )
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
@@ -746,6 +747,10 @@ def on_ui_tabs():
                                             attribute_edit_wiki_url
                                         )
                                     )
+                                with gr.Row():
+                                    lora_weights = gr.Slider(
+                                        minimum=0.00, maximum=1.30, value=0.90, step=0.05, label="Lora Weights of User id"
+                                    )
 
                                 with gr.Row():
                                     before_face_fusion_ratio = gr.Slider(
@@ -964,6 +969,7 @@ def on_ui_tabs():
                                 }
 
                             display_button = gr.Button("Start Generation", variant="primary")
+                            empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
 
                             face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
                             face_id_outputs = gr.Gallery(
@@ -978,6 +984,7 @@ def on_ui_tabs():
                             )
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
+                            empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
                     display_button.click(
                         fn=easyphoto_infer_forward,
@@ -992,6 +999,7 @@ def on_ui_tabs():
                             scene_id,
                             prompt_generate_sd_model_checkpoint,
                             additional_prompt,
+                            lora_weights,
                             before_face_fusion_ratio,
                             after_face_fusion_ratio,
                             first_diffusion_steps,
@@ -1087,17 +1095,16 @@ def on_ui_tabs():
 
                                     with gr.Row():
                                         upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
-                                        
+
                                     with gr.Row(visible=False) as control_video_type_line:
                                         upload_control_video_type = gr.Dropdown(
                                             value="dwpose",
-                                            choices=list(
-                                                set(['dwpose', 'openpose', 'depth'] )
-                                            ),
+                                            choices=list(set(["dwpose", "openpose", "depth"])),
                                             elem_id="dropdown",
                                             min_width=40,
                                             label="video control type.",
                                         )
+
                                         def upload_control_video_type_change(upload_control_video):
                                             if upload_control_video:
                                                 return (
@@ -1213,7 +1220,9 @@ def on_ui_tabs():
                                             ]
 
                                     i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
-
+                                    i2v_denoising_strength = gr.Slider(
+                                        minimum=0.00, maximum=1.00, value=0.65, step=0.05, label="Denoising Strength for image to video"
+                                    )
                                     with gr.Row():
                                         sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(
                                             value="majicmixRealistic_v7.safetensors",
@@ -1339,6 +1348,11 @@ def on_ui_tabs():
                                             min_width=30,
                                             label=f"Video Save as",
                                             visible=True,
+                                        )
+
+                                    with gr.Row():
+                                        lora_weights = gr.Slider(
+                                            minimum=0.00, maximum=1.30, value=0.90, step=0.05, label="Video Lora Weights of User id"
                                         )
 
                                     with gr.Row():
@@ -1562,12 +1576,15 @@ def on_ui_tabs():
                                         outputs=[download_origin_files, download_crop_files],
                                         show_progress=False,
                                     )
+                                empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
 
                                 output_images = gr.Gallery(
                                     label="Output Frames",
                                 ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                                 infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
+
+                                empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
                         display_button.click(
                             fn=easyphoto_video_infer_forward,
@@ -1585,8 +1602,10 @@ def on_ui_tabs():
                                 init_image,
                                 init_image_prompt,
                                 last_image,
+                                i2v_denoising_strength,
                                 init_video,
                                 additional_prompt,
+                                lora_weights,
                                 max_frames,
                                 max_fps,
                                 save_as,

@@ -1,9 +1,11 @@
 import os
-from modules.paths import data_path, models_path
+from modules.paths import data_path, models_path, extensions_builtin_dir, extensions_dir
 
 # save_dirs
 data_dir = data_path
 models_path = models_path
+extensions_builtin_dir = extensions_builtin_dir
+extensions_dir = extensions_dir
 easyphoto_models_path = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models")
 easyphoto_img2img_samples = os.path.join(data_dir, "outputs/img2img-images")
 easyphoto_txt2img_samples = os.path.join(data_dir, "outputs/txt2img-images")

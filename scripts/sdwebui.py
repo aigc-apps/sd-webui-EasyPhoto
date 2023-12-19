@@ -427,12 +427,6 @@ def t2i_call(
     if steps is None:
         steps = 20
 
-    # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
-    opts.return_mask = False
-    opts.return_mask_composite = False
-    if "control_net_no_detectmap" in shared.opts.data.keys():
-        shared.opts.data["control_net_no_detectmap"] = True
-
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_txt2img = StableDiffusionProcessingTxt2Img(
@@ -463,8 +457,7 @@ def t2i_call(
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
     if animatediff_flag:
-        before_opts, before_pad_cond_uncond = copy.deepcopy(opts.return_mask), copy.deepcopy(opts.pad_cond_uncond)
-        opts.return_mask = False
+        before_pad_cond_uncond = copy.deepcopy(opts.pad_cond_uncond)
         opts.pad_cond_uncond = True
 
         animate_diff_process = AnimateDiffProcess(enable=True, video_length=animatediff_video_length, fps=animatediff_fps)
@@ -502,7 +495,6 @@ def t2i_call(
     if loractl_flag:
         return (processed.images[0], processed.images[1])
     if animatediff_flag:
-        opts.return_mask = before_opts
         opts.pad_cond_uncond = before_pad_cond_uncond
 
     if animatediff_flag:
@@ -636,12 +628,6 @@ def i2i_inpaint_call(
     if steps is None:
         steps = 20
 
-    # It's useful to ensure the generated image is the first element among SD WebUI img2img api call results.
-    opts.return_mask = False
-    opts.return_mask_composite = False
-    if "control_net_no_detectmap" in shared.opts.data.keys():
-        shared.opts.data["control_net_no_detectmap"] = True
-
     # Pass sd_model to StableDiffusionProcessingTxt2Img does not work.
     # We should modify shared.opts.sd_model_checkpoint instead.
     p_img2img = StableDiffusionProcessingImg2Img(
@@ -684,8 +670,8 @@ def i2i_inpaint_call(
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
     if animatediff_flag:
-        before_opts = copy.deepcopy(opts.return_mask)
-        opts.return_mask = False
+        before_pad_cond_uncond = copy.deepcopy(opts.pad_cond_uncond)
+        opts.pad_cond_uncond = True
 
         animate_diff_process = AnimateDiffProcess(
             enable=True,
@@ -730,7 +716,7 @@ def i2i_inpaint_call(
     if loractl_flag:
         return (processed.images[0], processed.images[1])
     if animatediff_flag:
-        opts.return_mask = before_opts
+        opts.pad_cond_uncond = before_pad_cond_uncond
 
     if animatediff_flag:
         gen_image = processed.images
