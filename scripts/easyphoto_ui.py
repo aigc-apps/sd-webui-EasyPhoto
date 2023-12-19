@@ -962,6 +962,11 @@ def on_ui_tabs():
                                         tooltip="Send image and generation parameters to tryon tab.",
                                     ),
                                 }
+                            
+                            def update_faceid(display_score, ipa_control):
+                                if display_score or ipa_control:
+                                    return [gr.update(visible=True), gr.update(visible=True)]
+                                return [gr.update(visible=False), gr.update(visible=False)]
 
                             display_button = gr.Button("Start Generation", variant="primary")
 
@@ -971,11 +976,7 @@ def on_ui_tabs():
                                 show_label=False,
                                 visible=False,
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                            # Display Face Similarity Scores if the user intend to do it.
-                            display_score.change(lambda x: face_id_text.update(visible=x), inputs=[display_score], outputs=[face_id_text])
-                            display_score.change(
-                                lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs]
-                            )
+                            display_score.change(update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs])
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
 
