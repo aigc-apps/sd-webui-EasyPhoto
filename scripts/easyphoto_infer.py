@@ -52,6 +52,7 @@ from scripts.easyphoto_utils import (
     switch_ms_model_cpu,
     unload_models,
     seed_everything,
+    postprocess_paste_text_images,
 )
 from scripts.sdwebui import (
     get_checkpoint_type,
@@ -127,7 +128,7 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
-    
+
     elif unit == "dwpose":
         control_unit = dict(
             image=None,
@@ -474,6 +475,7 @@ def easyphoto_infer_forward(
     ipa_only_weight,
     ipa_only_image_path,
     lcm_accelerate,
+    selected_text_template,
     *user_ids,
 ):
     # global
@@ -1690,9 +1692,20 @@ def easyphoto_infer_forward(
                 p=None,
             )
 
+            # postprocess
+            if selected_text_template != "":
+                ep_logger.info(f"Start adding text for Template: {str(template_idx + 1)}")
+                text_template = eval(selected_text_template)[1]
+                try:
+                    add_text_img = postprocess_paste_text_images(text_template, output_image)
+                    outputs.append(add_text_img)
+                    text_info = " Add text success"
+                except Exception as e:
+                    text_info = f"Add text error: {e}"
+
             if loop_message != "":
                 loop_message += "\n"
-            loop_message += f"Template {str(template_idx + 1)} Success."
+            loop_message += f"Template {str(template_idx + 1)} Success. + {text_info}"
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -1994,7 +2007,7 @@ def easyphoto_video_infer_forward(
                 if upload_control_video_type == "openpose":
                     ep_logger.info(f"Using openpose control for video control input")
                     controlnet_pairs = [["openpose", template_images[0], 1, 1]]
-                
+
                 if upload_control_video_type == "dwpose":
                     ep_logger.info(f"Using dwpose control for video control input")
                     controlnet_pairs = [["dwpose", template_images[0], 1, 1]]

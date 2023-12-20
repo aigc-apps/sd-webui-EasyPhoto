@@ -59,6 +59,7 @@ try:
         unload_models,
         seed_everything,
         get_attribute_edit_ids,
+        postprocess_paste_text_images,
     )
     from .loractl_utils import check_loractl_conflict, LoraCtlScript
 except Exception as e:

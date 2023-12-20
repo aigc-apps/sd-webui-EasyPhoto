@@ -19,6 +19,7 @@ tryon_preview_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)).repl
 tryon_gallery_dir = os.path.join(cloth_id_outpath_samples, "gallery")
 
 infer_template_dir = os.path.join(easyphoto_models_path, "infer_templates")
+text_gallery_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "images"), "text")
 
 # prompts
 validation_prompt = "easyphoto_face, easyphoto, 1person"
@@ -41,6 +42,7 @@ DEFAULT_SCENE_LORA = [
 
 # tryon template
 DEFAULT_TRYON_TEMPLATE = ["boy", "girl", "dress", "short"]
+DEFAULT_TEXT_TEMPLATE = ["christmas_text", "new_year_text"]
 DEFAULT_INFER_TEMPLATE = ["christmas", "new_year"]
 
 # cloth lora
@@ -48,6 +50,9 @@ DEFAULT_CLOTH_LORA = ["demo_black_200", "demo_white_200", "demo_purple_200", "de
 
 # sliders
 DEFAULT_SLIDERS = ["age_sd1_sliders", "smiling_sd1_sliders", "age_sdxl_sliders", "smiling_sdxl_sliders"]
+
+# text_type
+DEFAULT_TEXTS = ["christmas_h1", "christmas_h2", "christmas_v1"]
 
 # ModelName
 SDXL_MODEL_NAME = "SDXL_1.0_ArienMixXL_v2.0.safetensors"

@@ -15,9 +15,18 @@ import torch
 import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
+from PIL import Image
 
 import scripts.easyphoto_infer
-from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, infer_template_dir, DEFAULT_SLIDERS
+from scripts.easyphoto_config import (
+    data_path,
+    easyphoto_models_path,
+    models_path,
+    tryon_gallery_dir,
+    infer_template_dir,
+    text_gallery_dir,
+    DEFAULT_SLIDERS,
+)
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -142,17 +151,16 @@ download_urls = {
     ],
     # Scene Lora Collection
     "Christmas_boy": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/christmas_boy.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/scene/christmas_boy.safetensors",
     ],
     "Christmas_girl": [
-        # "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/christmas_girl.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scene_lora/Christmas_1.safetensors"
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/scene/christmas_girl.safetensors",
     ],
     "New_year_boy": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/scene_lora/newyear_girl.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/scene/new_year_boy.safetensors",
     ],
     "New_year_girl": [
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/new_year_challenge/scene_lora/newyear_girl.safetensors",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/scene/new_year_girl.safetensors",
     ],
     "lcm": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/lcm_lora_sd15.safetensors",
@@ -160,15 +168,25 @@ download_urls = {
     ],
     # Infer Template
     "christmas": [
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy1.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy2.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy3.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_boy4.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/c_girl1.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/template/" + f"{style}_ch_{sex}_{index}.jpg"
+        for style in ["cartoon", "real"]
+        for sex in ["boy", "girl"]
+        for index in ["1", "2"]
     ],
     "new_year": [
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_boy1.png",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/template/n_girl1.png",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/template/" + f"{style}_ny_{sex}_{index}.jpg"
+        for style in ["cartoon", "real"]
+        for sex in ["boy", "girl"]
+        for index in ["1", "2"]
+    ],
+    # text template
+    "christmas_text": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/text/" + f"christmas_{index}.png"
+        for index in ["1", "2", "3"]
+    ],
+    "new_year_text": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/challenge/text/" f"new_year_{index}.png"
+        for index in ["1", "2", "3", "4", "5"]
     ],
     # Tryon Gallery Collections
     # template
@@ -326,18 +344,22 @@ save_filenames = {
         os.path.join(models_path, f"Lora/lcm_lora_sd15.safetensors"),
         os.path.join(models_path, f"Lora/lcm_lora_sdxl.safetensors"),
     ],
-    # infer templaye
+    # infer template
     "christmas": [
-        os.path.join(infer_template_dir, "c_boy1.png"),
-        os.path.join(infer_template_dir, "c_boy2.png"),
-        os.path.join(infer_template_dir, "c_boy3.png"),
-        os.path.join(infer_template_dir, "c_boy4.png"),
-        os.path.join(infer_template_dir, "c_girl1.png"),
+        os.path.join(infer_template_dir, f"{style}_ch_{sex}_{index}.jpg")
+        for style in ["cartoon", "real"]
+        for sex in ["boy", "girl"]
+        for index in ["1", "2"]
     ],
     "new_year": [
-        os.path.join(infer_template_dir, "n_boy1.png"),
-        os.path.join(infer_template_dir, "n_girl1.png"),
+        os.path.join(infer_template_dir, f"{style}_ny_{sex}_{index}.jpg")
+        for style in ["cartoon", "real"]
+        for sex in ["boy", "girl"]
+        for index in ["1", "2"]
     ],
+    # text template
+    "christmas_text": [os.path.join(text_gallery_dir, f"christmas_{index}.png") for index in ["1", "2", "3"]],
+    "new_year_text": [os.path.join(text_gallery_dir, f"new_year_{index}.png") for index in ["1", "2", "3", "4", "5"]],
     # tryon template
     "boy": [os.path.join(tryon_template_gallery_dir, "boy.jpg")],
     "girl": [os.path.join(tryon_template_gallery_dir, "girl.jpg")],
@@ -537,6 +559,7 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
 
 
 def convert_to_video(path, frames, fps, prefix=None, mode="gif"):
+    print("fps:", fps)
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
     index = len([path for path in os.listdir(path)]) + 1
@@ -697,3 +720,52 @@ def get_controlnet_version() -> str:
     controlnet_version = re.search(version_pattern, content).group(1)
 
     return controlnet_version
+
+
+def postprocess_paste_text_images(text_img_path, img_path):
+    if "new_year_2.png" in text_img_path or "new_year_4.png" in text_img_path:
+        is_down = False
+    else:
+        is_down = True
+
+    img1 = cv2.imread(text_img_path, cv2.IMREAD_UNCHANGED)  # h,w
+
+    if isinstance(img_path, str):
+        img2 = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    else:
+        img2 = np.array(img_path)
+        img2 = img2[:, :, ::-1]
+
+    # Ensure img1 has 4 channels
+    if img1.shape[2] == 3:
+        img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2BGRA)
+
+    # Calculate the height after resizing img1 to match img2 width while maintaining the aspect ratio
+    new_height = int((img2.shape[1] / img1.shape[1]) * img1.shape[0])
+
+    # Resize img1 to match img2 width while maintaining the aspect ratio
+    img1_resized = cv2.resize(img1, (img2.shape[1], new_height), interpolation=cv2.INTER_AREA)
+    height_pad = img2.shape[0] - img1_resized.shape[0]
+
+    if height_pad > 0:
+        # pad
+        pad_img = np.zeros((height_pad, img2.shape[1], 4), dtype=np.uint8)
+        if is_down:
+            img1_resized = np.vstack([pad_img, img1_resized])
+        else:
+            img1_resized = np.vstack([img1_resized, pad_img])
+    elif height_pad < 0:
+        # crop
+        height_pad = -height_pad
+        if is_down:
+            img1_resized = img1_resized[height_pad:, :, :]
+        else:
+            img1_resized = img1_resized[:-height_pad, :, :]
+
+    # Filter img1 based on alpha channel
+    img1_mask = (img1_resized[:, :, 3][:, :, None].repeat(3, axis=-1)) / 255.0
+    img1_masked = img1_resized[:, :, :3] * img1_mask
+
+    combined = img2 * (1 - img1_mask) + img1_masked
+    combined = combined[:, :, ::-1]
+    return Image.fromarray(np.uint8(np.array(combined)))

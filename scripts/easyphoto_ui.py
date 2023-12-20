@@ -1,6 +1,6 @@
 import glob
 import os
-
+from PIL import Image
 import gradio as gr
 import modules.generation_parameters_copypaste as parameters_copypaste
 from modules import script_callbacks, shared
@@ -11,7 +11,9 @@ from scripts.easyphoto_config import (
     DEFAULT_CLOTH_LORA,
     DEFAULT_TRYON_TEMPLATE,
     DEFAULT_INFER_TEMPLATE,
+    DEFAULT_TEXT_TEMPLATE,
     DEFAULT_SLIDERS,
+    DEFAULT_TEXTS,
     cache_log_file_path,
     easyphoto_models_path,
     easyphoto_video_outpath_samples,
@@ -20,6 +22,7 @@ from scripts.easyphoto_config import (
     tryon_preview_dir,
     tryon_gallery_dir,
     infer_template_dir,
+    text_gallery_dir,
 )
 from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
@@ -32,6 +35,8 @@ from scripts.easyphoto_utils import (
     ep_logger,
     get_attribute_edit_ids,
     video_visible,
+    postprocess_paste_text_images,
+    convert_to_video,
 )
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
@@ -492,7 +497,7 @@ def on_ui_tabs():
                     except Exception as e:
                         ep_logger.error(f"Download infer template Error. Error Info {e}")
 
-                infer_templates = glob.glob(os.path.join(infer_template_dir, "*.png"))
+                infer_templates = glob.glob(os.path.join(infer_template_dir, "*.jpg"))
                 preset_template = list(infer_templates)
 
                 with gr.Blocks():
@@ -978,7 +983,36 @@ def on_ui_tabs():
                                     ),
                                 }
 
-                            display_button = gr.Button("Start Generation", variant="primary")
+                            with gr.Accordion("Text Options (Click here to add text to final result)", open=False):
+                                # download text images
+                                os.makedirs(text_gallery_dir, exist_ok=True)
+                                for text_name in DEFAULT_TEXT_TEMPLATE:
+                                    try:
+                                        check_files_exists_and_download(False, text_name)
+                                    except Exception as e:
+                                        ep_logger.error(f"Download text template Error. Error Info {e}")
+
+                                text_gallery_preview_list = glob.glob(
+                                    os.path.join(
+                                        text_gallery_dir,
+                                        "*.png",
+                                    )
+                                )
+
+                                text_gallery_preview_list = [(i, i) for i in text_gallery_preview_list]
+                                text_gallery = gr.Gallery(
+                                    value=text_gallery_preview_list,
+                                    label="Text Gallery for PostProcess",
+                                    allow_preview=False,
+                                    elem_id="text_id_select",
+                                    show_share_button=False,
+                                    visible=True,
+                                ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                                selected_text_template = gr.Text(show_label=False, visible=False, placeholder="Selected")
+
+                            with gr.Row():
+                                display_button = gr.Button("Start Generation", variant="primary")
 
                             face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
                             face_id_outputs = gr.Gallery(
@@ -992,7 +1026,9 @@ def on_ui_tabs():
                                 lambda x: face_id_outputs.update(visible=x), inputs=[display_score], outputs=[face_id_outputs]
                             )
 
-                            infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
+                            infer_progress_photo_infer = gr.Textbox(
+                                label="Generation Progress", value="No task currently", interactive=False
+                            )
 
                     display_button.click(
                         fn=easyphoto_infer_forward,
@@ -1036,10 +1072,35 @@ def on_ui_tabs():
                             ipa_only_weight,
                             ipa_only_image_path,
                             lcm_accelerate,
+                            selected_text_template,
                             *uuids,
                         ],
-                        outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
+                        outputs=[infer_progress_photo_infer, photo_infer_output_images, face_id_outputs],
                     )
+
+                def add_text_to_result(text_gallery, selected_photo_infer_output_image, photo_infer_output_images, evt: gr.SelectData):
+                    res = []
+                    for img_item in photo_infer_output_images:
+                        res.append(Image.open(img_item["name"]))
+                    if selected_photo_infer_output_image is None or selected_photo_infer_output_image == "":
+                        info = "Please choose a generated result before choosing a text."
+                        return info, res, text_gallery[evt.index]
+                    else:
+                        text_img = text_gallery[evt.index][0]["name"]
+                        try:
+                            add_text_img = postprocess_paste_text_images(text_img, selected_photo_infer_output_image)
+                            res.append(add_text_img)
+                            info = "Add text success"
+                        except Exception as e:
+                            info = f"Add text error: {e}"
+
+                        return info, res, text_gallery[evt.index]
+
+                text_gallery.select(
+                    add_text_to_result,
+                    [text_gallery, selected_photo_infer_output_image, photo_infer_output_images],
+                    [infer_progress_photo_infer, photo_infer_output_images, selected_text_template],
+                )
 
             with gr.TabItem("Video Inference"):
                 if not video_visible:
@@ -1419,7 +1480,6 @@ def on_ui_tabs():
                                             ],
                                         )
 
-
                                     with gr.Row():
                                         super_resolution_method = gr.Dropdown(
                                             value="gpen",
@@ -1579,9 +1639,62 @@ def on_ui_tabs():
                                         show_progress=False,
                                     )
 
-                                output_images = gr.Gallery(
+                                video_output_images = gr.Gallery(
                                     label="Output Frames",
                                 ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                                selected_video_output_image = gr.Text(show_label=False, visible=False, placeholder="Selected")
+
+                                with gr.Accordion("Text Options (Click here to add text to final result)", open=False):
+                                    video_add_text_way = gr.Radio(
+                                        ["Add to Selected Frame", "Add to Whole Video"],
+                                        value="Add to Selected Frame",
+                                        show_label=False,
+                                    )
+
+                                    video_text_output_img = gr.Image(label="Add Text on Frame")
+                                    video_text_output_video = gr.Video(label="Add Text on Video (mp4)", visible=False)
+
+                                    def video_add_way_change(video_add_text_way, save_as):
+                                        if video_add_text_way == "Add to Selected Frame":
+                                            return [
+                                                gr.update(visible=True, label="Add Text on Frame"),
+                                                gr.update(visible=False),
+                                            ]
+                                        else:
+                                            if save_as == "gif":
+                                                return [
+                                                    gr.update(visible=True, label="Add Text on Video (gif)"),
+                                                    gr.update(visible=False),
+                                                ]
+                                            else:
+                                                return [
+                                                    gr.update(visible=False),
+                                                    gr.update(visible=True, label="Add Text on Video (mp4)"),
+                                                ]
+
+                                    save_as.change(
+                                        video_add_way_change,
+                                        [video_add_text_way, save_as],
+                                        [video_text_output_img, video_text_output_video],
+                                    )
+
+                                    video_add_text_way.change(
+                                        video_add_way_change,
+                                        [video_add_text_way, save_as],
+                                        [video_text_output_img, video_text_output_video],
+                                    )
+
+                                    video_text_gallery = gr.Gallery(
+                                        value=text_gallery_preview_list,
+                                        label="Video Text Gallery for PostProcess",
+                                        allow_preview=False,
+                                        elem_id="text_id_select",
+                                        show_share_button=False,
+                                        visible=True,
+                                    ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
+
+                                    selected_video_text_image = gr.Text(show_label=False, visible=False, placeholder="Selected")
 
                                 infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
 
@@ -1631,7 +1744,53 @@ def on_ui_tabs():
                                 lcm_accelerate_video,
                                 *uuids,
                             ],
-                            outputs=[infer_progress, output_video, output_gif, output_images],
+                            outputs=[infer_progress, output_video, output_gif, video_output_images],
+                        )
+
+                        def video_add_text_to_result(
+                            video_text_gallery,
+                            video_add_text_way,
+                            selected_video_output_image,
+                            video_output_images,
+                            save_as,
+                            evt: gr.SelectData,
+                        ):
+                            if video_add_text_way == "Add to Selected Frame":
+                                if selected_video_output_image is None or selected_video_output_image == "":
+                                    info = "Please choose a generated result before choosing a text when use add to select Frame."
+                                    return info, [], None, video_text_gallery[evt.index]
+                                else:
+                                    text_img = video_text_gallery[evt.index][0]["name"]
+
+                                    try:
+                                        add_text_img = postprocess_paste_text_images(text_img, selected_video_output_image)
+                                        info = "Add text success"
+                                        return info, add_text_img, None, video_text_gallery[evt.index]
+                                    except Exception as e:
+                                        info = f"Add text error: {e}"
+                                        return info, [], None, video_text_gallery[evt.index]
+                            else:
+                                outputs = []
+                                text_img = video_text_gallery[evt.index][0]["name"]
+                                for video_img_meta in video_output_images:
+                                    img_path = video_img_meta["name"]
+                                    output = postprocess_paste_text_images(text_img, img_path)
+                                    outputs.append(output)
+                                output_dir = os.path.join(easyphoto_video_outpath_samples, "text")
+                                os.makedirs(output_dir, exist_ok=True)
+                                output_video, output_gif, _ = convert_to_video(output_dir, outputs, 8, mode=save_as)
+                                return "Success", output_gif, output_video, video_text_gallery[evt.index]
+
+                        def select_output_function(output_images, evt: gr.SelectData):
+                            # output_images [{'name':path,'data':'','is_file':True},{},...]
+                            return output_images[evt.index]["name"]
+
+                        video_output_images.select(select_output_function, video_output_images, selected_video_output_image)
+
+                        video_text_gallery.select(
+                            video_add_text_to_result,
+                            inputs=[video_text_gallery, video_add_text_way, selected_video_output_image, video_output_images, save_as],
+                            outputs=[infer_progress, video_text_output_img, video_text_output_video, selected_video_text_image],
                         )
 
             with gr.TabItem("Virtual Try On"):
@@ -2006,6 +2165,7 @@ def on_ui_tabs():
 
                             parameters_copypaste.add_paste_fields("tryon", template_image_tryon, None)
                             parameters_copypaste.add_paste_fields("animate", init_image, None)
+
                             for paste_tabname, paste_button in buttons_photo_infer.items():
                                 if paste_tabname in ["img2img", "inpaint"]:
                                     parameters_copypaste.register_paste_params_button(
@@ -2106,6 +2266,7 @@ def on_ui_tabs():
                         # output_images [{'name':path,'data':'','is_file':True},{},...]
                         return output_images[evt.index]["name"]
 
+                    # after the new geneartion is done
                     tryon_output_images.select(
                         select_output_function,
                         tryon_output_images,
