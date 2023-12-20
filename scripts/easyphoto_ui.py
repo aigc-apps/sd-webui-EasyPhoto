@@ -1074,10 +1074,10 @@ def on_ui_tabs():
 
                                 with gr.TabItem("Text2Video") as video_template_images_tab:
                                     t2v_input_prompt = gr.Textbox(
-                                        label="Text2Video Input Prompt.",
+                                        label="Text2Video Input Prompt",
                                         interactive=True,
                                         lines=3,
-                                        value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ",
+                                        value="1girl, (black hair, long hair), black eyes, hair ornament, white dress, standing, looking at viewer, shy, upper-body, ",
                                         visible=True,
                                     )
 
@@ -1341,8 +1341,8 @@ def on_ui_tabs():
                                     )
                                     with gr.Row():
                                         max_frames = gr.Textbox(
-                                            label="Video Max frames",
-                                            value=32,
+                                            label="Video Max num of frames",
+                                            value=16,
                                         )
                                         max_fps = gr.Textbox(
                                             label="Video Max fps",

@@ -2017,7 +2017,7 @@ def easyphoto_video_infer_forward(
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
                 default_negative_prompt=DEFAULT_NEGATIVE_AD,
                 seed=seed,
-                sampler="Euler a",
+                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 animatediff_flag=True,
                 animatediff_video_length=int(max_frames),
                 animatediff_fps=int(actual_fps),
