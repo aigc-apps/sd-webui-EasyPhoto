@@ -1961,7 +1961,6 @@ def easyphoto_video_infer_forward(
     face_id_retinaface_masks = []
     multi_user_facecrop_ratio = 1.5
     input_mask_face_part_only = True
-    animatediff_reserve_scale = 1.00
     # safe params
     crop_at_last = True
     crop_at_last_ratio = 3
@@ -2091,6 +2090,10 @@ def easyphoto_video_infer_forward(
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")
         if last_image is not None:
             last_image = Image.fromarray(np.uint8(last_image)).convert("RGB")
+            animatediff_reserve_scale = 1.00
+        else:
+            animatediff_reserve_scale = 0.70
+
         if lcm_accelerate:
             init_image_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
         # Resize the template image with short edges on 512
