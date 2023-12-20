@@ -709,6 +709,7 @@ def unload_models():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+    return "Already Empty Cache of Preprocess Model in EasyPhoto"
 
 
 def seed_everything(seed=11):

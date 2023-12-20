@@ -107,6 +107,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         prompt_generate_sd_model_checkpoint = datas.get("sd_model_checkpoint", "LZ-16K+Optics.safetensors")
 
         additional_prompt = datas.get("additional_prompt", "")
+        lora_weights = datas.get("lora_weights", 0.9)
 
         first_diffusion_steps = datas.get("first_diffusion_steps", 50)
         first_denoising_strength = datas.get("first_denoising_strength", 0.45)
@@ -200,6 +201,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 scene_id,
                 prompt_generate_sd_model_checkpoint,
                 additional_prompt,
+                lora_weights,
                 before_face_fusion_ratio,
                 after_face_fusion_ratio,
                 first_diffusion_steps,

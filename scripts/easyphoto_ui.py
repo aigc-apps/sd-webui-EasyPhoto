@@ -30,6 +30,7 @@ from scripts.easyphoto_utils import (
     ep_logger,
     get_attribute_edit_ids,
     video_visible,
+    unload_models,
 )
 from scripts.sdwebui import get_checkpoint_type, get_scene_prompt
 
@@ -587,6 +588,26 @@ def on_ui_tabs():
                                                 minimum=64, maximum=2048, step=8, label="Height", value=832, elem_id=f"height"
                                             )
 
+                                        t2i_control_way = gr.Radio(
+                                            ["Control with inner template", "Control with uploaded template", "Without Control"],
+                                            value="Control with inner template",
+                                            label="Text2Photo Control Way",
+                                        )
+                                        t2i_pose_template = gr.Image(
+                                            label="Text2Photo Pose Template", show_label=True, source="upload", visible=False
+                                        )
+
+                                        def upload_t2i_control_way(t2i_control_way):
+                                            if t2i_control_way == "Control with uploaded template":
+                                                return gr.update(visible=True)
+                                            return gr.update(visible=False)
+
+                                        t2i_control_way.change(
+                                            upload_t2i_control_way,
+                                            inputs=[t2i_control_way],
+                                            outputs=[t2i_pose_template],
+                                        )
+
                                         with gr.Row():
                                             prompt_generate_sd_model_checkpoint = gr.Dropdown(
                                                 value="LZ-16K+Optics.safetensors",
@@ -745,6 +766,10 @@ def on_ui_tabs():
                                         value="**Please check the [[wiki]]({}) before using attribute edit**.".format(
                                             attribute_edit_wiki_url
                                         )
+                                    )
+                                with gr.Row():
+                                    lora_weights = gr.Slider(
+                                        minimum=0.00, maximum=1.30, value=0.90, step=0.05, label="Lora Weights of User id"
                                     )
 
                                 with gr.Row():
@@ -969,6 +994,7 @@ def on_ui_tabs():
                                 return [gr.update(visible=False), gr.update(visible=False)]
 
                             display_button = gr.Button("Start Generation", variant="primary")
+                            empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
 
                             face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
                             face_id_outputs = gr.Gallery(
@@ -979,6 +1005,7 @@ def on_ui_tabs():
                             display_score.change(update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs])
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
+                            empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
                     display_button.click(
                         fn=easyphoto_infer_forward,
@@ -990,9 +1017,12 @@ def on_ui_tabs():
                             text_to_image_input_prompt,
                             text_to_image_width,
                             text_to_image_height,
+                            t2i_control_way,
+                            t2i_pose_template,
                             scene_id,
                             prompt_generate_sd_model_checkpoint,
                             additional_prompt,
+                            lora_weights,
                             before_face_fusion_ratio,
                             after_face_fusion_ratio,
                             first_diffusion_steps,
@@ -1045,10 +1075,10 @@ def on_ui_tabs():
 
                                 with gr.TabItem("Text2Video") as video_template_images_tab:
                                     t2v_input_prompt = gr.Textbox(
-                                        label="Text2Video Input Prompt.",
+                                        label="Text2Video Input Prompt",
                                         interactive=True,
                                         lines=3,
-                                        value="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body, ",
+                                        value="1girl, (black hair, long hair), black eyes, hair ornament, white dress, standing, looking at viewer, shy, upper-body, ",
                                         visible=True,
                                     )
 
@@ -1087,59 +1117,43 @@ def on_ui_tabs():
                                         )
 
                                     with gr.Row():
-                                        upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
-                                        
+                                        upload_control_video = gr.Checkbox(label="Upload Video for Control", value=False)
+
                                     with gr.Row(visible=False) as control_video_type_line:
                                         upload_control_video_type = gr.Dropdown(
                                             value="dwpose",
-                                            choices=list(
-                                                set(['dwpose', 'openpose', 'depth'] )
-                                            ),
+                                            choices=list(set(["dwpose", "openpose", "depth"])),
                                             elem_id="dropdown",
                                             min_width=40,
-                                            label="video control type.",
-                                        )
-                                        def upload_control_video_type_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
-                                            return (
-                                                gr.update(visible=False),
-                                                gr.update(visible=True),
-                                            )
-
-                                        upload_control_video.change(
-                                            upload_control_video_type_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_type_line, width_height_line],
+                                            label="Video Control Type",
                                         )
 
                                     with gr.Row(visible=False) as control_video_line:
                                         control_video = gr.Video(
-                                            label="Video for Openpose Control",
+                                            label="Video for Control",
                                             show_label=True,
-                                            elem_id="{id_part}_video",
+                                            elem_id="control_video",
                                             source="upload",
                                         )
 
-                                        def upload_control_video_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
+                                    def upload_control_video_change(upload_control_video):
+                                        if upload_control_video:
                                             return (
-                                                gr.update(visible=False),
                                                 gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
                                             )
-
-                                        upload_control_video.change(
-                                            upload_control_video_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_line, width_height_line],
+                                        return (
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=True),
                                         )
+
+                                    upload_control_video.change(
+                                        upload_control_video_change,
+                                        inputs=[upload_control_video],
+                                        outputs=[control_video_line, control_video_type_line, width_height_line],
+                                    )
 
                                     with gr.Row():
                                         sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(
@@ -1214,7 +1228,9 @@ def on_ui_tabs():
                                             ]
 
                                     i2v_mode_choose.change(update_i2v_mode, inputs=i2v_mode_choose, outputs=[init_image, last_image])
-
+                                    i2v_denoising_strength = gr.Slider(
+                                        minimum=0.00, maximum=1.00, value=0.65, step=0.05, label="Denoising Strength for image to video"
+                                    )
                                     with gr.Row():
                                         sd_model_checkpoint_for_animatediff_image2video = gr.Dropdown(
                                             value="majicmixRealistic_v7.safetensors",
@@ -1326,8 +1342,8 @@ def on_ui_tabs():
                                     )
                                     with gr.Row():
                                         max_frames = gr.Textbox(
-                                            label="Video Max frames",
-                                            value=32,
+                                            label="Video Max num of frames",
+                                            value=16,
                                         )
                                         max_fps = gr.Textbox(
                                             label="Video Max fps",
@@ -1340,6 +1356,11 @@ def on_ui_tabs():
                                             min_width=30,
                                             label=f"Video Save as",
                                             visible=True,
+                                        )
+
+                                    with gr.Row():
+                                        lora_weights = gr.Slider(
+                                            minimum=0.00, maximum=1.30, value=0.90, step=0.05, label="Video Lora Weights of User id"
                                         )
 
                                     with gr.Row():
@@ -1563,12 +1584,15 @@ def on_ui_tabs():
                                         outputs=[download_origin_files, download_crop_files],
                                         show_progress=False,
                                     )
+                                empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
 
                                 output_images = gr.Gallery(
                                     label="Output Frames",
                                 ).style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                                 infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
+
+                                empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
                         display_button.click(
                             fn=easyphoto_video_infer_forward,
@@ -1586,8 +1610,10 @@ def on_ui_tabs():
                                 init_image,
                                 init_image_prompt,
                                 last_image,
+                                i2v_denoising_strength,
                                 init_video,
                                 additional_prompt,
+                                lora_weights,
                                 max_frames,
                                 max_fps,
                                 save_as,

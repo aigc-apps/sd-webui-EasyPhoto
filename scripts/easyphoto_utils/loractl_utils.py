@@ -13,12 +13,12 @@ from modules import extra_networks, shared, script_callbacks
 from modules.processing import StableDiffusionProcessing
 import modules.scripts as scripts
 from PIL import Image
-from scripts.easyphoto_config import data_path
+from scripts.easyphoto_config import extensions_builtin_dir, extensions_dir
 
 
 # TODO: refactor the plugin dependency.
-lora_extensions_path = os.path.join(data_path, "extensions", "Lora")
-lora_extensions_builtin_path = os.path.join(data_path, "extensions-builtin", "Lora")
+lora_extensions_path = os.path.join(extensions_dir, "Lora")
+lora_extensions_builtin_path = os.path.join(extensions_builtin_dir, "Lora")
 
 if os.path.exists(lora_extensions_path):
     lora_path = lora_extensions_path
@@ -35,7 +35,7 @@ sys.path.remove(lora_path)
 
 
 def check_loractl_conflict():
-    loractl_extensions_path = os.path.join(data_path, "extensions", "sd-webui-loractl")
+    loractl_extensions_path = os.path.join(extensions_dir, "sd-webui-loractl")
     if os.path.exists(loractl_extensions_path):
         disabled_extensions = shared.opts.data.get("disabled_extensions", [])
         if "sd-webui-loractl" not in disabled_extensions:

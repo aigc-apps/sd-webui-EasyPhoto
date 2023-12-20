@@ -502,6 +502,7 @@ def easyphoto_tryon_infer_forward(
             seed=str(seed),
             sd_model_checkpoint=sd_model_checkpoint,
         )
+        result_img = result_img[0]
 
         # start inner bound refine
         controlnet_pairs = [
@@ -524,6 +525,7 @@ def easyphoto_tryon_infer_forward(
             seed=str(seed),
             sd_model_checkpoint=sd_model_checkpoint,
         )
+        result_img = result_img[0]
 
         # resize diffusion results
         target_width = box_template[2] - box_template[0]
@@ -608,6 +610,7 @@ def easyphoto_tryon_infer_forward(
                 seed=str(seed),
                 sd_model_checkpoint=sd_model_checkpoint,
             )
+            result_img = result_img[0]
 
             # resize diffusion results
             target_width = box_pad[2] - box_pad[0]
