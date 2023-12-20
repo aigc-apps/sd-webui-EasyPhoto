@@ -654,6 +654,11 @@ def i2i_inpaint_call(
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
 
+    shared.opts.return_mask = False
+    shared.opts.return_mask_composite = False
+    if "control_net_no_detectmap" in shared.opts.data.keys():
+        shared.opts.data["control_net_no_detectmap"] = True
+
     if animatediff_flag:
         before_pad_cond_uncond = copy.deepcopy(opts.pad_cond_uncond)
         opts.pad_cond_uncond = True
