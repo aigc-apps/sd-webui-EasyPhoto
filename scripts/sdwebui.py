@@ -71,6 +71,11 @@ class switch_return_opt(ContextDecorator):
         self.origin_return_mask = shared.opts.return_mask
         self.origin_return_mask_composite = shared.opts.return_mask_composite
         self.origin_control_net_no_detectmap = shared.opts.data.get("control_net_no_detectmap", False)
+
+        shared.opts.return_mask = False
+        shared.opts.return_mask_composite = False
+        if "control_net_no_detectmap" in shared.opts.data.keys():
+            shared.opts.data["control_net_no_detectmap"] = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
