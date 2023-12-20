@@ -1702,6 +1702,8 @@ def easyphoto_infer_forward(
                     text_info = " Add text success"
                 except Exception as e:
                     text_info = f"Add text error: {e}"
+            else:
+                text_info=''
 
             if loop_message != "":
                 loop_message += "\n"
