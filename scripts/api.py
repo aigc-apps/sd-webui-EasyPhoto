@@ -10,6 +10,7 @@ from modules.api import api
 
 from scripts.easyphoto_infer import easyphoto_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
+from scripts.easyphoto_utils import ep_logger
 
 
 def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
@@ -82,6 +83,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         except Exception as e:
             torch.cuda.empty_cache()
             message = f"Train error, error info:{str(e)}"
+            ep_logger.error(message)
 
         return {"message": message}
 
@@ -103,6 +105,10 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         )
         text_to_image_width = datas.get("text_to_image_width", 624)
         text_to_image_height = datas.get("text_to_image_height", 832)
+
+        t2i_control_way = datas.get("t2i_control_way", "Control with inner template")
+        t2i_pose_template = datas.get("t2i_pose_template", None)
+
         scene_id = datas.get("scene_id", "none")
         prompt_generate_sd_model_checkpoint = datas.get("sd_model_checkpoint", "LZ-16K+Optics.safetensors")
 
@@ -150,6 +156,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         selected_template_images = [api.decode_base64_to_image(_) for _ in selected_template_images]
         init_image = None if init_image is None else api.decode_base64_to_image(init_image)
         uploaded_template_images = [api.decode_base64_to_image(_) for _ in uploaded_template_images]
+        t2i_pose_template = None if t2i_pose_template is None else api.decode_base64_to_image(t2i_pose_template)
         ipa_image = None if ipa_image is None else api.decode_base64_to_image(ipa_image)
         ipa_only_image = None if ipa_only_image is None else api.decode_base64_to_image(ipa_only_image)
 
@@ -171,6 +178,9 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             uploaded_template_image.save(save_path)
             _uploaded_template_images.append({"name": save_path})
         uploaded_template_images = _uploaded_template_images
+
+        if t2i_pose_template is not None:
+            t2i_pose_template = np.uint8(t2i_pose_template)
 
         if ipa_image is not None:
             hash_value = hashlib.md5(ipa_image.tobytes()).hexdigest()
@@ -198,6 +208,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 text_to_image_input_prompt,
                 text_to_image_width,
                 text_to_image_height,
+                t2i_control_way,
+                t2i_pose_template,
                 scene_id,
                 prompt_generate_sd_model_checkpoint,
                 additional_prompt,
@@ -245,6 +257,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             comment = f"Infer error, error info:{str(e)}"
             outputs = []
             face_id_outputs_base64 = []
+            ep_logger.error(comment)
 
         return {"message": comment, "outputs": outputs, "face_id_outputs": face_id_outputs_base64}
 
