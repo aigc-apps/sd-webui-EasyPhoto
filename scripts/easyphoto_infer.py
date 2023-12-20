@@ -301,14 +301,7 @@ def txt2img(
                 get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
             )
         else:
-            controlnet_units_list.append(
-                get_controlnet_unit(
-                    pair[0],
-                    pair[1],
-                    pair[2],
-                    False if type(1) is not list else True,
-                )
-            )
+            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -329,7 +322,7 @@ def txt2img(
         animatediff_flag=animatediff_flag,
         animatediff_video_length=animatediff_video_length,
         animatediff_fps=animatediff_fps,
-        loractl_flag=False,
+        loractl_flag=loractl_flag,
     )
 
     return image
@@ -366,25 +359,11 @@ def inpaint(
 
     for pair in controlnet_pairs:
         if len(pair) == 4:
-            # if control_mode is additional given (default 1 prompt is better)
             controlnet_units_list.append(
-                get_controlnet_unit(
-                    pair[0],
-                    pair[1],
-                    pair[2],
-                    False if type(input_image) is not list else True,
-                    pair[3],
-                )
+                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
             )
         else:
-            controlnet_units_list.append(
-                get_controlnet_unit(
-                    pair[0],
-                    pair[1],
-                    pair[2],
-                    False if type(input_image) is not list else True,
-                )
-            )
+            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -442,6 +421,8 @@ def easyphoto_infer_forward(
     text_to_image_input_prompt,
     text_to_image_width,
     text_to_image_height,
+    t2i_control_way,
+    t2i_pose_template,
     scene_id,
     prompt_generate_sd_model_checkpoint,
     additional_prompt,
@@ -479,6 +460,19 @@ def easyphoto_infer_forward(
 ):
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
+
+    # update donot delete but use "none" as placeholder and will pass this face inpaint later
+    passed_userid_list = []
+    last_user_id_none_num = 0
+    for idx, user_id in enumerate(user_ids):
+        if user_id == "none":
+            last_user_id_none_num += 1
+            passed_userid_list.append(idx)
+        else:
+            last_user_id_none_num = 0
+
+    if len(user_ids) == last_user_id_none_num:
+        return "Please choose a user id.", [], []
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
@@ -556,19 +550,6 @@ def easyphoto_infer_forward(
         check_files_exists_and_download(check_hash.get("sliders", True), download_mode="sliders")
         check_hash["sliders"] = False
         loractl_flag = True
-
-    # update donot delete but use "none" as placeholder and will pass this face inpaint later
-    passed_userid_list = []
-    last_user_id_none_num = 0
-    for idx, user_id in enumerate(user_ids):
-        if user_id == "none":
-            last_user_id_none_num += 1
-            passed_userid_list.append(idx)
-        else:
-            last_user_id_none_num = 0
-
-    if len(user_ids) == last_user_id_none_num:
-        return "Please choose a user id.", [], []
 
     # check the version of controlnets
     controlnet_version = get_controlnet_version()
@@ -728,6 +709,18 @@ def easyphoto_infer_forward(
     if tabs == 3:
         reload_sd_model_vae(prompt_generate_sd_model_checkpoint, prompt_generate_vae)
 
+        if t2i_control_way == "Control with inner template":
+            t2i_pose_templates = glob.glob(os.path.join(easyphoto_models_path, "pose_templates/*.jpg")) + glob.glob(
+                os.path.join(easyphoto_models_path, "pose_templates/*.png")
+            )
+            t2i_pose_template = Image.open(np.random.choice(t2i_pose_templates))
+            controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+        elif t2i_control_way == "Control with uploaded template":
+            t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
+            controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+        else:
+            controlnet_pairs = []
+
         if scene_id != "none":
             # scene lora path
             scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
@@ -760,13 +753,9 @@ def easyphoto_infer_forward(
 
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-            pose_templates = glob.glob(os.path.join(easyphoto_models_path, "pose_templates/*.jpg")) + glob.glob(
-                os.path.join(easyphoto_models_path, "pose_templates/*.png")
-            )
 
-            pose_template = Image.open(np.random.choice(pose_templates))
             template_images = txt2img(
-                [["openpose", pose_template, 0.50, 1]],
+                controlnet_pairs,
                 input_prompt=last_scene_lora_prompt_high_weight,
                 diffusion_steps=30 if not lcm_accelerate else 8,
                 cfg_scale=7 if not lcm_accelerate else 2,
@@ -779,7 +768,7 @@ def easyphoto_infer_forward(
             )
             ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
             template_images = inpaint(
-                template_images,
+                template_images[0],
                 None,
                 [],
                 input_prompt=last_scene_lora_prompt_low_weight,
@@ -792,7 +781,7 @@ def easyphoto_infer_forward(
                 seed=seed,
                 sampler="Euler a",
             )
-            template_images = [np.uint8(template_images)]
+            template_images = [np.uint8(template_images[0])]
         else:
             text_to_image_input_prompt += ", look at viewer"
             # get lora scene prompt
@@ -803,13 +792,9 @@ def easyphoto_infer_forward(
             if lcm_accelerate:
                 text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
-            pose_templates = glob.glob(os.path.join(easyphoto_models_path, "pose_templates/*.jpg")) + glob.glob(
-                os.path.join(easyphoto_models_path, "pose_templates/*.png")
-            )
 
-            pose_template = Image.open(np.random.choice(pose_templates))
             template_images = txt2img(
-                [["openpose", pose_template, 0.50, 1]],
+                controlnet_pairs,
                 input_prompt=text_to_image_input_prompt,
                 diffusion_steps=30 if not lcm_accelerate else 8,
                 cfg_scale=7 if not lcm_accelerate else 2,
@@ -820,7 +805,7 @@ def easyphoto_infer_forward(
                 seed=seed,
                 sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
             )
-            template_images = [np.uint8(template_images)]
+            template_images = [np.uint8(template_images[0])]
 
     if not sdxl_pipeline_flag:
         reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
@@ -1232,7 +1217,6 @@ def easyphoto_infer_forward(
 
                 # First diffusion, facial reconstruction
                 ep_logger.info("Start First diffusion.")
-                ImageChops.multiply(input_image, input_mask)
                 if not face_shape_match:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [
@@ -1261,7 +1245,9 @@ def easyphoto_infer_forward(
                     )
                     # We only save the lora weight image in the first diffusion.
                     if loractl_flag:
-                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image[:2]
+                    else:
+                        first_diffusion_output_image = first_diffusion_output_image[0]
                 else:
                     if not sdxl_pipeline_flag:
                         controlnet_pairs = [["canny", input_image, 0.50], ["openpose", replaced_input_image, 0.50]]
@@ -1283,9 +1269,10 @@ def easyphoto_infer_forward(
                         seed=seed,
                         sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
-                    # We only save the lora weight image in the first diffusion.
                     if loractl_flag:
-                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image
+                        first_diffusion_output_image, lora_weight_image = first_diffusion_output_image[:2]
+                    else:
+                        first_diffusion_output_image = first_diffusion_output_image[0]
 
                     # detect face area
                     face_skin_mask = face_skin(
@@ -1419,6 +1406,7 @@ def easyphoto_infer_forward(
                     seed=seed,
                     sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 )
+                second_diffusion_output_image = second_diffusion_output_image[0]
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -1770,6 +1758,19 @@ def easyphoto_video_infer_forward(
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash
 
+    # update donot delete but use "none" as placeholder and will pass this face inpaint later
+    passed_userid_list = []
+    last_user_id_none_num = 0
+    for idx, user_id in enumerate(user_ids):
+        if user_id == "none":
+            last_user_id_none_num += 1
+            passed_userid_list.append(idx)
+        else:
+            last_user_id_none_num = 0
+
+    if len(user_ids) == last_user_id_none_num:
+        return "Please choose a user id.", None, None, []
+
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
@@ -1806,19 +1807,6 @@ def easyphoto_video_infer_forward(
         if user_id != "none":
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", None, None, []
-
-    # update donot delete but use "none" as placeholder and will pass this face inpaint later
-    passed_userid_list = []
-    last_user_id_none_num = 0
-    for idx, user_id in enumerate(user_ids):
-        if user_id == "none":
-            last_user_id_none_num += 1
-            passed_userid_list.append(idx)
-        else:
-            last_user_id_none_num = 0
-
-    if len(user_ids) == last_user_id_none_num:
-        return "Please choose a user id.", None, None, []
 
     # check the version of controlnets, reuse code at L538
     controlnet_version = get_controlnet_version()
@@ -1987,105 +1975,54 @@ def easyphoto_video_infer_forward(
                 return "Please use the lora trained by ep.", None, None, []
 
             t2v_input_prompt = t2v_input_prompt + f"<lora:{scene_id}:0.80>, "
-            if lcm_accelerate:
-                t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
 
-            # text to image with scene lora
-            ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
-            if upload_control_video:
-                image = Image.fromarray(np.uint8(template_images[0][0]))
-                # Resize the template image with short edges on 512
-                short_side = min(image.width, image.height)
-                resize = float(short_side / 512.0)
-                new_size = (int(image.width // resize), int(image.height // resize))
+        if lcm_accelerate:
+            t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
 
-                if upload_control_video_type == "depth":
-                    ep_logger.info(f"Using depth control for video control input")
-                    controlnet_pairs = [["depth", template_images[0], 1, 1]]
+        # text to image with scene lora
+        ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
+        if upload_control_video:
+            image = Image.fromarray(np.uint8(template_images[0][0]))
+            # Resize the template image with short edges on 512
+            short_side = min(image.width, image.height)
+            resize = float(short_side / 512.0)
+            new_size = (int(image.width // resize), int(image.height // resize))
 
-                if upload_control_video_type == "openpose":
-                    ep_logger.info(f"Using openpose control for video control input")
-                    controlnet_pairs = [["openpose", template_images[0], 1, 1]]
+            ep_logger.info(f"Using {upload_control_video_type} control for video control input")
+            controlnet_pairs = [[upload_control_video_type, template_images[0], 1, 1]]
 
-                if upload_control_video_type == "dwpose":
-                    ep_logger.info(f"Using dwpose control for video control input")
-                    controlnet_pairs = [["dwpose", template_images[0], 1, 1]]
-
-                template_images = txt2img(
-                    controlnet_pairs,
-                    input_prompt=t2v_input_prompt,
-                    diffusion_steps=30 if not lcm_accelerate else 8,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    width=new_size[0],
-                    height=new_size[1],
-                    default_positive_prompt=DEFAULT_POSITIVE_AD,
-                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                    seed=seed,
-                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                    animatediff_flag=True,
-                    animatediff_video_length=len(template_images[0]),
-                    animatediff_fps=int(actual_fps),
-                )
-            else:
-                template_images = txt2img(
-                    [],
-                    input_prompt=t2v_input_prompt,
-                    diffusion_steps=30 if not lcm_accelerate else 8,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    width=t2v_input_width,
-                    height=t2v_input_height,
-                    default_positive_prompt=DEFAULT_POSITIVE_AD,
-                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                    seed=seed,
-                    sampler="Euler a",
-                    animatediff_flag=True,
-                    animatediff_video_length=int(max_frames),
-                    animatediff_fps=int(actual_fps),
-                )
-            template_images = [template_images]
+            template_images = txt2img(
+                controlnet_pairs,
+                input_prompt=t2v_input_prompt,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
+                width=new_size[0],
+                height=new_size[1],
+                default_positive_prompt=DEFAULT_POSITIVE_AD,
+                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                seed=seed,
+                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                animatediff_flag=True,
+                animatediff_video_length=len(template_images[0]),
+                animatediff_fps=int(actual_fps),
+            )
         else:
-            if lcm_accelerate:
-                t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
-            if upload_control_video:
-                image = Image.fromarray(np.uint8(template_images[0][0]))
-                # Resize the template image with short edges on 512
-                short_side = min(image.width, image.height)
-                resize = float(short_side / 512.0)
-                new_size = (int(image.width // resize), int(image.height // resize))
-
-                controlnet_pairs = [["openpose", template_images[0], 1, 1]]
-                template_images = txt2img(
-                    controlnet_pairs,
-                    input_prompt=t2v_input_prompt,
-                    diffusion_steps=30 if not lcm_accelerate else 8,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    width=new_size[0],
-                    height=new_size[1],
-                    default_positive_prompt=DEFAULT_POSITIVE_AD,
-                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                    seed=seed,
-                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                    animatediff_flag=True,
-                    animatediff_video_length=len(template_images[0]),
-                    animatediff_fps=int(actual_fps),
-                )
-            else:
-                template_images = txt2img(
-                    [],
-                    input_prompt=t2v_input_prompt,
-                    diffusion_steps=30 if not lcm_accelerate else 8,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    width=t2v_input_width,
-                    height=t2v_input_height,
-                    default_positive_prompt=DEFAULT_POSITIVE_AD,
-                    default_negative_prompt=DEFAULT_NEGATIVE_AD,
-                    seed=seed,
-                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                    animatediff_flag=True,
-                    animatediff_video_length=int(max_frames),
-                    animatediff_fps=int(actual_fps),
-                )
-            template_images = [template_images]
+            template_images = txt2img(
+                [],
+                input_prompt=t2v_input_prompt,
+                diffusion_steps=30 if not lcm_accelerate else 8,
+                cfg_scale=7 if not lcm_accelerate else 2,
+                width=t2v_input_width,
+                height=t2v_input_height,
+                default_positive_prompt=DEFAULT_POSITIVE_AD,
+                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                seed=seed,
+                sampler="Euler a",
+                animatediff_flag=True,
+                animatediff_video_length=int(max_frames),
+                animatediff_fps=int(actual_fps),
+            )
+        template_images = [template_images]
     elif tabs == 1:
         reload_sd_model_vae(sd_model_checkpoint_for_animatediff_image2video, "vae-ft-mse-840000-ema-pruned.ckpt")
         image = Image.fromarray(np.uint8(template_images)).convert("RGB")

@@ -588,6 +588,26 @@ def on_ui_tabs():
                                                 minimum=64, maximum=2048, step=8, label="Height", value=832, elem_id=f"height"
                                             )
 
+                                        t2i_control_way = gr.Radio(
+                                            ["Control with inner template", "Control with uploaded template", "Without Control"],
+                                            value="Control with inner template",
+                                            label="Text2Photo Control Way",
+                                        )
+                                        t2i_pose_template = gr.Image(
+                                            label="Text2Photo Pose Template", show_label=True, source="upload", visible=False
+                                        )
+
+                                        def upload_t2i_control_way(t2i_control_way):
+                                            if t2i_control_way == "Control with uploaded template":
+                                                return gr.update(visible=True)
+                                            return gr.update(visible=False)
+
+                                        t2i_control_way.change(
+                                            upload_t2i_control_way,
+                                            inputs=[t2i_control_way],
+                                            outputs=[t2i_pose_template],
+                                        )
+
                                         with gr.Row():
                                             prompt_generate_sd_model_checkpoint = gr.Dropdown(
                                                 value="LZ-16K+Optics.safetensors",
@@ -996,6 +1016,8 @@ def on_ui_tabs():
                             text_to_image_input_prompt,
                             text_to_image_width,
                             text_to_image_height,
+                            t2i_control_way,
+                            t2i_pose_template,
                             scene_id,
                             prompt_generate_sd_model_checkpoint,
                             additional_prompt,
@@ -1094,7 +1116,7 @@ def on_ui_tabs():
                                         )
 
                                     with gr.Row():
-                                        upload_control_video = gr.Checkbox(label="Upload Video for Openpose Control", value=False)
+                                        upload_control_video = gr.Checkbox(label="Upload Video for Control", value=False)
 
                                     with gr.Row(visible=False) as control_video_type_line:
                                         upload_control_video_type = gr.Dropdown(
@@ -1102,50 +1124,35 @@ def on_ui_tabs():
                                             choices=list(set(["dwpose", "openpose", "depth"])),
                                             elem_id="dropdown",
                                             min_width=40,
-                                            label="video control type.",
-                                        )
-
-                                        def upload_control_video_type_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
-                                            return (
-                                                gr.update(visible=False),
-                                                gr.update(visible=True),
-                                            )
-
-                                        upload_control_video.change(
-                                            upload_control_video_type_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_type_line, width_height_line],
+                                            label="Video Control Type",
                                         )
 
                                     with gr.Row(visible=False) as control_video_line:
                                         control_video = gr.Video(
-                                            label="Video for Openpose Control",
+                                            label="Video for Control",
                                             show_label=True,
-                                            elem_id="{id_part}_video",
+                                            elem_id="control_video",
                                             source="upload",
                                         )
 
-                                        def upload_control_video_change(upload_control_video):
-                                            if upload_control_video:
-                                                return (
-                                                    gr.update(visible=True),
-                                                    gr.update(visible=False),
-                                                )
+                                    def upload_control_video_change(upload_control_video):
+                                        if upload_control_video:
                                             return (
-                                                gr.update(visible=False),
                                                 gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
                                             )
-
-                                        upload_control_video.change(
-                                            upload_control_video_change,
-                                            inputs=[upload_control_video],
-                                            outputs=[control_video_line, width_height_line],
+                                        return (
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=True),
                                         )
+
+                                    upload_control_video.change(
+                                        upload_control_video_change,
+                                        inputs=[upload_control_video],
+                                        outputs=[control_video_line, control_video_type_line, width_height_line],
+                                    )
 
                                     with gr.Row():
                                         sd_model_checkpoint_for_animatediff_text2video = gr.Dropdown(

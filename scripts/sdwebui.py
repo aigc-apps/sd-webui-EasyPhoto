@@ -72,10 +72,6 @@ class switch_return_opt(ContextDecorator):
         self.origin_return_mask_composite = shared.opts.return_mask_composite
         self.origin_control_net_no_detectmap = shared.opts.data.get("control_net_no_detectmap", False)
 
-        shared.opts.return_mask = False
-        shared.opts.return_mask_composite = False
-        if "control_net_no_detectmap" in shared.opts.data.keys():
-            shared.opts.data["control_net_no_detectmap"] = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -423,9 +419,6 @@ def t2i_call(
 
     Returns:
         gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
-            When animatediff_flag is True, outputs is list.
-            When animatediff_flag is False, outputs is PIL.Image.Image.
-            When loractl_flag is True, outputs is (PIL.Image.Image, PIL.Image.Image).
     """
     if sampler is None:
         sampler = "Euler a"
@@ -461,6 +454,11 @@ def t2i_call(
     p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
+    shared.opts.return_mask = False
+    shared.opts.return_mask_composite = False
+    if "control_net_no_detectmap" in shared.opts.data.keys():
+        shared.opts.data["control_net_no_detectmap"] = True
+
     if animatediff_flag:
         before_pad_cond_uncond = copy.deepcopy(opts.pad_cond_uncond)
         opts.pad_cond_uncond = True
@@ -493,29 +491,14 @@ def t2i_call(
                 # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
                 p_txt2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_txt2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
-
     p_txt2img.seed = int(seed)
-    # TODO: refactor.
+
     processed = processing.process_images(p_txt2img)
-    if loractl_flag:
-        return (processed.images[0], processed.images[1])
+
     if animatediff_flag:
         opts.pad_cond_uncond = before_pad_cond_uncond
 
-    if animatediff_flag:
-        gen_image = processed.images
-    else:
-        if len(processed.images) > 1:
-            # get the generate image!
-            h_0, w_0, c_0 = np.shape(processed.images[0])
-            h_1, w_1, c_1 = np.shape(processed.images[1])
-            if w_1 != w_0:
-                gen_image = processed.images[1]
-            else:
-                gen_image = processed.images[0]
-        else:
-            gen_image = processed.images[0]
-    return gen_image
+    return processed.images
 
 
 @switch_return_opt()
@@ -624,9 +607,6 @@ def i2i_inpaint_call(
 
     Returns:
         gen_image (Union[PIL.Image.Image, List[PIL.Image.Image]]): Generated image.
-            When animatediff_flag is True, outputs is list.
-            When animatediff_flag is False, outputs is PIL.Image.Image.
-            When loractl_flag is True, outputs is (PIL.Image.Image, PIL.Image.Image).
     """
     if sampler is None:
         sampler = "Euler a"
@@ -714,22 +694,14 @@ def i2i_inpaint_call(
                 # All LoRAs in the additional prompt will be wrapped with LoraCtlNetwork rather than ExtraNetworkLora.
                 p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
-
     p_img2img.seed = int(seed)
-    # TODO: refactor.
+
     processed = processing.process_images(p_img2img)
-    if loractl_flag:
-        return (processed.images[0], processed.images[1])
+
     if animatediff_flag:
         opts.pad_cond_uncond = before_pad_cond_uncond
 
-    if animatediff_flag:
-        gen_image = processed.images
-    else:
-        if (opts.return_mask or opts.return_mask_composite) and mask_image is not None:
-            return processed.images[1]
-        return processed.images[0]
-    return gen_image
+    return processed.images
 
 
 def get_checkpoint_type(sd_model_checkpoint: str) -> int:
