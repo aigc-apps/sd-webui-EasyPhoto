@@ -1980,7 +1980,7 @@ def easyphoto_video_infer_forward(
             t2v_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
 
         # text to image with scene lora
-        ep_logger.info(f"Text to Image with prompt: {t2v_input_prompt} and lora: {scene_lora_model_path}")
+        ep_logger.info(f"Text to video with prompt: {t2v_input_prompt}.")
         if upload_control_video:
             image = Image.fromarray(np.uint8(template_images[0][0]))
             # Resize the template image with short edges on 512
