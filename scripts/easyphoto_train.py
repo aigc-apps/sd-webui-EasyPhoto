@@ -6,7 +6,7 @@ import numpy as np
 from glob import glob
 from shutil import copyfile
 
-from modules.sd_models_config import config_sdxl
+from modules.sd_models_config import config_default, config_sdxl
 from PIL import Image, ImageOps
 
 from scripts.easyphoto_config import (
@@ -193,8 +193,8 @@ def easyphoto_train_forward(
 
     # Extra arguments to run SDXL training.
     env = None
-    if sdxl_pipeline_flag:
-        original_config = config_sdxl
+    if sdxl_pipeline_flag or enable_rl:
+        original_config = config_sdxl if sdxl_pipeline_flag else config_default
         sdxl_model_dir = os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models/stable-diffusion-xl")
         pretrained_vae_model_name_or_path = os.path.join(sdxl_model_dir, "madebyollin_sdxl_vae_fp16_fix")
         # SDXL training requires some config files in openai/clip-vit-large-patch14 and laion/CLIP-ViT-bigG-14-laion2B-39B-b160k.
@@ -275,6 +275,7 @@ def easyphoto_train_forward(
                 f"--cache_log_file={cache_log_file_path}",
                 f"--pretrained_model_name_or_path={os.path.relpath(sd_save_path, pwd)}",
                 f"--pretrained_model_ckpt={os.path.relpath(webui_load_path, pwd)}",
+                f"--original_config={original_config}",
                 f"--face_lora_path={os.path.relpath(face_lora_path, pwd)}",
                 f"--sample_batch_size=4",
                 f"--sample_num_batches_per_epoch=2",
@@ -295,11 +296,11 @@ def easyphoto_train_forward(
                 f"--per_prompt_stat_tracking",
             ]
             max_rl_time = int(float(max_rl_time) * 60 * 60)
-            os.environ["MAX_RL_TIME"] = str(max_rl_time)
+            env["MAX_RL_TIME"] = str(max_rl_time)
             try:
                 print("Start RL (reinforcement learning). The max time of RL is {}.".format(max_rl_time))
                 # Since `accelerate` spawns a new process, set `timeout` in `subprocess.run` does not take effects.
-                subprocess.run(command, check=True)
+                subprocess.run(command, env=env, check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
             finally:
@@ -373,6 +374,7 @@ def easyphoto_train_forward(
                 f"--cache_log_file={cache_log_file_path}",
                 f"--pretrained_model_name_or_path={sd_save_path}",
                 f"--pretrained_model_ckpt={webui_load_path}",
+                f"--original_config={original_config}",
                 f"--face_lora_path={face_lora_path}",
                 f"--sample_batch_size=4",
                 f"--sample_num_batches_per_epoch=2",
@@ -393,11 +395,11 @@ def easyphoto_train_forward(
                 f"--per_prompt_stat_tracking",
             ]
             max_rl_time = int(float(max_rl_time) * 60 * 60)
-            os.environ["MAX_RL_TIME"] = str(max_rl_time)
+            env["MAX_RL_TIME"] = str(max_rl_time)
             try:
                 print("Start RL (reinforcement learning). The max time of RL is {}.".format(max_rl_time))
                 # Since `accelerate` spawns a new process, set `timeout` in `subprocess.run` does not take effects.
-                subprocess.run(command, check=True)
+                subprocess.run(command, env=env, check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error executing the command: {e}")
             finally:

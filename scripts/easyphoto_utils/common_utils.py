@@ -559,7 +559,6 @@ def get_mov_all_images(file: str, required_fps: int) -> tuple:
 
 
 def convert_to_video(path, frames, fps, prefix=None, mode="gif"):
-    print("fps:", fps)
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
     index = len([path for path in os.listdir(path)]) + 1
@@ -690,6 +689,7 @@ def unload_models():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+    return "Already Empty Cache of Preprocess Model in EasyPhoto"
 
 
 def seed_everything(seed=11):

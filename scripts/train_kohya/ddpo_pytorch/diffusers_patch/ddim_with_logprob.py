@@ -7,11 +7,18 @@
 # Copied from https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/ddim_with_logprob.py.
 
 import math
+from packaging import version
 from typing import Optional, Tuple, Union
 
+import diffusers
 import torch
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler, DDIMSchedulerOutput
-from diffusers.utils import randn_tensor
+
+# See https://github.com/huggingface/diffusers/issues/5025 for details.
+if version.parse(diffusers.__version__) > version.parse("0.20.2"):
+    from diffusers.utils.torch_utils import randn_tensor
+else:
+    from diffusers.utils import randn_tensor
 
 
 def _left_broadcast(t, shape):

@@ -23,10 +23,10 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
+from diffusers.pipelines.stable_diffusion.convert_from_ckpt import download_from_original_stable_diffusion_ckpt
 from diffusers.utils import is_wandb_available
 from PIL import Image
 from safetensors.torch import load_file
-from transformers import CLIPTokenizer
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import ddpo_pytorch.prompts
@@ -35,7 +35,6 @@ import utils.lora_utils as network_module
 from ddpo_pytorch.diffusers_patch.ddim_with_logprob import ddim_step_with_logprob
 from ddpo_pytorch.diffusers_patch.pipeline_with_logprob import pipeline_with_logprob
 from ddpo_pytorch.stat_tracking import PerPromptStatTracker
-from utils.model_utils import load_models_from_stable_diffusion_checkpoint
 
 
 class TimeoutException(Exception):
@@ -166,6 +165,12 @@ def parse_args():
         type=str,
         required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument(
+        "--original_config",
+        type=str,
+        required=True,
+        help="Path to .yaml config file corresponding to the original architecture.",
     )
     parser.add_argument(
         "--face_lora_path",
@@ -374,18 +379,25 @@ def main():
     set_seed(args.seed, device_specific=True)
 
     # load scheduler, tokenizer and models.
-    scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
-    tokenizer = CLIPTokenizer.from_pretrained(args.pretrained_model_name_or_path, subfolder="tokenizer")
-    text_encoder, vae, unet = load_models_from_stable_diffusion_checkpoint(False, args.pretrained_model_ckpt)
-    pipeline = StableDiffusionPipeline(
-        tokenizer=tokenizer,
-        scheduler=scheduler,
-        unet=unet,
-        text_encoder=text_encoder,
-        vae=vae,
-        safety_checker=None,
-        feature_extractor=None,
+    pipeline = download_from_original_stable_diffusion_ckpt(
+        args.pretrained_model_ckpt,
+        original_config_file=args.original_config,
+        pipeline_class=StableDiffusionPipeline,
+        model_type=None,
+        stable_unclip=None,
+        controlnet=False,
+        from_safetensors=True,
+        extract_ema=False,
+        image_size=None,
+        scheduler_type="pndm",
+        num_in_channels=None,
+        upcast_attention=None,
+        load_safety_checker=False,
+        prediction_type=None,
+        text_encoder=None,
+        tokenizer=None
     )
+    pipeline.scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
     face_lora_state_dict = load_file(args.face_lora_path, device="cpu")
     network_module.merge_lora(pipeline, face_lora_state_dict)
 

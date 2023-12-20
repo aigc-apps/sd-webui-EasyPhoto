@@ -1210,7 +1210,9 @@ if video_visible:
     class AnimateDiffI2VLatent:
         def randomize(self, p: StableDiffusionProcessingImg2Img, params: AnimateDiffProcess):
             # Get init_alpha
-            reserve_scale = [params.i2i_reserve_scale for i in range(params.video_length)]
+            step = (1 - params.i2i_reserve_scale) / (params.video_length - 1)
+            reserve_scale = [1 - i * step for i in range(params.video_length)]
+
             logger.info(f"Randomizing reserve_scale according to {reserve_scale}.")
             reserve_scale = torch.tensor(reserve_scale, dtype=torch.float32, device=device)[:, None, None, None]
             reserve_scale[reserve_scale < 0] = 0
