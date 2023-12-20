@@ -738,6 +738,7 @@ def easyphoto_infer_forward(
                 return "Please use the lora trained by ep.", [], []
 
             # get lora scene prompt
+            # add user lora for kind of WARMUP, better result in t2i final result
             if user_ids[0] != "ipa_control_only":
                 last_scene_lora_prompt_high_weight = (
                     text_to_image_input_prompt
