@@ -461,6 +461,13 @@ def easyphoto_infer_forward(
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
+    # infer with IPA only
+    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+        ipa_control = True
+        ipa_weight = ipa_only_weight
+        ipa_image_path = ipa_only_image_path
+        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
+
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
     last_user_id_none_num = 0
@@ -487,13 +494,6 @@ def easyphoto_infer_forward(
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
-
-    # infer with IPA only
-    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
-        ipa_control = True
-        ipa_weight = ipa_only_weight
-        ipa_image_path = ipa_only_image_path
-        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
 
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
