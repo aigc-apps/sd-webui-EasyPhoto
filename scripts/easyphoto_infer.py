@@ -302,7 +302,7 @@ def txt2img(
                 get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
             )
         else:
-             controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
+            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -360,12 +360,12 @@ def inpaint(
 
     for pair in controlnet_pairs:
         if len(pair) == 4:
-            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
-                
+            controlnet_units_list.append(
+                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
             )
         else:
             controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
-            
+
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
 
@@ -462,7 +462,14 @@ def easyphoto_infer_forward(
 ):
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
-    
+
+    # infer with IPA only
+    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
+        ipa_control = True
+        ipa_weight = ipa_only_weight
+        ipa_image_path = ipa_only_image_path
+        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
+
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
     last_user_id_none_num = 0
@@ -475,7 +482,7 @@ def easyphoto_infer_forward(
 
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", [], []
-    
+
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
@@ -489,13 +496,6 @@ def easyphoto_infer_forward(
     if checkpoint_type == 2:
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
-
-    # infer with IPA only
-    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
-        ipa_control = True
-        ipa_weight = ipa_only_weight
-        ipa_image_path = ipa_only_image_path
-        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
 
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
@@ -755,7 +755,7 @@ def easyphoto_infer_forward(
 
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-        
+
             template_images = txt2img(
                 controlnet_pairs,
                 input_prompt=last_scene_lora_prompt_high_weight,
@@ -794,7 +794,7 @@ def easyphoto_infer_forward(
             if lcm_accelerate:
                 text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
-            
+
             template_images = txt2img(
                 controlnet_pairs,
                 input_prompt=text_to_image_input_prompt,
@@ -1607,6 +1607,7 @@ def easyphoto_infer_forward(
                             seed=seed,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
+                        sub_output_image = sub_output_image[0]
 
                         # Paste the image back to the background
                         sub_output_image = sub_output_image.resize([sub_output_image_width, sub_output_image_height])
@@ -1640,6 +1641,7 @@ def easyphoto_infer_forward(
                             seed=seed,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
+                        output_image = output_image[0]
 
             except Exception as e:
                 torch.cuda.empty_cache()
@@ -1702,7 +1704,7 @@ def easyphoto_infer_forward(
                 except Exception as e:
                     text_info = f"Add text error: {e}"
             else:
-                text_info=''
+                text_info = ""
 
             if loop_message != "":
                 loop_message += "\n"
@@ -1785,7 +1787,7 @@ def easyphoto_video_infer_forward(
 
     if len(user_ids) == last_user_id_none_num:
         return "Please choose a user id.", None, None, []
-    
+
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")

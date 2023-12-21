@@ -60,6 +60,8 @@ try:
         seed_everything,
         get_attribute_edit_ids,
         postprocess_paste_text_images,
+        encode_video_to_base64,
+        decode_base64_to_video,
     )
     from .loractl_utils import check_loractl_conflict, LoraCtlScript
 except Exception as e:

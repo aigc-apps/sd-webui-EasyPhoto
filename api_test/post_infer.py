@@ -101,6 +101,7 @@ if __name__ == "__main__":
             image = decode_image_from_base64jpeg(outputs["outputs"][0])
             toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.jpg")
             cv2.imwrite(toutput_path, image)
+            print(outputs["message"])
 
     # When selecting a local file as a parameter input.
     else:
@@ -131,6 +132,7 @@ if __name__ == "__main__":
                         cv2.imwrite(toutput_path, image)
                     else:
                         print("Error!", outputs["message"])
+                    print(outputs["message"])
 
     # End of record time
     # The calculated time difference is the execution time of the program, expressed in seconds / s

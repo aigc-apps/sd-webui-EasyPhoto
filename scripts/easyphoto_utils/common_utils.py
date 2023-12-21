@@ -7,6 +7,7 @@ import re
 import traceback
 from contextlib import ContextDecorator
 
+import base64
 import cv2
 import random
 import numpy as np
@@ -769,3 +770,22 @@ def postprocess_paste_text_images(text_img_path, img_path):
     combined = img2 * (1 - img1_mask) + img1_masked
     combined = combined[:, :, ::-1]
     return Image.fromarray(np.uint8(np.array(combined)))
+
+
+# Function to encode a video file to Base64
+def encode_video_to_base64(video_file_path):
+    with open(video_file_path, "rb") as video_file:
+        # Read the video file as binary data
+        video_data = video_file.read()
+        # Encode the data to Base64
+        video_base64 = base64.b64encode(video_data)
+        return video_base64
+
+
+# Function to decode Base64 encoded data and save it as a video file
+def decode_base64_to_video(encoded_video, output_file_path):
+    with open(output_file_path, "wb") as output_file:
+        # Decode the Base64 encoded data
+        video_data = base64.b64decode(encoded_video)
+        # Write the decoded binary data to the file
+        output_file.write(video_data)

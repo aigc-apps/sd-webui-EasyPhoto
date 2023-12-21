@@ -498,7 +498,7 @@ def on_ui_tabs():
                         ep_logger.error(f"Download infer template Error. Error Info {e}")
 
                 infer_templates = glob.glob(os.path.join(infer_template_dir, "*.jpg"))
-                preset_template = list(infer_templates)
+                infer_templates = sorted(infer_templates)
 
                 with gr.Blocks():
                     with gr.Row():
@@ -512,13 +512,13 @@ def on_ui_tabs():
                                     )
 
                                     with gr.Column() as template_gallery:
-                                        template_gallery_list = [(i, i) for i in preset_template]
+                                        template_gallery_list = [(i, i) for i in infer_templates]
                                         gallery = gr.Gallery(template_gallery_list).style(
                                             columns=[4], rows=[2], object_fit="contain", height="auto"
                                         )
 
                                         def select_function(evt: gr.SelectData):
-                                            return [preset_template[evt.index]]
+                                            return [infer_templates[evt.index]]
 
                                         selected_template_images = gr.Text(show_label=False, visible=False, placeholder="Selected")
                                         gallery.select(select_function, None, selected_template_images)
@@ -601,7 +601,7 @@ def on_ui_tabs():
                                             text_to_image_height = gr.Slider(
                                                 minimum=64, maximum=2048, step=8, label="Height", value=832, elem_id=f"height"
                                             )
-                                        
+
                                         t2i_control_way = gr.Radio(
                                             ["Control with inner template", "Control with uploaded template", "Without Control"],
                                             value="Control with inner template",
@@ -1027,7 +1027,7 @@ def on_ui_tabs():
                                         "*.png",
                                     )
                                 )
-
+                                text_gallery_preview_list = sorted(text_gallery_preview_list)
                                 text_gallery_preview_list = [(i, i) for i in text_gallery_preview_list]
                                 text_gallery = gr.Gallery(
                                     value=text_gallery_preview_list,
@@ -1050,8 +1050,10 @@ def on_ui_tabs():
                                 show_label=False,
                                 visible=False,
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                            display_score.change(update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs])
-            
+                            display_score.change(
+                                update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs]
+                            )
+
                             infer_progress_photo_infer = gr.Textbox(
                                 label="Generation Progress", value="No task currently", interactive=False
                             )
@@ -1626,16 +1628,30 @@ def on_ui_tabs():
                                         visible=False,
                                         elem_id=f"download_files",
                                     )
+                                    download_text_files = gr.File(
+                                        None,
+                                        label="Download Files For Texted Video",
+                                        file_count="multiple",
+                                        interactive=False,
+                                        show_label=True,
+                                        visible=False,
+                                        elem_id=f"download_files",
+                                    )
 
                                     def save_video():
                                         origin_path = os.path.join(easyphoto_video_outpath_samples, "origin")
                                         crop_path = os.path.join(easyphoto_video_outpath_samples, "crop")
-                                        if not os.path.exists(origin_path):
-                                            os.makedirs(origin_path, exist_ok=True)
+                                        text_video_path = os.path.join(easyphoto_video_outpath_samples, "text")
+
+                                        os.makedirs(origin_path, exist_ok=True)
+                                        os.makedirs(crop_path, exist_ok=True)
+                                        os.makedirs(text_video_path, exist_ok=True)
+
                                         index = len([path for path in os.listdir(origin_path)]) + 1
 
                                         video_path = []
                                         video_crop_path = []
+                                        video_text_path = []
                                         for sub_index in range(max(index - 3, 0), index):
                                             video_mp4_path = os.path.join(origin_path, str(sub_index).zfill(8) + ".mp4")
                                             video_gif_path = os.path.join(origin_path, str(sub_index).zfill(8) + ".gif")
@@ -1643,21 +1659,33 @@ def on_ui_tabs():
                                                 if os.path.exists(_video_path):
                                                     video_path.append(_video_path)
                                                     continue
-
                                             video_mp4_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + ".mp4")
                                             video_gif_crop_path = os.path.join(crop_path, str(sub_index).zfill(8) + "_crop" + ".gif")
                                             for _video_path in [video_mp4_crop_path, video_gif_crop_path]:
                                                 if os.path.exists(_video_path):
                                                     video_crop_path.append(_video_path)
                                                     continue
-                                        return gr.File.update(value=video_path, visible=True), gr.File.update(
-                                            value=video_crop_path, visible=True
-                                        )
+
+                                        index_text = len([path for path in os.listdir(text_video_path)]) + 1
+                                        for sub_index in range(max(index_text - 3, 0), index_text):
+                                            video_mp4_text_path = os.path.join(text_video_path, str(sub_index).zfill(8) + ".mp4")
+                                            video_gif_text_path = os.path.join(text_video_path, str(sub_index).zfill(8) + ".gif")
+
+                                            for _video_path in [video_mp4_text_path, video_gif_text_path]:
+                                                if os.path.exists(_video_path):
+                                                    video_text_path.append(_video_path)
+                                                    continue
+
+                                        return [
+                                            gr.File.update(value=video_path, visible=True),
+                                            gr.File.update(value=video_crop_path, visible=True),
+                                            gr.File.update(value=video_text_path, visible=True),
+                                        ]
 
                                     save.click(
                                         fn=save_video,
                                         inputs=None,
-                                        outputs=[download_origin_files, download_crop_files],
+                                        outputs=[download_origin_files, download_crop_files, download_text_files],
                                         show_progress=False,
                                     )
                                 empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
@@ -1784,7 +1812,7 @@ def on_ui_tabs():
                             if video_add_text_way == "Add to Selected Frame":
                                 if selected_video_output_image is None or selected_video_output_image == "":
                                     info = "Please choose a generated result before choosing a text when use add to select Frame."
-                                    return info, [], None, video_text_gallery[evt.index]
+                                    return info, None, None, video_text_gallery[evt.index]
                                 else:
                                     text_img = video_text_gallery[evt.index][0]["name"]
 
@@ -1794,7 +1822,7 @@ def on_ui_tabs():
                                         return info, add_text_img, None, video_text_gallery[evt.index]
                                     except Exception as e:
                                         info = f"Add text error: {e}"
-                                        return info, [], None, video_text_gallery[evt.index]
+                                        return info, None, None, video_text_gallery[evt.index]
                             else:
                                 outputs = []
                                 text_img = video_text_gallery[evt.index][0]["name"]
