@@ -418,6 +418,10 @@ def easyphoto_video_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 *user_ids,
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]
+            if output_video is not None:
+                output_video = encode_video_to_base64(output_video)
+            if output_gif is not None:
+                output_gif = encode_video_to_base64(output_gif)
         except Exception as e:
             torch.cuda.empty_cache()
             comment = f"Infer error, error info:{str(e)}"
