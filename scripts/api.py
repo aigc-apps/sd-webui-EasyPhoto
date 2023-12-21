@@ -4,13 +4,13 @@ import os
 
 import gradio as gr
 import numpy as np
+import traceback
 import torch
 from fastapi import FastAPI
 from modules.api import api
-
-from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_video_infer_forward
 from scripts.easyphoto_train import easyphoto_train_forward
-from scripts.easyphoto_utils import ep_logger
+from scripts.easyphoto_utils import decode_base64_to_video, ep_logger, encode_video_to_base64
 
 
 def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
@@ -83,6 +83,7 @@ def easyphoto_train_forward_api(_: gr.Blocks, app: FastAPI):
         except Exception as e:
             torch.cuda.empty_cache()
             message = f"Train error, error info:{str(e)}"
+            traceback.print_exc()
             ep_logger.error(message)
 
         return {"message": message}
@@ -257,9 +258,180 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             comment = f"Infer error, error info:{str(e)}"
             outputs = []
             face_id_outputs_base64 = []
+            traceback.print_exc()
             ep_logger.error(comment)
 
         return {"message": comment, "outputs": outputs, "face_id_outputs": face_id_outputs_base64}
+
+
+def easyphoto_video_infer_forward_api(_: gr.Blocks, app: FastAPI):
+    @app.post("/easyphoto/easyphoto_video_infer_forward")
+    def _easyphoto_video_infer_forward_api(
+        datas: dict,
+    ):
+        user_ids = datas.get("user_ids", [])
+        datas.get("webui_id", "")
+        sd_model_checkpoint = datas.get("sd_model_checkpoint", "Chilloutmix-Ni-pruned-fp16-fix.safetensors")
+        sd_model_checkpoint_for_animatediff_text2video = datas.get(
+            "sd_model_checkpoint_for_animatediff_text2video", "majicmixRealistic_v7.safetensors"
+        )
+        sd_model_checkpoint_for_animatediff_image2video = datas.get(
+            "sd_model_checkpoint_for_animatediff_image2video", "majicmixRealistic_v7.safetensors"
+        )
+
+        t2v_input_prompt = datas.get(
+            "t2v_input_prompt",
+            "1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body",
+        )
+        t2v_input_width = datas.get("t2v_input_width", 512)
+        t2v_input_height = datas.get("t2v_input_height", 768)
+
+        scene_id = datas.get("scene_id", "none")
+        upload_control_video = datas.get("upload_control_video", False)
+        upload_control_video_type = datas.get("upload_control_video_type", "openpose")
+        openpose_video = datas.get("openpose_video", None)
+        init_image = datas.get("init_image", None)
+        init_image_prompt = datas.get("init_image_prompt", "")
+        last_image = datas.get("last_image", None)
+
+        i2v_denoising_strength = datas.get("i2v_denoising_strength", 0.65)
+
+        init_video = datas.get("init_video", None)
+        additional_prompt = datas.get("additional_prompt", "masterpiece, beauty")
+
+        lora_weights = datas.get("lora_weights", 0.9)
+
+        max_frames = datas.get("max_frames", 32)
+        max_fps = datas.get("max_fps", 8)
+
+        save_as = datas.get("save_as", "gif")
+
+        first_diffusion_steps = datas.get("first_diffusion_steps", 50)
+        first_denoising_strength = datas.get("first_denoising_strength", 0.45)
+
+        seed = datas.get("seed", -1)
+        crop_face_preprocess = datas.get("crop_face_preprocess", True)
+
+        before_face_fusion_ratio = datas.get("before_face_fusion_ratio", 0.50)
+        after_face_fusion_ratio = datas.get("after_face_fusion_ratio", 0.50)
+        apply_face_fusion_before = datas.get("apply_face_fusion_before", True)
+        apply_face_fusion_after = datas.get("apply_face_fusion_after", True)
+        color_shift_middle = datas.get("color_shift_middle", True)
+
+        super_resolution = datas.get("super_resolution", True)
+        super_resolution_method = datas.get("super_resolution_method", "gpen")
+        skin_retouching_bool = datas.get("skin_retouching_bool", False)
+        display_score = datas.get("display_score", False)
+
+        makeup_transfer = datas.get("makeup_transfer", False)
+        makeup_transfer_ratio = datas.get("makeup_transfer_ratio", 0.50)
+        face_shape_match = datas.get("face_shape_match", False)
+        video_interpolation = datas.get("video_interpolation", False)
+        video_interpolation_ext = datas.get("video_interpolation_ext", 1)
+        tabs = datas.get("tabs", 1)
+
+        ipa_control = datas.get("ipa_control", False)
+        ipa_weight = datas.get("ipa_weight", 0.50)
+        ipa_image = datas.get("ipa_image", None)
+
+        lcm_accelerate = datas.get("lcm_accelerate", None)
+
+        if type(user_ids) == str:
+            user_ids = [user_ids]
+
+        init_image = None if init_image is None else api.decode_base64_to_image(init_image)
+        last_image = None if last_image is None else api.decode_base64_to_image(last_image)
+        ipa_image = None if ipa_image is None else api.decode_base64_to_image(ipa_image)
+
+        if openpose_video is not None:
+            openpose_video = base64.b64decode(openpose_video)
+            hash_value = hashlib.md5(openpose_video).hexdigest()
+            save_path = os.path.join("/tmp", hash_value + ".mp4")
+            decode_base64_to_video(openpose_video, save_path)
+
+        if init_image is not None:
+            init_image = np.uint8(init_image)
+
+        if last_image is not None:
+            last_image = np.uint8(last_image)
+
+        if init_video is not None:
+            init_video = base64.b64decode(init_video)
+            hash_value = hashlib.md5(init_video).hexdigest()
+            save_path = os.path.join("/tmp", hash_value + ".mp4")
+            decode_base64_to_video(init_video, save_path)
+
+        if ipa_image is not None:
+            hash_value = hashlib.md5(ipa_image.tobytes()).hexdigest()
+            save_path = os.path.join("/tmp", hash_value + ".jpg")
+            ipa_image.save(save_path)
+            ipa_image_path = save_path
+        else:
+            ipa_image_path = None
+
+        tabs = int(tabs)
+        try:
+            comment, output_video, output_gif, outputs = easyphoto_video_infer_forward(
+                sd_model_checkpoint,
+                sd_model_checkpoint_for_animatediff_text2video,
+                sd_model_checkpoint_for_animatediff_image2video,
+                t2v_input_prompt,
+                t2v_input_width,
+                t2v_input_height,
+                scene_id,
+                upload_control_video,
+                upload_control_video_type,
+                openpose_video,
+                init_image,
+                init_image_prompt,
+                last_image,
+                i2v_denoising_strength,
+                init_video,
+                additional_prompt,
+                lora_weights,
+                max_frames,
+                max_fps,
+                save_as,
+                before_face_fusion_ratio,
+                after_face_fusion_ratio,
+                first_diffusion_steps,
+                first_denoising_strength,
+                seed,
+                crop_face_preprocess,
+                apply_face_fusion_before,
+                apply_face_fusion_after,
+                color_shift_middle,
+                super_resolution,
+                super_resolution_method,
+                skin_retouching_bool,
+                display_score,
+                makeup_transfer,
+                makeup_transfer_ratio,
+                face_shape_match,
+                video_interpolation,
+                video_interpolation_ext,
+                tabs,
+                ipa_control,
+                ipa_weight,
+                ipa_image_path,
+                lcm_accelerate,
+                *user_ids,
+            )
+            outputs = [api.encode_pil_to_base64(output) for output in outputs]
+            if output_video is not None:
+                output_video = encode_video_to_base64(output_video)
+            if output_gif is not None:
+                output_gif = encode_video_to_base64(output_gif)
+        except Exception as e:
+            torch.cuda.empty_cache()
+            comment = f"Infer error, error info:{str(e)}"
+            output_video = None
+            output_gif = None
+            outputs = []
+            traceback.print_exc()
+            ep_logger.error(comment)
+
+        return {"message": comment, "outputs": outputs, "output_video": output_video, "output_gif": output_gif}
 
 
 try:
@@ -267,5 +439,6 @@ try:
 
     script_callbacks.on_app_started(easyphoto_train_forward_api)
     script_callbacks.on_app_started(easyphoto_infer_forward_api)
+    script_callbacks.on_app_started(easyphoto_video_infer_forward_api)
 except Exception as e:
     print(e)
