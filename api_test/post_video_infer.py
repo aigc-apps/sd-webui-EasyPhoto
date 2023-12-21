@@ -28,7 +28,7 @@ def decode_base64_to_video(encoded_video, output_file_path):
         output_file.write(video_data)
 
 
-def post(init_image, last_image=None, init_video=None, user_id=None, tabs=0, url="http://0.0.0.0:7860"):
+def post(t2v_input_prompt="", init_image=None, last_image=None, init_video=None, user_id=None, tabs=0, url="http://0.0.0.0:7860"):
     if user_id is None:
         user_id = "test"
     datas = json.dumps(
@@ -37,7 +37,7 @@ def post(init_image, last_image=None, init_video=None, user_id=None, tabs=0, url
             "sd_model_checkpoint": "Chilloutmix-Ni-pruned-fp16-fix.safetensors",
             "sd_model_checkpoint_for_animatediff_text2video": "majicmixRealistic_v7.safetensors",
             "sd_model_checkpoint_for_animatediff_image2video": "majicmixRealistic_v7.safetensors",
-            "t2v_input_prompt": "1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body",
+            "t2v_input_prompt": t2v_input_prompt,
             "t2v_input_width": 512,
             "t2v_input_height": 768,
             "scene_id": "none",
@@ -89,6 +89,12 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser(description="Description of your script")
 
+    parser.add_argument(
+        "--t2v_input_prompt",
+        type=str,
+        default="1girl, (white hair, long hair), blue eyes, hair ornament, blue dress, standing, looking at viewer, shy, upper-body",
+        help="Prompt for t2v",
+    )
     parser.add_argument("--init_image_path", type=str, default="", help="Path to the init image path")
     parser.add_argument("--last_image_path", type=str, default="", help="Path to the last image path")
     parser.add_argument("--video_path", type=str, default="", help="Path to the video path")
@@ -97,6 +103,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    t2v_input_prompt = args.t2v_input_prompt
     init_image_path = args.init_image_path
     last_image_path = args.last_image_path
     video_path = args.video_path
@@ -114,28 +121,30 @@ if __name__ == "__main__":
     # When there is no parameter input.
     if init_image_path == "" and last_image_path == "" and video_path == "":
         for user_id in tqdm(user_ids):
-            outputs = post(None, None, None, user_id, tabs=0)
+            outputs = post(t2v_input_prompt, None, None, None, user_id, tabs=0)
             outputs = json.loads(outputs)
+            print(outputs["message"])
             if outputs["output_video"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.mp4")
-                image = decode_base64_to_video(outputs["output_video"], toutput_path)
+                decode_base64_to_video(outputs["output_video"], toutput_path)
             elif outputs["output_gif"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.gif")
-                image = decode_base64_to_video(outputs["output_gif"], toutput_path)
+                decode_base64_to_video(outputs["output_gif"], toutput_path)
 
     elif init_image_path != "" and last_image_path == "" and video_path == "":
         with open(init_image_path, "rb") as f:
             init_image = base64.b64encode(f.read()).decode("utf-8")
 
         for user_id in tqdm(user_ids):
-            outputs = post(init_image, None, None, user_id, tabs=1)
+            outputs = post(t2v_input_prompt, init_image, None, None, user_id, tabs=1)
             outputs = json.loads(outputs)
+            print(outputs["message"])
             if outputs["output_video"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.mp4")
-                image = decode_base64_to_video(outputs["output_video"], toutput_path)
+                decode_base64_to_video(outputs["output_video"], toutput_path)
             elif outputs["output_gif"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.gif")
-                image = decode_base64_to_video(outputs["output_gif"], toutput_path)
+                decode_base64_to_video(outputs["output_gif"], toutput_path)
 
     elif init_image_path != "" and last_image_path != "" and video_path == "":
         with open(init_image_path, "rb") as f:
@@ -144,28 +153,30 @@ if __name__ == "__main__":
             last_image = base64.b64encode(f.read()).decode("utf-8")
 
         for user_id in tqdm(user_ids):
-            outputs = post(init_image, last_image, None, user_id, tabs=1)
+            outputs = post(t2v_input_prompt, init_image, last_image, None, user_id, tabs=1)
             outputs = json.loads(outputs)
+            print(outputs["message"])
             if outputs["output_video"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.mp4")
-                image = decode_base64_to_video(outputs["output_video"], toutput_path)
+                decode_base64_to_video(outputs["output_video"], toutput_path)
             elif outputs["output_gif"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.gif")
-                image = decode_base64_to_video(outputs["output_gif"], toutput_path)
+                decode_base64_to_video(outputs["output_gif"], toutput_path)
 
     elif init_image_path == "" and last_image_path == "" and video_path != "":
         with open(video_path, "rb") as f:
             init_video = base64.b64encode(f.read()).decode("utf-8")
 
         for user_id in tqdm(user_ids):
-            outputs = post(None, None, init_video, user_id, tabs=2)
+            outputs = post(t2v_input_prompt, None, None, init_video, user_id, tabs=2)
             outputs = json.loads(outputs)
+            print(outputs["message"])
             if outputs["output_video"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.mp4")
-                image = decode_base64_to_video(outputs["output_video"], toutput_path)
+                decode_base64_to_video(outputs["output_video"], toutput_path)
             elif outputs["output_gif"] is not None:
                 toutput_path = os.path.join(os.path.join(output_path), f"{user_id}_tmp.gif")
-                image = decode_base64_to_video(outputs["output_gif"], toutput_path)
+                decode_base64_to_video(outputs["output_gif"], toutput_path)
 
     # End of record time
     # The calculated time difference is the execution time of the program, expressed in seconds / s

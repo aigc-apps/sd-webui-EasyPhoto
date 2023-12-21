@@ -1605,6 +1605,7 @@ def easyphoto_infer_forward(
                             seed=seed,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
+                        sub_output_image = sub_output_image[0]
 
                         # Paste the image back to the background
                         sub_output_image = sub_output_image.resize([sub_output_image_width, sub_output_image_height])
@@ -1638,6 +1639,7 @@ def easyphoto_infer_forward(
                             seed=seed,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
+                        output_image = output_image[0]
 
             except Exception as e:
                 torch.cuda.empty_cache()
