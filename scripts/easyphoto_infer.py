@@ -1184,8 +1184,12 @@ def easyphoto_infer_forward(
                     fusion_image_mask, input_image_mask = np.int32(np.float32(fusion_image_mask) > 128), np.int32(
                         np.float32(input_image_mask) > 128
                     )
-                    combine_mask = cv2.erode(
-                        np.uint8(input_image_mask * fusion_image_mask * 255), np.ones((16, 16), np.uint8), iterations=1
+                    combine_mask = np.uint8(input_image_mask * fusion_image_mask * 255)
+                    combine_mask = (
+                        cv2.erode(
+                            cv2.dilate(combine_mask, np.ones((8, 8), np.uint8), iterations=1), np.ones((16, 16), np.uint8), iterations=1
+                        )
+                        * before_face_fusion_ratio
                     )
                     combine_mask[np.float32(fusion_image_eyes_mask) > 128] = 255
                     combine_mask[np.float32(input_image_lips_mask) > 128] = 0
@@ -1194,15 +1198,7 @@ def easyphoto_infer_forward(
                     # paste back to photo
                     fusion_image = np.array(fusion_image) * combine_mask + np.array(input_image) * (1 - combine_mask)
                     fusion_image = Image.fromarray(np.uint8(fusion_image))
-
-                    input_image = Image.fromarray(
-                        np.uint8(
-                            (
-                                np.array(input_image, np.float32) * (1 - before_face_fusion_ratio)
-                                + np.array(fusion_image, np.float32) * before_face_fusion_ratio
-                            )
-                        )
-                    )
+                    input_image = fusion_image
 
                 if input_mask_face_part_only:
                     face_width = input_image_retinaface_box[2] - input_image_retinaface_box[0]
@@ -1380,8 +1376,12 @@ def easyphoto_infer_forward(
                     fusion_image_mask, input_image_mask = np.int32(np.float32(fusion_image_mask) > 128), np.int32(
                         np.float32(input_image_mask) > 128
                     )
-                    combine_mask = cv2.erode(
-                        np.uint8(input_image_mask * fusion_image_mask * 255), np.ones((16, 16), np.uint8), iterations=1
+                    combine_mask = np.uint8(input_image_mask * fusion_image_mask * 255)
+                    combine_mask = (
+                        cv2.erode(
+                            cv2.dilate(combine_mask, np.ones((8, 8), np.uint8), iterations=1), np.ones((16, 16), np.uint8), iterations=1
+                        )
+                        * after_face_fusion_ratio
                     )
                     combine_mask[np.float32(fusion_image_eyes_mask) > 128] = 255
                     combine_mask[np.float32(input_image_lips_mask) > 128] = 0
@@ -1390,15 +1390,7 @@ def easyphoto_infer_forward(
                     # paste back to photo
                     fusion_image = np.array(fusion_image) * combine_mask + np.array(first_diffusion_output_image) * (1 - combine_mask)
                     fusion_image = Image.fromarray(np.uint8(fusion_image))
-
-                    input_image = Image.fromarray(
-                        np.uint8(
-                            (
-                                np.array(first_diffusion_output_image, np.float32) * (1 - after_face_fusion_ratio)
-                                + np.array(fusion_image, np.float32) * after_face_fusion_ratio
-                            )
-                        )
-                    )
+                    input_image = fusion_image
                 else:
                     fusion_image = first_diffusion_output_image
                     input_image = first_diffusion_output_image
@@ -2396,8 +2388,14 @@ def easyphoto_video_infer_forward(
                         _fusion_image_mask, _input_image_mask = np.int32(np.float32(_fusion_image_mask) > 128), np.int32(
                             np.float32(_input_image_mask) > 128
                         )
-                        _combine_mask = cv2.erode(
-                            np.uint8(_input_image_mask * _fusion_image_mask * 255), np.ones((16, 16), np.uint8), iterations=1
+                        _combine_mask = np.uint8(_input_image_mask * _fusion_image_mask * 255)
+                        _combine_mask = (
+                            cv2.erode(
+                                cv2.dilate(_combine_mask, np.ones((8, 8), np.uint8), iterations=1),
+                                np.ones((16, 16), np.uint8),
+                                iterations=1,
+                            )
+                            * before_face_fusion_ratio
                         )
                         _combine_mask[np.float32(_fusion_image_eyes_mask) > 128] = 255
                         _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
@@ -2406,15 +2404,7 @@ def easyphoto_video_infer_forward(
                         # paste back to photo
                         _fusion_image = np.array(_fusion_image) * _combine_mask + np.array(_input_image) * (1 - _combine_mask)
                         _fusion_image = Image.fromarray(np.uint8(_fusion_image))
-
-                        _input_image = Image.fromarray(
-                            np.uint8(
-                                (
-                                    np.array(_input_image, np.float32) * (1 - before_face_fusion_ratio)
-                                    + np.array(_fusion_image, np.float32) * before_face_fusion_ratio
-                                )
-                            )
-                        )
+                        _input_image = _fusion_image
                     except Exception as e:
                         new_input_image.append(_input_image)
                         new_input_mask.append(None)
@@ -2612,27 +2602,28 @@ def easyphoto_video_infer_forward(
                             _fusion_image_mask, _input_image_mask = np.int32(np.float32(_fusion_image_mask) > 128), np.int32(
                                 np.float32(_input_image_mask) > 128
                             )
-                            _combine_mask = cv2.erode(
-                                np.uint8(_input_image_mask * _fusion_image_mask * 255), np.ones((16, 16), np.uint8), iterations=1
+                            _combine_mask = np.uint8(_input_image_mask * _fusion_image_mask * 255)
+                            _combine_mask = (
+                                cv2.erode(
+                                    cv2.dilate(_combine_mask, np.ones((8, 8), np.uint8), iterations=1),
+                                    np.ones((16, 16), np.uint8),
+                                    iterations=1,
+                                )
+                                * after_face_fusion_ratio
                             )
                             _combine_mask[np.float32(_fusion_image_eyes_mask) > 128] = 255
                             _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
                             _combine_mask = cv2.blur(np.array(_combine_mask), (8, 8)) / 255
 
+                            cv2.imwrite("1.jpg", cv2.cvtColor(np.uint8(np.array(_fusion_image) * _combine_mask), cv2.COLOR_BGR2RGB))
+                            cv2.imwrite("2.jpg", cv2.cvtColor(np.uint8(np.array(_fusion_image)), cv2.COLOR_BGR2RGB))
+                            cv2.imwrite("3.jpg", cv2.cvtColor(np.uint8(np.array(_first_diffusion_output_image)), cv2.COLOR_BGR2RGB))
                             # paste back to photo
                             _fusion_image = np.array(_fusion_image) * _combine_mask + np.array(_first_diffusion_output_image) * (
                                 1 - _combine_mask
                             )
                             _fusion_image = Image.fromarray(np.uint8(_fusion_image))
-
-                            _input_image = Image.fromarray(
-                                np.uint8(
-                                    (
-                                        np.array(_first_diffusion_output_image, np.float32) * (1 - after_face_fusion_ratio)
-                                        + np.array(_fusion_image, np.float32) * after_face_fusion_ratio
-                                    )
-                                )
-                            )
+                            _input_image = _fusion_image
                         except Exception as e:
                             _fusion_image = _first_diffusion_output_image
                             _input_image = _first_diffusion_output_image
