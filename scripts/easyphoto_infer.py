@@ -2597,12 +2597,12 @@ def easyphoto_video_infer_forward(
                             # detect face area
                             # fusion_image_mask and input_image_mask are 0, 1 masks of shape [h, w, 3]
                             _fusion_image_mask, _fusion_image_eyes_mask, _fusion_image_lips_mask = face_skin(
-                                _fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]]
+                                _fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]]
                             )
                             _input_image_mask, _input_image_eyes_mask, _input_image_lips_mask = face_skin(
                                 _first_diffusion_output_image,
                                 retinaface_detection,
-                                needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]],
+                                needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]],
                             )
 
                             # The face blending here utilized some rather hard techniques. The face is currently divided into three parts:
