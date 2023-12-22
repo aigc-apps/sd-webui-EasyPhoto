@@ -31,8 +31,6 @@ from modules.script_callbacks import (AfterCFGCallbackParams,
                                       cfg_after_cfg_callback,
                                       cfg_denoised_callback,
                                       cfg_denoiser_callback)
-from modules.sd_samplers_cfg_denoiser import (CFGDenoiser, catenate_conds,
-                                              pad_cond, subscript_cond)
 from modules.shared import opts, state
 from PIL import Image, ImageFilter, ImageOps, PngImagePlugin
 from scripts.easyphoto_config import easyphoto_models_path
@@ -41,6 +39,8 @@ from tqdm import tqdm
 try:
     from modules.sd_samplers_common import (approximation_indexes,
                                             images_tensor_to_samples)
+    from modules.sd_samplers_cfg_denoiser import (CFGDenoiser, catenate_conds,
+                                                pad_cond, subscript_cond)
 
     from .animatediff.animatediff_i2ibatch import animatediff_i2ibatch
     from .animatediff.animatediff_infotext import update_infotext
