@@ -50,6 +50,7 @@ from scripts.easyphoto_utils import (
     modelscope_models_to_cpu,
     modelscope_models_to_gpu,
     switch_ms_model_cpu,
+    cleanup_decorator,
     unload_models,
     seed_everything,
 )
@@ -413,6 +414,7 @@ sdxl_txt2img_flag = False
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator()
 @switch_sd_model_vae()
+@cleanup_decorator()
 def easyphoto_infer_forward(
     sd_model_checkpoint,
     selected_template_images,
@@ -441,6 +443,7 @@ def easyphoto_infer_forward(
     color_shift_last,
     super_resolution,
     super_resolution_method,
+    super_resolution_ratio,
     skin_retouching_bool,
     display_score,
     background_restore,
@@ -456,6 +459,7 @@ def easyphoto_infer_forward(
     ipa_only_weight,
     ipa_only_image_path,
     lcm_accelerate,
+    enable_second_diffusion,
     *user_ids,
 ):
     # global
@@ -479,6 +483,7 @@ def easyphoto_infer_forward(
             last_user_id_none_num = 0
 
     if len(user_ids) == last_user_id_none_num:
+        ep_logger.error("Please choose a user id.")
         return "Please choose a user id.", [], []
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
@@ -492,6 +497,7 @@ def easyphoto_infer_forward(
     # check the checkpoint_type of sd_model_checkpoint
     checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
     if checkpoint_type == 2:
+        ep_logger.error("EasyPhoto does not support the SD2 checkpoint.")
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
 
@@ -536,6 +542,7 @@ def easyphoto_infer_forward(
                 error_info = "The type of the stable diffusion model {} ({}) and the user id {} ({}) does not " "match ".format(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
+                ep_logger.error(error_info)
                 return error_info, [], []
 
     loractl_flag = False
@@ -555,9 +562,11 @@ def easyphoto_infer_forward(
     controlnet_version = get_controlnet_version()
     major, minor, patch = map(int, controlnet_version.split("."))
     if major == 0 and minor == 0 and patch == 0:
+        ep_logger.error("Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.")
         return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", [], []
     if ipa_control:
         if major < 1 or minor < 1 or patch < 417:
+            ep_logger.error("To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.")
             return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", [], []
 
     # check the number of controlnets
@@ -569,6 +578,7 @@ def easyphoto_infer_forward(
             "Please go to Settings/ControlNet and at least set {} for "
             "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)
         )
+        ep_logger.error(error_info)
         return error_info, [], []
 
     if ipa_control:
@@ -615,11 +625,13 @@ def easyphoto_infer_forward(
                 prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
 
             if prompt_generate_sd_model_checkpoint_type == 3 and scene_id != "none":
+                ep_logger.error("EasyPhoto does not support infer scene lora with the SDXL checkpoint.")
                 return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
             ep_logger.info("Template images will be generated when you use text2photo")
     except Exception:
         torch.cuda.empty_cache()
         traceback.print_exc()
+        ep_logger.error("Please choose or upload a template.")
         return "Please choose or upload a template.", [], []
 
     # create modelscope model
@@ -725,9 +737,11 @@ def easyphoto_infer_forward(
             # scene lora path
             scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
             if not os.path.exists(scene_lora_model_path):
+                ep_logger.error("Please check scene lora is exist or not.")
                 return "Please check scene lora is exist or not.", [], []
             is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
             if not is_scene_lora:
+                ep_logger.error("Please use the lora trained by ep.")
                 return "Please use the lora trained by ep.", [], []
 
             # get lora scene prompt
@@ -977,6 +991,7 @@ def easyphoto_infer_forward(
 
             template_face_safe_boxes, _, _ = call_face_crop(retinaface_detection, template_image, multi_user_safecrop_ratio, "crop")
             if len(template_face_safe_boxes) == 0:
+                ep_logger.error("Please upload a template with face.")
                 return "Please upload a template with face.", [], []
             template_detected_facenum = len(template_face_safe_boxes)
 
@@ -1158,26 +1173,35 @@ def easyphoto_infer_forward(
 
                     # The edge shadows generated by fusion are filtered out by taking intersections of masks of faces before and after fusion.
                     # detect face area
-                    fusion_image_mask = np.int32(
-                        np.float32(face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 10, 11, 12, 13]])[0]) > 128
+                    fusion_image_mask, fusion_image_eyes_mask, fusion_image_lips_mask = face_skin(
+                        fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]]
                     )
-                    input_image_mask = np.int32(
-                        np.float32(face_skin(input_image, retinaface_detection, needs_index=[[1, 2, 3, 10, 11, 12, 13]])[0]) > 128
+                    input_image_mask, input_image_eyes_mask, input_image_lips_mask = face_skin(
+                        input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]]
                     )
-                    combine_mask = cv2.blur(np.uint8(input_image_mask * fusion_image_mask * 255), (8, 8)) / 255
+
+                    # The face blending here utilized some rather hard techniques. The face is currently divided into three parts:
+                    # 1. The eyes are taken from the results of face fusion,
+                    # 2. The skin is derived from the proportional blending of both sources
+                    # 3. The lips are taken from the diffusion.
+                    fusion_image_mask, input_image_mask = np.int32(np.float32(fusion_image_mask) > 128), np.int32(
+                        np.float32(input_image_mask) > 128
+                    )
+                    combine_mask = np.uint8(input_image_mask * fusion_image_mask * 255)
+                    combine_mask = (
+                        cv2.erode(
+                            cv2.dilate(combine_mask, np.ones((8, 8), np.uint8), iterations=1), np.ones((16, 16), np.uint8), iterations=1
+                        )
+                        * before_face_fusion_ratio
+                    )
+                    combine_mask[cv2.dilate(np.float32(fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128] = 255
+                    combine_mask[np.float32(input_image_lips_mask) > 128] = 0
+                    combine_mask = cv2.blur(np.array(combine_mask), (8, 8)) / 255
 
                     # paste back to photo
                     fusion_image = np.array(fusion_image) * combine_mask + np.array(input_image) * (1 - combine_mask)
                     fusion_image = Image.fromarray(np.uint8(fusion_image))
-
-                    input_image = Image.fromarray(
-                        np.uint8(
-                            (
-                                np.array(input_image, np.float32) * (1 - before_face_fusion_ratio)
-                                + np.array(fusion_image, np.float32) * before_face_fusion_ratio
-                            )
-                        )
-                    )
+                    input_image = fusion_image
 
                 if input_mask_face_part_only:
                     face_width = input_image_retinaface_box[2] - input_image_retinaface_box[0]
@@ -1341,72 +1365,85 @@ def easyphoto_infer_forward(
                     # The edge shadows generated by fusion are filtered out by taking intersections of masks of faces before and after fusion.
                     # detect face area
                     # fusion_image_mask and input_image_mask are 0, 1 masks of shape [h, w, 3]
-                    fusion_image_mask = np.int32(
-                        np.float32(face_skin(fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 11, 12, 13]])[0]) > 128
+                    fusion_image_mask, fusion_image_eyes_mask, fusion_image_lips_mask = face_skin(
+                        fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]]
                     )
-                    input_image_mask = np.int32(
-                        np.float32(face_skin(first_diffusion_output_image, retinaface_detection, needs_index=[[1, 2, 3, 11, 12, 13]])[0])
-                        > 128
+                    input_image_mask, input_image_eyes_mask, input_image_lips_mask = face_skin(
+                        first_diffusion_output_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]]
                     )
-                    combine_mask = cv2.blur(np.uint8(input_image_mask * fusion_image_mask * 255), (8, 8)) / 255
+
+                    # The face blending here utilized some rather hard techniques. The face is currently divided into three parts:
+                    # 1. The eyes are taken from the results of face fusion,
+                    # 2. The skin is derived from the proportional blending of both sources
+                    # 3. The lips are taken from the diffusion.
+                    fusion_image_mask, input_image_mask = np.int32(np.float32(fusion_image_mask) > 128), np.int32(
+                        np.float32(input_image_mask) > 128
+                    )
+                    combine_mask = np.uint8(input_image_mask * fusion_image_mask * 255)
+                    combine_mask = (
+                        cv2.erode(
+                            cv2.dilate(combine_mask, np.ones((8, 8), np.uint8), iterations=1), np.ones((16, 16), np.uint8), iterations=1
+                        )
+                        * after_face_fusion_ratio
+                    )
+                    combine_mask[cv2.dilate(np.float32(fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128] = 255
+                    combine_mask[np.float32(input_image_lips_mask) > 128] = 0
+                    combine_mask = cv2.blur(np.array(combine_mask), (8, 8)) / 255
 
                     # paste back to photo
                     fusion_image = np.array(fusion_image) * combine_mask + np.array(first_diffusion_output_image) * (1 - combine_mask)
                     fusion_image = Image.fromarray(np.uint8(fusion_image))
-
-                    input_image = Image.fromarray(
-                        np.uint8(
-                            (
-                                np.array(first_diffusion_output_image, np.float32) * (1 - after_face_fusion_ratio)
-                                + np.array(fusion_image, np.float32) * after_face_fusion_ratio
-                            )
-                        )
-                    )
+                    input_image = fusion_image
                 else:
                     fusion_image = first_diffusion_output_image
                     input_image = first_diffusion_output_image
 
-                # Add mouth_mask to avoid some fault lips, close if you dont need
-                if need_mouth_fix:
-                    ep_logger.info("Start mouth detect.")
-                    mouth_mask, face_mask = face_skin(input_image, retinaface_detection, [[4, 5, 12, 13], [1, 2, 3, 4, 5, 10, 11, 12, 13]])
-                    # Obtain the mask of the area around the face
-                    face_mask = Image.fromarray(
-                        np.uint8(
-                            cv2.dilate(np.array(face_mask), np.ones((32, 32), np.uint8), iterations=1)
-                            - cv2.erode(np.array(face_mask), np.ones((16, 16), np.uint8), iterations=1)
+                if enable_second_diffusion:
+                    # Add mouth_mask to avoid some fault lips, close if you dont need
+                    if need_mouth_fix:
+                        ep_logger.info("Start mouth detect.")
+                        mouth_mask, face_mask = face_skin(
+                            input_image, retinaface_detection, [[4, 5, 12, 13], [1, 2, 3, 4, 5, 10, 11, 12, 13]]
                         )
+                        # Obtain the mask of the area around the face
+                        face_mask = Image.fromarray(
+                            np.uint8(
+                                cv2.dilate(np.array(face_mask), np.ones((32, 32), np.uint8), iterations=1)
+                                - cv2.erode(np.array(face_mask), np.ones((16, 16), np.uint8), iterations=1)
+                            )
+                        )
+
+                        i_h, i_w, i_c = np.shape(face_mask)
+                        m_h, m_w, m_c = np.shape(mouth_mask)
+                        if i_h != m_h or i_w != m_w:
+                            face_mask = face_mask.resize([m_w, m_h])
+                        input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
+
+                    ep_logger.info("Start Second diffusion.")
+                    if not sdxl_pipeline_flag:
+                        controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
+                        if ipa_control:
+                            controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ipa_weight]]
+                    else:
+                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
+                        if ipa_control:
+                            controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
+
+                    second_diffusion_output_image = inpaint(
+                        input_image,
+                        input_mask,
+                        controlnet_pairs,
+                        input_prompts[index],
+                        diffusion_steps=second_diffusion_steps,
+                        cfg_scale=7 if not lcm_accelerate else 2,
+                        denoising_strength=second_denoising_strength,
+                        hr_scale=default_hr_scale,
+                        seed=seed,
+                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
-
-                    i_h, i_w, i_c = np.shape(face_mask)
-                    m_h, m_w, m_c = np.shape(mouth_mask)
-                    if i_h != m_h or i_w != m_w:
-                        face_mask = face_mask.resize([m_w, m_h])
-                    input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
-
-                ep_logger.info("Start Second diffusion.")
-                if not sdxl_pipeline_flag:
-                    controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
-                    if ipa_control:
-                        controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ipa_weight]]
+                    second_diffusion_output_image = second_diffusion_output_image[0]
                 else:
-                    controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
-                    if ipa_control:
-                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
-
-                second_diffusion_output_image = inpaint(
-                    input_image,
-                    input_mask,
-                    controlnet_pairs,
-                    input_prompts[index],
-                    diffusion_steps=second_diffusion_steps,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    denoising_strength=second_denoising_strength,
-                    hr_scale=default_hr_scale,
-                    seed=seed,
-                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                )
-                second_diffusion_output_image = second_diffusion_output_image[0]
+                    second_diffusion_output_image = input_image
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:
@@ -1665,8 +1702,22 @@ def easyphoto_infer_forward(
                         ep_logger.info("Start Portrait enhancement.")
                         h, w, c = np.shape(np.array(output_image))
                         # Super-resolution is performed here.
-                        output_image = Image.fromarray(
+                        output_image_sr = Image.fromarray(
                             cv2.cvtColor(portrait_enhancement(output_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB)
+                        )
+                        h_sr, w_sr, _ = np.shape(np.array(output_image_sr))
+
+                        # Resize output image and Merge output_image and output_image_sr
+                        output_image = output_image.resize([w_sr, h_sr])
+                        output_image = Image.fromarray(
+                            np.uint8(
+                                np.clip(
+                                    np.uint8(output_image) * (1 - super_resolution_ratio)
+                                    + np.uint8(output_image_sr) * super_resolution_ratio,
+                                    0,
+                                    255,
+                                )
+                            )
                         )
                     except Exception as e:
                         torch.cuda.empty_cache()
@@ -1703,14 +1754,11 @@ def easyphoto_infer_forward(
                 loop_message += "\n"
             loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
-    if not shared.opts.data.get("easyphoto_cache_model", True):
-        unload_models()
-
-    torch.cuda.empty_cache()
     return loop_message, outputs, face_id_outputs
 
 
 @switch_sd_model_vae()
+@cleanup_decorator()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint,
     sd_model_checkpoint_for_animatediff_text2video,
@@ -1743,6 +1791,7 @@ def easyphoto_video_infer_forward(
     color_shift_middle,
     super_resolution,
     super_resolution_method,
+    super_resolution_ratio,
     skin_retouching_bool,
     display_score,
     makeup_transfer,
@@ -1771,6 +1820,7 @@ def easyphoto_video_infer_forward(
             last_user_id_none_num = 0
 
     if len(user_ids) == last_user_id_none_num:
+        ep_logger.error("Please choose a user id.")
         return "Please choose a user id.", None, None, []
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
@@ -1794,6 +1844,7 @@ def easyphoto_video_infer_forward(
         or checkpoint_type_image2video == 2
         or checkpoint_type_image2video == 3
     ):
+        ep_logger.error("EasyPhoto video infer does not support the SD2 checkpoint and sdxl.")
         return "EasyPhoto video infer does not support the SD2 checkpoint and sdxl.", None, None, []
 
     if ipa_control:
@@ -1808,15 +1859,18 @@ def easyphoto_video_infer_forward(
     for user_id in user_ids:
         if user_id != "none":
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
+                ep_logger.error("User id is not exist")
                 return "User id is not exist", None, None, []
 
     # check the version of controlnets, reuse code at L538
     controlnet_version = get_controlnet_version()
     major, minor, patch = map(int, controlnet_version.split("."))
     if major == 0 and minor == 0 and patch == 0:
+        ep_logger.error("Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.")
         return "Please install sd-webui-controlnet from https://github.com/Mikubill/sd-webui-controlnet.", None, None, []
     if ipa_control:
         if major < 1 or minor < 1 or patch < 417:
+            ep_logger.error("To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.")
             return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", None, None, []
 
     # check the number of controlnets
@@ -1828,6 +1882,7 @@ def easyphoto_video_infer_forward(
             "Please go to Settings/ControlNet and at least set {} for "
             "Multi-ControlNet: ControlNet unit number (requires restart).".format(max_control_net_unit_count)
         )
+        ep_logger.error(error_info)
         return error_info, None, None, []
 
     if ipa_control:
@@ -1884,6 +1939,7 @@ def easyphoto_video_infer_forward(
     except Exception:
         torch.cuda.empty_cache()
         traceback.print_exc()
+        ep_logger.error("Please input the correct params or upload a template.")
         return "Please input the correct params or upload a template.", None, None, []
 
     # create modelscope model
@@ -1971,9 +2027,11 @@ def easyphoto_video_infer_forward(
             # scene lora path
             scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
             if not os.path.exists(scene_lora_model_path):
+                ep_logger.error("Please check scene lora is exist or not.")
                 return "Please check scene lora is exist or not.", None, None, []
             is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
             if not is_scene_lora:
+                ep_logger.error("Please use the lora trained by ep.")
                 return "Please use the lora trained by ep.", None, None, []
 
             t2v_input_prompt = t2v_input_prompt + f"<lora:{scene_id}:0.80>, "
@@ -2321,29 +2379,39 @@ def easyphoto_video_infer_forward(
 
                         # The edge shadows generated by fusion are filtered out by taking intersections of masks of faces before and after fusion.
                         # detect face area
-                        _fusion_image_mask = np.int32(
-                            np.float32(face_skin(_fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0])
-                            > 128
+                        _fusion_image_mask, _fusion_image_eyes_mask, _fusion_image_lips_mask = face_skin(
+                            _fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]]
                         )
-                        _input_image_mask = np.int32(
-                            np.float32(face_skin(_input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0])
-                            > 128
+                        _input_image_mask, _input_image_eyes_mask, _input_image_lips_mask = face_skin(
+                            _input_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13], [4, 5], [12, 13]]
                         )
-                        # paste back to photo
-                        _fusion_image = _fusion_image * _fusion_image_mask * _input_image_mask + np.array(_input_image) * (
-                            1 - _fusion_image_mask * _input_image_mask
-                        )
-                        _fusion_image = cv2.medianBlur(np.uint8(_fusion_image), 3)
-                        _fusion_image = Image.fromarray(_fusion_image)
 
-                        _input_image = Image.fromarray(
-                            np.uint8(
-                                (
-                                    np.array(_input_image, np.float32) * (1 - before_face_fusion_ratio)
-                                    + np.array(_fusion_image, np.float32) * before_face_fusion_ratio
-                                )
-                            )
+                        # The face blending here utilized some rather hard techniques. The face is currently divided into three parts:
+                        # 1. The eyes are taken from the results of face fusion,
+                        # 2. The skin is derived from the proportional blending of both sources
+                        # 3. The lips are taken from the diffusion.
+                        _fusion_image_mask, _input_image_mask = np.int32(np.float32(_fusion_image_mask) > 128), np.int32(
+                            np.float32(_input_image_mask) > 128
                         )
+                        _combine_mask = np.uint8(_input_image_mask * _fusion_image_mask * 255)
+                        _combine_mask = (
+                            cv2.erode(
+                                cv2.dilate(_combine_mask, np.ones((8, 8), np.uint8), iterations=1),
+                                np.ones((16, 16), np.uint8),
+                                iterations=1,
+                            )
+                            * before_face_fusion_ratio
+                        )
+                        _combine_mask[
+                            cv2.dilate(np.float32(_fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128
+                        ] = 255
+                        _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
+                        _combine_mask = cv2.blur(np.array(_combine_mask), (8, 8)) / 255
+
+                        # paste back to photo
+                        _fusion_image = np.array(_fusion_image) * _combine_mask + np.array(_input_image) * (1 - _combine_mask)
+                        _fusion_image = Image.fromarray(np.uint8(_fusion_image))
+                        _input_image = _fusion_image
                     except Exception as e:
                         new_input_image.append(_input_image)
                         new_input_mask.append(None)
@@ -2524,33 +2592,47 @@ def easyphoto_video_infer_forward(
 
                             # The edge shadows generated by fusion are filtered out by taking intersections of masks of faces before and after fusion.
                             # detect face area
-                            _fusion_image_mask = np.int32(
-                                np.float32(face_skin(_fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]])[0])
-                                > 128
+                            # fusion_image_mask and input_image_mask are 0, 1 masks of shape [h, w, 3]
+                            _fusion_image_mask, _fusion_image_eyes_mask, _fusion_image_lips_mask = face_skin(
+                                _fusion_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]]
                             )
-                            _input_image_mask = np.int32(
-                                np.float32(
-                                    face_skin(
-                                        _first_diffusion_output_image, retinaface_detection, needs_index=[[1, 2, 3, 4, 5, 10, 11, 12, 13]]
-                                    )[0]
-                                )
-                                > 128
+                            _input_image_mask, _input_image_eyes_mask, _input_image_lips_mask = face_skin(
+                                _first_diffusion_output_image,
+                                retinaface_detection,
+                                needs_index=[[1, 2, 3, 4, 5, 11, 12, 13], [4, 5], [12, 13]],
                             )
-                            # paste back to photo
-                            _fusion_image = _fusion_image * _fusion_image_mask * _input_image_mask + np.array(
-                                _first_diffusion_output_image
-                            ) * (1 - _fusion_image_mask * _input_image_mask)
-                            _fusion_image = cv2.medianBlur(np.uint8(_fusion_image), 3)
-                            _fusion_image = Image.fromarray(_fusion_image)
 
-                            _input_image = Image.fromarray(
-                                np.uint8(
-                                    (
-                                        np.array(_first_diffusion_output_image, np.float32) * (1 - after_face_fusion_ratio)
-                                        + np.array(_fusion_image, np.float32) * after_face_fusion_ratio
-                                    )
-                                )
+                            # The face blending here utilized some rather hard techniques. The face is currently divided into three parts:
+                            # 1. The eyes are taken from the results of face fusion,
+                            # 2. The skin is derived from the proportional blending of both sources
+                            # 3. The lips are taken from the diffusion.
+                            _fusion_image_mask, _input_image_mask = np.int32(np.float32(_fusion_image_mask) > 128), np.int32(
+                                np.float32(_input_image_mask) > 128
                             )
+                            _combine_mask = np.uint8(_input_image_mask * _fusion_image_mask * 255)
+                            _combine_mask = (
+                                cv2.erode(
+                                    cv2.dilate(_combine_mask, np.ones((8, 8), np.uint8), iterations=1),
+                                    np.ones((16, 16), np.uint8),
+                                    iterations=1,
+                                )
+                                * after_face_fusion_ratio
+                            )
+                            _combine_mask[
+                                cv2.dilate(np.float32(_fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128
+                            ] = 255
+                            _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
+                            _combine_mask = cv2.blur(np.array(_combine_mask), (8, 8)) / 255
+
+                            cv2.imwrite("1.jpg", cv2.cvtColor(np.uint8(np.array(_fusion_image) * _combine_mask), cv2.COLOR_BGR2RGB))
+                            cv2.imwrite("2.jpg", cv2.cvtColor(np.uint8(np.array(_fusion_image)), cv2.COLOR_BGR2RGB))
+                            cv2.imwrite("3.jpg", cv2.cvtColor(np.uint8(np.array(_first_diffusion_output_image)), cv2.COLOR_BGR2RGB))
+                            # paste back to photo
+                            _fusion_image = np.array(_fusion_image) * _combine_mask + np.array(_first_diffusion_output_image) * (
+                                1 - _combine_mask
+                            )
+                            _fusion_image = Image.fromarray(np.uint8(_fusion_image))
+                            _input_image = _fusion_image
                         except Exception as e:
                             _fusion_image = _first_diffusion_output_image
                             _input_image = _first_diffusion_output_image
@@ -2639,8 +2721,22 @@ def easyphoto_video_infer_forward(
                         ep_logger.info(f"Start {idx} Portrait enhancement.")
                         h, w, c = np.shape(np.array(_input_image))
                         # Super-resolution is performed here.
-                        _input_image = Image.fromarray(
+                        _input_image_sr = Image.fromarray(
                             cv2.cvtColor(portrait_enhancement(_input_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB)
+                        )
+                        h_sr, w_sr, _ = np.shape(np.array(_input_image_sr))
+
+                        # Resize output image and Merge _input_image and _input_image_sr
+                        _input_image = _input_image.resize([w_sr, h_sr])
+                        _input_image = Image.fromarray(
+                            np.uint8(
+                                np.clip(
+                                    np.uint8(_input_image) * (1 - super_resolution_ratio)
+                                    + np.uint8(_input_image_sr) * super_resolution_ratio,
+                                    0,
+                                    255,
+                                )
+                            )
                         )
                     except Exception as e:
                         torch.cuda.empty_cache()
@@ -2745,8 +2841,4 @@ def easyphoto_video_infer_forward(
                 loop_message += "\n"
             loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
-    if not shared.opts.data.get("easyphoto_cache_model", True):
-        unload_models()
-
-    torch.cuda.empty_cache()
     return loop_message, output_video, output_gif, outputs

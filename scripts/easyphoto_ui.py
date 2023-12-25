@@ -774,10 +774,10 @@ def on_ui_tabs():
 
                                 with gr.Row():
                                     before_face_fusion_ratio = gr.Slider(
-                                        minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Face Fusion Ratio Before"
+                                        minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Face Fusion Ratio Before"
                                     )
                                     after_face_fusion_ratio = gr.Slider(
-                                        minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Face Fusion Ratio After"
+                                        minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Face Fusion Ratio After"
                                     )
 
                                 with gr.Row():
@@ -849,6 +849,7 @@ def on_ui_tabs():
                                     )
                                 with gr.Row():
                                     lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
+                                    enable_second_diffusion = gr.Checkbox(label="Enable Second Diffusion", value=True)
 
                                     def lcm_change(lcm_accelerate):
                                         if lcm_accelerate:
@@ -856,15 +857,11 @@ def on_ui_tabs():
                                                 gr.update(value=12, minimum=4, maximum=20),
                                                 gr.update(value=0.50),
                                                 gr.update(value=8, minimum=4, maximum=20),
-                                                gr.update(value=0.60),
-                                                gr.update(value=0.60),
                                             )
                                         return (
                                             gr.update(value=50, minimum=15, maximum=50),
                                             gr.update(value=0.45),
                                             gr.update(value=20, minimum=15, maximum=50),
-                                            gr.update(value=0.50),
-                                            gr.update(value=0.50),
                                         )
 
                                     lcm_accelerate.change(
@@ -874,8 +871,29 @@ def on_ui_tabs():
                                             first_diffusion_steps,
                                             first_denoising_strength,
                                             second_diffusion_steps,
-                                            before_face_fusion_ratio,
-                                            after_face_fusion_ratio,
+                                        ],
+                                    )
+
+                                    def enable_second_diffusion_change(enable_second_diffusion):
+                                        if enable_second_diffusion:
+                                            return (
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(value=True),
+                                            )
+                                        return (
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(value=False),
+                                        )
+
+                                    enable_second_diffusion.change(
+                                        enable_second_diffusion_change,
+                                        inputs=[enable_second_diffusion],
+                                        outputs=[
+                                            second_diffusion_steps,
+                                            second_denoising_strength,
+                                            color_shift_last,
                                         ],
                                     )
                                 with gr.Row():
@@ -883,6 +901,14 @@ def on_ui_tabs():
                                         value="gpen",
                                         choices=list(["gpen", "realesrgan"]),
                                         label="The super resolution way you use.",
+                                        visible=True,
+                                    )
+                                    super_resolution_ratio = gr.Slider(
+                                        minimum=0.00,
+                                        maximum=1.00,
+                                        value=0.50,
+                                        step=0.05,
+                                        label="Super Resolution Ratio",
                                         visible=True,
                                     )
                                     background_restore_denoising_strength = gr.Slider(
@@ -901,9 +927,9 @@ def on_ui_tabs():
                                     )
 
                                     super_resolution.change(
-                                        lambda x: super_resolution_method.update(visible=x),
+                                        lambda x: (super_resolution_method.update(visible=x), super_resolution_ratio.update(visible=x)),
                                         inputs=[super_resolution],
-                                        outputs=[super_resolution_method],
+                                        outputs=[super_resolution_method, super_resolution_ratio],
                                     )
                                     background_restore.change(
                                         lambda x: background_restore_denoising_strength.update(visible=x),
@@ -987,7 +1013,7 @@ def on_ui_tabs():
                                         tooltip="Send image and generation parameters to tryon tab.",
                                     ),
                                 }
-                            
+
                             def update_faceid(display_score, ipa_control):
                                 if display_score or ipa_control:
                                     return [gr.update(visible=True), gr.update(visible=True)]
@@ -1002,7 +1028,9 @@ def on_ui_tabs():
                                 show_label=False,
                                 visible=False,
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                            display_score.change(update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs])
+                            display_score.change(
+                                update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs]
+                            )
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
                             empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
@@ -1037,6 +1065,7 @@ def on_ui_tabs():
                             color_shift_last,
                             super_resolution,
                             super_resolution_method,
+                            super_resolution_ratio,
                             skin_retouching_bool,
                             display_score,
                             background_restore,
@@ -1052,6 +1081,7 @@ def on_ui_tabs():
                             ipa_only_weight,
                             ipa_only_image_path,
                             lcm_accelerate,
+                            enable_second_diffusion,
                             *uuids,
                         ],
                         outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
@@ -1062,6 +1092,7 @@ def on_ui_tabs():
                     gr.Markdown(
                         """
                         Animatediff is not Support when the version of Stable Diffusion Webui is under v1.6.0. If you want to use the video feature of EasyPhoto, please update your Stable Diffusion Webui.
+
                         Animatediff 无法在 Stable Diffusion Webui 的版本低于v1.6.0时使用。如果你想要使用EasyPhoto的Video功能，请更新您的Stable Diffusion Webui。
                         """
                     )
@@ -1365,10 +1396,10 @@ def on_ui_tabs():
 
                                     with gr.Row():
                                         before_face_fusion_ratio = gr.Slider(
-                                            minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Video Face Fusion Ratio Before"
+                                            minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Video Face Fusion Ratio Before"
                                         )
                                         after_face_fusion_ratio = gr.Slider(
-                                            minimum=0.2, maximum=0.8, value=0.50, step=0.05, label="Video Face Fusion Ratio After"
+                                            minimum=0.2, maximum=0.8, value=0.60, step=0.05, label="Video Face Fusion Ratio After"
                                         )
 
                                     with gr.Row():
@@ -1405,14 +1436,10 @@ def on_ui_tabs():
                                                 return (
                                                     gr.update(value=12, minimum=4, maximum=20),
                                                     gr.update(value=0.50),
-                                                    gr.update(value=0.60),
-                                                    gr.update(value=0.60),
                                                 )
                                             return (
                                                 gr.update(value=50, minimum=15, maximum=50),
                                                 gr.update(value=0.45),
-                                                gr.update(value=0.50),
-                                                gr.update(value=0.50),
                                             )
 
                                         lcm_accelerate.change(
@@ -1421,8 +1448,6 @@ def on_ui_tabs():
                                             outputs=[
                                                 first_diffusion_steps,
                                                 first_denoising_strength,
-                                                before_face_fusion_ratio,
-                                                after_face_fusion_ratio,
                                             ],
                                         )
 
@@ -1431,6 +1456,14 @@ def on_ui_tabs():
                                             value="gpen",
                                             choices=list(["gpen", "realesrgan"]),
                                             label="The video super resolution way you use.",
+                                            visible=True,
+                                        )
+                                        super_resolution_ratio = gr.Slider(
+                                            minimum=0.00,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="Video Super Resolution Ratio",
                                             visible=True,
                                         )
                                         makeup_transfer_ratio = gr.Slider(
@@ -1451,9 +1484,9 @@ def on_ui_tabs():
                                         )
 
                                         super_resolution.change(
-                                            lambda x: super_resolution_method.update(visible=x),
+                                            lambda x: [super_resolution_method.update(visible=x), super_resolution_ratio.update(visible=x)],
                                             inputs=[super_resolution],
-                                            outputs=[super_resolution_method],
+                                            outputs=[super_resolution_method, super_resolution_ratio],
                                         )
                                         makeup_transfer.change(
                                             lambda x: makeup_transfer_ratio.update(visible=x),
@@ -1628,6 +1661,7 @@ def on_ui_tabs():
                                 color_shift_middle,
                                 super_resolution,
                                 super_resolution_method,
+                                super_resolution_ratio,
                                 skin_retouching_bool,
                                 display_score,
                                 makeup_transfer,

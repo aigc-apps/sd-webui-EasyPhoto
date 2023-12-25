@@ -6,9 +6,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import gradio as gr
 import modules
+import traceback
 import modules.scripts as scripts
 import numpy as np
-from modules import cache, errors, processing, sd_models, sd_vae, shared
+from modules import cache, errors, processing, sd_hijack, sd_models, sd_vae, shared
 from modules.paths import models_path
 from modules.processing import Processed, StableDiffusionProcessing, StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
 from modules.sd_models import list_models
@@ -45,6 +46,7 @@ class unload_sd(ContextDecorator):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sd_models.reload_model_weights()
+        sd_hijack.apply_optimizations()  # cross attention optimization.
 
 
 class switch_sd_model_vae(ContextDecorator):
@@ -282,6 +284,12 @@ if video_visible:
                 self.ad_params = AnimateDiffProcess(**params)
                 params = self.ad_params
             if params.enable:
+                if self.hacked:
+                    self.cn_hacker.restore()
+                    self.cfg_hacker.restore()
+                    self.lora_hacker.restore()
+                    motion_module.restore(p.sd_model)
+                    self.hacked = False
                 ep_logger.info("AnimateDiff process start.")
                 params.set_p(p)
                 motion_module.inject(p.sd_model, params.model)
@@ -333,6 +341,13 @@ def refresh_model_vae():
     """Refresh sd model and vae"""
     list_models()
     refresh_vae_list()
+    try:
+        from scripts import global_state
+
+        global_state.update_cn_models()
+    except Exception as e:
+        ep_logger.error(f"Controlnet Refresh Error. Error info:{e}")
+        traceback.print_exc()
 
 
 @switch_return_opt()

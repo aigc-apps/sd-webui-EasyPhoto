@@ -19,13 +19,14 @@ from tqdm import tqdm
 
 import scripts.easyphoto_infer
 from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
+from modules import shared
 
 # Ms logger set
 ms_logger = ms_get_logger()
 ms_logger.setLevel(logging.ERROR)
 
 # ep logger set
-ep_logger_name = __name__.split(".")[0]
+ep_logger_name = "EasyPhoto"
 ep_logger = logging.getLogger(ep_logger_name)
 ep_logger.propagate = False
 
@@ -711,6 +712,23 @@ def unload_models():
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
     return "Already Empty Cache of Preprocess Model in EasyPhoto"
+
+
+class cleanup_decorator(ContextDecorator):
+    """Context-manager that supports cleanup cache."""
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not shared.opts.data.get("easyphoto_cache_model", True):
+            unload_models()
+        else:
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+        print("Cleanup completed.")
 
 
 def seed_everything(seed=11):
