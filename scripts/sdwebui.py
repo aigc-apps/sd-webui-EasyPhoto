@@ -9,7 +9,7 @@ import modules
 import traceback
 import modules.scripts as scripts
 import numpy as np
-from modules import cache, errors, processing, sd_models, sd_vae, shared
+from modules import cache, errors, processing, sd_hijack, sd_models, sd_vae, shared
 from modules.paths import models_path
 from modules.processing import Processed, StableDiffusionProcessing, StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
 from modules.sd_models import list_models
@@ -46,6 +46,7 @@ class unload_sd(ContextDecorator):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sd_models.reload_model_weights()
+        sd_hijack.apply_optimizations()  # cross attention optimization.
 
 
 class switch_sd_model_vae(ContextDecorator):
