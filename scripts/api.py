@@ -151,6 +151,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         ipa_only_image = datas.get("ipa_only_image", None)
 
         lcm_accelerate = datas.get("lcm_accelerate", None)
+        enable_second_diffusion = datas.get("enable_second_diffusion", True)
 
         if type(user_ids) == str:
             user_ids = [user_ids]
@@ -246,6 +247,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 ipa_only_weight,
                 ipa_only_image_path,
                 lcm_accelerate,
+                enable_second_diffusion,
                 *user_ids,
             )
             outputs = [api.encode_pil_to_base64(output) for output in outputs]

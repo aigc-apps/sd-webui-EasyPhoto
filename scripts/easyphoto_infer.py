@@ -459,6 +459,7 @@ def easyphoto_infer_forward(
     ipa_only_weight,
     ipa_only_image_path,
     lcm_accelerate,
+    enable_second_diffusion,
     *user_ids,
 ):
     # global
@@ -1397,47 +1398,52 @@ def easyphoto_infer_forward(
                     fusion_image = first_diffusion_output_image
                     input_image = first_diffusion_output_image
 
-                # Add mouth_mask to avoid some fault lips, close if you dont need
-                if need_mouth_fix:
-                    ep_logger.info("Start mouth detect.")
-                    mouth_mask, face_mask = face_skin(input_image, retinaface_detection, [[4, 5, 12, 13], [1, 2, 3, 4, 5, 10, 11, 12, 13]])
-                    # Obtain the mask of the area around the face
-                    face_mask = Image.fromarray(
-                        np.uint8(
-                            cv2.dilate(np.array(face_mask), np.ones((32, 32), np.uint8), iterations=1)
-                            - cv2.erode(np.array(face_mask), np.ones((16, 16), np.uint8), iterations=1)
+                if enable_second_diffusion:
+                    # Add mouth_mask to avoid some fault lips, close if you dont need
+                    if need_mouth_fix:
+                        ep_logger.info("Start mouth detect.")
+                        mouth_mask, face_mask = face_skin(
+                            input_image, retinaface_detection, [[4, 5, 12, 13], [1, 2, 3, 4, 5, 10, 11, 12, 13]]
                         )
+                        # Obtain the mask of the area around the face
+                        face_mask = Image.fromarray(
+                            np.uint8(
+                                cv2.dilate(np.array(face_mask), np.ones((32, 32), np.uint8), iterations=1)
+                                - cv2.erode(np.array(face_mask), np.ones((16, 16), np.uint8), iterations=1)
+                            )
+                        )
+
+                        i_h, i_w, i_c = np.shape(face_mask)
+                        m_h, m_w, m_c = np.shape(mouth_mask)
+                        if i_h != m_h or i_w != m_w:
+                            face_mask = face_mask.resize([m_w, m_h])
+                        input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
+
+                    ep_logger.info("Start Second diffusion.")
+                    if not sdxl_pipeline_flag:
+                        controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
+                        if ipa_control:
+                            controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ipa_weight]]
+                    else:
+                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
+                        if ipa_control:
+                            controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
+
+                    second_diffusion_output_image = inpaint(
+                        input_image,
+                        input_mask,
+                        controlnet_pairs,
+                        input_prompts[index],
+                        diffusion_steps=second_diffusion_steps,
+                        cfg_scale=7 if not lcm_accelerate else 2,
+                        denoising_strength=second_denoising_strength,
+                        hr_scale=default_hr_scale,
+                        seed=seed,
+                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                     )
-
-                    i_h, i_w, i_c = np.shape(face_mask)
-                    m_h, m_w, m_c = np.shape(mouth_mask)
-                    if i_h != m_h or i_w != m_w:
-                        face_mask = face_mask.resize([m_w, m_h])
-                    input_mask = Image.fromarray(np.uint8(np.clip(np.float32(face_mask) + np.float32(mouth_mask), 0, 255)))
-
-                ep_logger.info("Start Second diffusion.")
-                if not sdxl_pipeline_flag:
-                    controlnet_pairs = [["canny", fusion_image, 1.00], ["tile", fusion_image, 1.00]]
-                    if ipa_control:
-                        controlnet_pairs = [["canny", fusion_image, 1.00], ["ipa_full_face", ipa_image_face, ipa_weight]]
+                    second_diffusion_output_image = second_diffusion_output_image[0]
                 else:
-                    controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
-                    if ipa_control:
-                        controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
-
-                second_diffusion_output_image = inpaint(
-                    input_image,
-                    input_mask,
-                    controlnet_pairs,
-                    input_prompts[index],
-                    diffusion_steps=second_diffusion_steps,
-                    cfg_scale=7 if not lcm_accelerate else 2,
-                    denoising_strength=second_denoising_strength,
-                    hr_scale=default_hr_scale,
-                    seed=seed,
-                    sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
-                )
-                second_diffusion_output_image = second_diffusion_output_image[0]
+                    second_diffusion_output_image = input_image
 
                 # use original template face area to shift generated face color at last
                 if color_shift_last:

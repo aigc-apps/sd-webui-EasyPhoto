@@ -849,6 +849,7 @@ def on_ui_tabs():
                                     )
                                 with gr.Row():
                                     lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
+                                    enable_second_diffusion = gr.Checkbox(label="Enable Second Diffusion", value=True)
 
                                     def lcm_change(lcm_accelerate):
                                         if lcm_accelerate:
@@ -870,6 +871,29 @@ def on_ui_tabs():
                                             first_diffusion_steps,
                                             first_denoising_strength,
                                             second_diffusion_steps,
+                                        ],
+                                    )
+
+                                    def enable_second_diffusion_change(enable_second_diffusion):
+                                        if enable_second_diffusion:
+                                            return (
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(value=True),
+                                            )
+                                        return (
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(value=False),
+                                        )
+
+                                    enable_second_diffusion.change(
+                                        enable_second_diffusion_change,
+                                        inputs=[enable_second_diffusion],
+                                        outputs=[
+                                            second_diffusion_steps,
+                                            second_denoising_strength,
+                                            color_shift_last,
                                         ],
                                     )
                                 with gr.Row():
@@ -1057,6 +1081,7 @@ def on_ui_tabs():
                             ipa_only_weight,
                             ipa_only_image_path,
                             lcm_accelerate,
+                            enable_second_diffusion,
                             *uuids,
                         ],
                         outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
