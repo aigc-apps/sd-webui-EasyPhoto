@@ -395,7 +395,7 @@ def main():
         load_safety_checker=False,
         prediction_type=None,
         text_encoder=None,
-        tokenizer=None
+        tokenizer=None,
     )
     pipeline.scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
     face_lora_state_dict = load_file(args.face_lora_path, device="cpu")
