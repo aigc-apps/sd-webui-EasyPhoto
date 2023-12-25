@@ -239,7 +239,7 @@ def easyphoto_tryon_infer_forward(
         dataloader_num_workers = 16
 
         ep_logger.info(f"Delete sam model before training to save CUDA memory.")
-        del sam_predictor
+        sam_predictor = None
         torch.cuda.empty_cache()
 
         if platform.system() == "Windows":
