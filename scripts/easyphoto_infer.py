@@ -50,6 +50,7 @@ from scripts.easyphoto_utils import (
     modelscope_models_to_cpu,
     modelscope_models_to_gpu,
     switch_ms_model_cpu,
+    cleanup_decorator,
     unload_models,
     seed_everything,
 )
@@ -413,6 +414,7 @@ sdxl_txt2img_flag = False
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator()
 @switch_sd_model_vae()
+@cleanup_decorator()
 def easyphoto_infer_forward(
     sd_model_checkpoint,
     selected_template_images,
@@ -1746,14 +1748,11 @@ def easyphoto_infer_forward(
                 loop_message += "\n"
             loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
-    if not shared.opts.data.get("easyphoto_cache_model", True):
-        unload_models()
-
-    torch.cuda.empty_cache()
     return loop_message, outputs, face_id_outputs
 
 
 @switch_sd_model_vae()
+@cleanup_decorator()
 def easyphoto_video_infer_forward(
     sd_model_checkpoint,
     sd_model_checkpoint_for_animatediff_text2video,
@@ -2836,8 +2835,4 @@ def easyphoto_video_infer_forward(
                 loop_message += "\n"
             loop_message += f"Template {str(template_idx + 1)} error: Error info is {e}."
 
-    if not shared.opts.data.get("easyphoto_cache_model", True):
-        unload_models()
-
-    torch.cuda.empty_cache()
     return loop_message, output_video, output_gif, outputs
