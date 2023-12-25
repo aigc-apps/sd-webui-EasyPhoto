@@ -1128,11 +1128,7 @@ def on_ui_tabs():
 
                         return info, res, text_gallery[evt.index]
 
-                text_gallery.select(
-                    add_text_to_result,
-                    [text_gallery, selected_photo_infer_output_image, photo_infer_output_images],
-                    [infer_progress_photo_infer, photo_infer_output_images, selected_text_template],
-                )
+                
 
             with gr.TabItem("Video Inference"):
                 if not video_visible:
@@ -2333,6 +2329,12 @@ def on_ui_tabs():
                         selected_photo_infer_output_image,
                     )
 
+                    text_gallery.select(
+                        add_text_to_result,
+                        [text_gallery, selected_photo_infer_output_image, photo_infer_output_images],
+                        [infer_progress_photo_infer, photo_infer_output_images, selected_text_template],
+                    )
+                    
                     buttons_photo_infer["tryon"].click(
                         _js="switch_to_ep_tryon",
                         fn=None,
