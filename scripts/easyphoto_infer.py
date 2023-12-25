@@ -1191,7 +1191,7 @@ def easyphoto_infer_forward(
                         )
                         * before_face_fusion_ratio
                     )
-                    combine_mask[np.float32(fusion_image_eyes_mask) > 128] = 255
+                    combine_mask[cv2.dilate(np.float32(fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128] = 255
                     combine_mask[np.float32(input_image_lips_mask) > 128] = 0
                     combine_mask = cv2.blur(np.array(combine_mask), (8, 8)) / 255
 
@@ -1383,7 +1383,7 @@ def easyphoto_infer_forward(
                         )
                         * after_face_fusion_ratio
                     )
-                    combine_mask[np.float32(fusion_image_eyes_mask) > 128] = 255
+                    combine_mask[cv2.dilate(np.float32(fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128] = 255
                     combine_mask[np.float32(input_image_lips_mask) > 128] = 0
                     combine_mask = cv2.blur(np.array(combine_mask), (8, 8)) / 255
 
@@ -2397,7 +2397,9 @@ def easyphoto_video_infer_forward(
                             )
                             * before_face_fusion_ratio
                         )
-                        _combine_mask[np.float32(_fusion_image_eyes_mask) > 128] = 255
+                        _combine_mask[
+                            cv2.dilate(np.float32(_fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128
+                        ] = 255
                         _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
                         _combine_mask = cv2.blur(np.array(_combine_mask), (8, 8)) / 255
 
@@ -2611,7 +2613,9 @@ def easyphoto_video_infer_forward(
                                 )
                                 * after_face_fusion_ratio
                             )
-                            _combine_mask[np.float32(_fusion_image_eyes_mask) > 128] = 255
+                            _combine_mask[
+                                cv2.dilate(np.float32(_fusion_image_eyes_mask), np.ones((16, 16), np.uint8), iterations=1) > 128
+                            ] = 255
                             _combine_mask[np.float32(_input_image_lips_mask) > 128] = 0
                             _combine_mask = cv2.blur(np.array(_combine_mask), (8, 8)) / 255
 
