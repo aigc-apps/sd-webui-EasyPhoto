@@ -17,9 +17,9 @@ import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
+from modules import shared
 import scripts.easyphoto_infer
 from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
-from modules import shared
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -424,15 +424,12 @@ save_filenames = {
 
 
 def check_scene_valid(lora_path, models_path):
-    from scripts.sdwebui import get_lora_type
-
+    from scripts.sdwebui import get_scene_prompt
+    
     safetensors_lora_path = os.path.join(models_path, "Lora", lora_path)
     if not safetensors_lora_path.endswith("safetensors"):
         return False
-    lora_type = get_lora_type(safetensors_lora_path)
-    if lora_type == 4:
-        return True
-    return False
+    return get_scene_prompt(safetensors_lora_path)[0]
 
 
 def get_attribute_edit_ids():

@@ -475,12 +475,14 @@ def easyphoto_infer_forward(
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
     last_user_id_none_num = 0
+    valid_user_id_num = 0
     for idx, user_id in enumerate(user_ids):
         if user_id == "none":
             last_user_id_none_num += 1
             passed_userid_list.append(idx)
         else:
             last_user_id_none_num = 0
+            valid_user_id_num += 1
 
     if len(user_ids) == last_user_id_none_num:
         ep_logger.error("Please choose a user id.")
@@ -534,12 +536,12 @@ def easyphoto_infer_forward(
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
                 return "User id is not exist", [], []
             # Check if the type of the stable diffusion model and the user LoRA match
-            sdxl_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
-            sdxl_lora_flag = True if sdxl_lora_type == 3 else False
-            if sdxl_lora_flag != sdxl_pipeline_flag:
+            user_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
+            user_lora_sdxl_flag = True if user_lora_type == 3 else False
+            if user_lora_sdxl_flag != sdxl_pipeline_flag:
                 checkpoint_type_name = "SDXL" if sdxl_pipeline_flag else "SD1"
-                lora_type_name = "SDXL" if sdxl_lora_flag else "SD1"
-                error_info = "The type of the stable diffusion model {} ({}) and the user id {} ({}) does not " "match ".format(
+                lora_type_name = "SDXL" if user_lora_sdxl_flag else "SD1"
+                error_info = "The type of the stable diffusion model {} ({}) and the user id {} ({}) does not match.".format(
                     sd_model_checkpoint, checkpoint_type_name, user_id, lora_type_name
                 )
                 ep_logger.error(error_info)
@@ -617,16 +619,43 @@ def easyphoto_infer_forward(
         elif tabs == 2:
             template_images = [file_d["name"] for file_d in uploaded_template_images]
         elif tabs == 3:
+            if user_id[0] == "none":
+                ep_logger.error("Found none in User_0 id with scene lora. Please choose a user id.")
+                return "Found none in User_0 id with scene lora. Please choose a user id.", [], []
+            if valid_user_id_num > 1:
+                ep_logger.warning(
+                    "Found {} user ids. EasyPhoto does not support Scene Lora with multiple user ids currently. "
+                    "Only User_0 id is used.".format(valid_user_id_num)
+                )
             # load sd and vae
             prompt_generate_sd_model_checkpoint_type = get_checkpoint_type(prompt_generate_sd_model_checkpoint)
             if prompt_generate_sd_model_checkpoint_type == 3:
                 prompt_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
             else:
                 prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
+            
+            if scene_id != "none":
+                sdxl_scene_flag = True if prompt_generate_sd_model_checkpoint_type == 3 else False
+                scene_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{scene_id}.safetensors"))
+                scene_lora_sdxl_flag = True if scene_lora_type == 3 else False
+                if sdxl_scene_flag != scene_lora_sdxl_flag:
+                    checkpoint_type_name = "SDXL" if sdxl_scene_flag else "SD1"
+                    lora_type_name = "SDXL" if scene_lora_sdxl_flag else "SD1"
+                    error_info = "The type of the stable diffusion model {} ({}) and the scene id {} ({}) does not match.".format(
+                        prompt_generate_sd_model_checkpoint, checkpoint_type_name, scene_id, lora_type_name
+                    )
+                    ep_logger.error(error_info)
+                    return error_info, [], []
+                
+                if scene_lora_sdxl_flag != user_lora_sdxl_flag:
+                    scene_lora_type_name = "SDXL" if scene_lora_sdxl_flag else "SD1"
+                    user_lora_type_name = "SDXL" if user_lora_sdxl_flag else "SD1"
+                    error_info = "The type of the user id {} ({}) and the scene id {} ({}) does not match.".format(
+                        user_ids[0], user_lora_type_name, scene_id, scene_lora_type_name
+                    )
+                    ep_logger.error(error_info)
+                    return error_info, [], []
 
-            if prompt_generate_sd_model_checkpoint_type == 3 and scene_id != "none":
-                ep_logger.error("EasyPhoto does not support infer scene lora with the SDXL checkpoint.")
-                return "EasyPhoto does not support infer scene lora with the SDXL checkpoint.", [], []
             ep_logger.info("Template images will be generated when you use text2photo")
     except Exception:
         torch.cuda.empty_cache()
@@ -727,9 +756,13 @@ def easyphoto_infer_forward(
             )
             t2i_pose_template = Image.open(np.random.choice(t2i_pose_templates))
             controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+            if prompt_generate_sd_model_checkpoint_type == 3:
+                controlnet_pairs = [["sdxl_openpose", t2i_pose_template, 0.50, 1]]
         elif t2i_control_way == "Control with uploaded template":
             t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
             controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+            if prompt_generate_sd_model_checkpoint_type == 3:
+                controlnet_pairs = [["sdxl_openpose", t2i_pose_template, 0.50, 1]]
         else:
             controlnet_pairs = []
 

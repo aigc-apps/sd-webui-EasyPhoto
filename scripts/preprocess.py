@@ -5,6 +5,7 @@ import math
 import os
 import platform
 import sys
+import re
 from shutil import copyfile
 
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), "easyphoto_utils"))
@@ -88,6 +89,9 @@ if __name__ == "__main__":
     images_save_path = args.images_save_path
     json_save_path = args.json_save_path
     validation_prompt = args.validation_prompt
+    # Convert a list of strings (type: str) into an list of strings (type: List).
+    if validation_prompt[0] == "[" and validation_prompt[-1] == "]":
+        validation_prompt = re.findall(r"'(.*?)'", validation_prompt)
     inputs_dir = args.inputs_dir
     ref_image_path = args.ref_image_path
     skin_retouching_bool = args.skin_retouching_bool
@@ -258,35 +262,39 @@ if __name__ == "__main__":
                 _image_path = os.path.join(inputs_dir, jpg)
                 image = Image.open(_image_path)
 
-                h, w, c = np.shape(image)
+                # Use original training photos if crop_ratio < 1.
+                if float(args.crop_ratio) >= 1:
+                    h, w, c = np.shape(image)
 
-                retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 1, prefix="tmp")
-                retinaface_box = retinaface_boxes[0]
-                retinaface_keypoint = retinaface_keypoints[0]
+                    retinaface_boxes, retinaface_keypoints, _ = call_face_crop(retinaface_detection, image, 1, prefix="tmp")
+                    retinaface_box = retinaface_boxes[0]
+                    retinaface_keypoint = retinaface_keypoints[0]
 
-                face_width = retinaface_box[2] - retinaface_box[0]
-                face_height = retinaface_box[3] - retinaface_box[1]
+                    face_width = retinaface_box[2] - retinaface_box[0]
+                    face_height = retinaface_box[3] - retinaface_box[1]
 
-                crop_ratio = float(args.crop_ratio)
-                retinaface_box[0] = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
-                retinaface_box[1] = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 4, 0, h - 1)
-                retinaface_box[2] = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
-                retinaface_box[3] = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 4 * 3, 0, h - 1)
+                    crop_ratio = float(args.crop_ratio)
+                    retinaface_box[0] = np.clip(np.array(retinaface_box[0], np.int32) - face_width * (crop_ratio - 1) / 2, 0, w - 1)
+                    retinaface_box[1] = np.clip(np.array(retinaface_box[1], np.int32) - face_height * (crop_ratio - 1) / 4, 0, h - 1)
+                    retinaface_box[2] = np.clip(np.array(retinaface_box[2], np.int32) + face_width * (crop_ratio - 1) / 2, 0, w - 1)
+                    retinaface_box[3] = np.clip(np.array(retinaface_box[3], np.int32) + face_height * (crop_ratio - 1) / 4 * 3, 0, h - 1)
 
-                # Calculate the left, top, right, bottom of all faces now
-                left, top, right, bottom = retinaface_box
-                # Calculate the width, height, center_x, and center_y of all faces, and get the long side for rec
-                width, height, center_x, center_y = [right - left, bottom - top, (left + right) / 2, (top + bottom) / 2]
-                long_side = min(width, height)
+                    # Calculate the left, top, right, bottom of all faces now
+                    left, top, right, bottom = retinaface_box
+                    # Calculate the width, height, center_x, and center_y of all faces, and get the long side for rec
+                    width, height, center_x, center_y = [right - left, bottom - top, (left + right) / 2, (top + bottom) / 2]
+                    long_side = min(width, height)
 
-                # Calculate the new left, top, right, bottom of all faces for clipping
-                # Pad the box to square for saving GPU memomry
-                left, top = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 2, 0, h - 1))
-                right, bottom = int(np.clip(left + long_side, 0, w - 1)), int(np.clip(top + long_side, 0, h - 1))
-                retinaface_box = [left, top, right, bottom]
+                    # Calculate the new left, top, right, bottom of all faces for clipping
+                    # Pad the box to square for saving GPU memomry
+                    left, top = int(np.clip(center_x - long_side // 2, 0, w - 1)), int(np.clip(center_y - long_side // 2, 0, h - 1))
+                    right, bottom = int(np.clip(left + long_side, 0, w - 1)), int(np.clip(top + long_side, 0, h - 1))
+                    retinaface_box = [left, top, right, bottom]
 
-                # face crop
-                sub_image = image.crop(retinaface_box)
+                    # face crop
+                    sub_image = image.crop(retinaface_box)
+                else:
+                    sub_image = image
                 if skin_retouching_bool:
                     try:
                         sub_image = Image.fromarray(cv2.cvtColor(skin_retouching(sub_image)[OutputKeys.OUTPUT_IMG], cv2.COLOR_BGR2RGB))
@@ -307,28 +315,8 @@ if __name__ == "__main__":
                 logging.error(f"Photo detect and count score error, error info: {e}")
 
         if len(images) > 0:
-            target_size = (224, 224)
-            image = images[0]
-
-            # calculate resize border
-            width, height = image.size
-            aspect_ratio = width / height
-            if aspect_ratio > 1:
-                new_width = int(target_size[0] * aspect_ratio)
-                image = image.resize((new_width, target_size[1]))
-            else:
-                new_height = int(target_size[1] / aspect_ratio)
-                image = image.resize((target_size[0], new_height))
-
-            # crop a 224x224 photo for goodlook
-            width, height = image.size
-            left = (width - target_size[0]) / 2
-            top = (height - target_size[1]) / 2
-            right = (width + target_size[0]) / 2
-            bottom = (height + target_size[1]) / 2
-
-            cropped_image = image.crop((left, top, right, bottom))
-            image.save(ref_image_path)
+            # Save the reference image displayed in the Scene Lora gallery.
+            images[0].save(ref_image_path)
 
     # write results
     for index, base64_pilimage in enumerate(images):
@@ -336,7 +324,10 @@ if __name__ == "__main__":
         image.save(os.path.join(images_save_path, str(index) + ".jpg"))
         print("save processed image to " + os.path.join(images_save_path, str(index) + ".jpg"))
         with open(os.path.join(images_save_path, str(index) + ".txt"), "w") as f:
-            f.write(validation_prompt)
+            if isinstance(validation_prompt, list):
+                f.write(validation_prompt[index])
+            else:
+                f.write(validation_prompt)
 
     with open(json_save_path, "w", encoding="utf-8") as f:
         for root, dirs, files in os.walk(images_save_path, topdown=False):

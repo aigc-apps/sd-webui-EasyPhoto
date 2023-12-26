@@ -452,6 +452,11 @@ def parse_args():
         default="train_kohya_log.txt",
         help=("The output log file path."),
     )
+    parser.add_argument(
+        "--train_scene_lora_bool",
+        action="store_true",
+        help=("Whether to train scene lora"),
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -927,6 +932,9 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
         accelerator.print(f"\nsaving checkpoint: {ckpt_file}")
         metadata = {"ss_base_model_version": "sdxl_"}
+        if args.train_scene_lora_bool:
+            metadata["ep_lora_version"] = "scene"
+            metadata["ep_prompt"] = args.validation_prompt
         unwrapped_nw.save_weights(ckpt_file, weight_dtype, metadata)
 
     user_id = os.path.basename(os.path.dirname(args.output_dir))
