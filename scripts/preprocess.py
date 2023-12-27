@@ -254,6 +254,8 @@ if __name__ == "__main__":
     else:
         # jpg list
         jpgs = os.listdir(inputs_dir)
+        # sort photo files to correspond with captions.
+        jpgs = sorted(jpgs, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
         images = []
         for index, jpg in enumerate(tqdm(jpgs)):
             try:

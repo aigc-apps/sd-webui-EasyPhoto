@@ -156,8 +156,9 @@ def easyphoto_train_forward(
     max_train_steps = int(min(len(instance_images) * int(steps_per_photos), int(max_train_steps)))
     local_validation_prompt = None
     if isinstance(instance_images[0], list):
-        # User upload training photos with caption files.
-        local_validation_prompt = [instance[1] for instance in instance_images]
+        # User upload training photos with caption files to train the scene lora.
+        if train_scene_lora_bool:
+            local_validation_prompt = [instance[1] for instance in instance_images]
         instance_images = [instance[0] for instance in instance_images]
 
     for index, user_image in enumerate(instance_images):
@@ -201,13 +202,13 @@ def easyphoto_train_forward(
         train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora.py")
     else:
         train_kohya_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_lora_sd_XL.py")
-    ep_logger.info("train_file_path : ", train_kohya_path)
+    ep_logger.info("train_file_path : {}".format(train_kohya_path))
     if enable_rl and not train_scene_lora_bool:
         train_ddpo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_kohya/train_ddpo.py")
-        ep_logger.info("train_ddpo_path : ", train_kohya_path)
+        ep_logger.info("train_ddpo_path : {}".format(train_kohya_path))
 
     # outputs/easyphoto-tmp/train_kohya_log.txt, use to cache log and flush to UI
-    ep_logger.info("cache_log_file_path:", cache_log_file_path)
+    ep_logger.info("cache_log_file_path: {}".format(cache_log_file_path))
     if not os.path.exists(os.path.dirname(cache_log_file_path)):
         os.makedirs(os.path.dirname(cache_log_file_path), exist_ok=True)
 
