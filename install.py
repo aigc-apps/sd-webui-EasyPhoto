@@ -74,9 +74,9 @@ if not is_installed("einops"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install einops", "requirements for diffusers")
 
-if not is_installed("imageio>=2.29.0"):
+if not is_installed("imageio[pyav]>=2.29.0"):
     print("Installing requirements for easyphoto-webui")
-    launch.run_pip("install imageio>=2.29.0", "requirements for imageio")
+    launch.run_pip("install imageio[pyav]>=2.29.0", "requirements for imageio[pyav]")
 
 # Temporarily pin fsspec==2023.9.2. See https://github.com/huggingface/datasets/issues/6330 for details.
 if not is_installed("fsspec==2023.9.2"):
