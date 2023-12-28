@@ -78,6 +78,10 @@ if not is_installed("imageio>=2.29.0"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install imageio>=2.29.0", "requirements for imageio")
 
+if not is_installed("imageio[pyav]"):
+    print("Installing requirements for easyphoto-webui")
+    launch.run_pip("install install imageio[pyav]", "requirements for imageio[pyav]")
+
 # Temporarily pin fsspec==2023.9.2. See https://github.com/huggingface/datasets/issues/6330 for details.
 if not is_installed("fsspec==2023.9.2"):
     print("Installing requirements for easyphoto-webui")
