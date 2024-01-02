@@ -41,6 +41,7 @@ from scripts.easyphoto_utils import (
     call_face_crop_templates,
     check_files_exists_and_download,
     check_id_valid,
+    check_scene_valid,
     color_transfer,
     convert_to_video,
     crop_and_paste,
@@ -57,7 +58,6 @@ from scripts.easyphoto_utils import (
 from scripts.sdwebui import (
     get_checkpoint_type,
     get_lora_type,
-    get_scene_prompt,
     i2i_inpaint_call,
     refresh_model_vae,
     reload_sd_model_vae,
@@ -772,8 +772,7 @@ def easyphoto_infer_forward(
             if not os.path.exists(scene_lora_model_path):
                 ep_logger.error("Please check scene lora is exist or not.")
                 return "Please check scene lora is exist or not.", [], []
-            is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
-            if not is_scene_lora:
+            if not check_scene_valid(f"{scene_id}.safetensors", models_path):
                 ep_logger.error("Please use the lora trained by ep.")
                 return "Please use the lora trained by ep.", [], []
 
@@ -2062,8 +2061,7 @@ def easyphoto_video_infer_forward(
             if not os.path.exists(scene_lora_model_path):
                 ep_logger.error("Please check scene lora is exist or not.")
                 return "Please check scene lora is exist or not.", None, None, []
-            is_scene_lora, scene_lora_prompt = get_scene_prompt(scene_lora_model_path)
-            if not is_scene_lora:
+            if not check_scene_valid(f"{scene_id}.safetensors", models_path):
                 ep_logger.error("Please use the lora trained by ep.")
                 return "Please use the lora trained by ep.", None, None, []
 

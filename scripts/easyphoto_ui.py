@@ -99,7 +99,7 @@ def scene_change_function(scene_id_gallery, evt: gr.SelectData):
         check_files_exists_and_download(False, download_mode=scene_id)
     if not os.path.exists(lora_model_path):
         return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
-    is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+    scene_lora_prompt = get_scene_prompt(lora_model_path)
 
     return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
 

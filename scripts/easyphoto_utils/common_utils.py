@@ -423,13 +423,17 @@ save_filenames = {
 }
 
 
-def check_scene_valid(lora_path, models_path):
-    from scripts.sdwebui import get_scene_prompt
+def check_scene_valid(lora_path, models_path) -> bool:
+    from scripts.sdwebui import read_lora_metadata
     
     safetensors_lora_path = os.path.join(models_path, "Lora", lora_path)
     if not safetensors_lora_path.endswith("safetensors"):
         return False
-    return get_scene_prompt(safetensors_lora_path)[0]
+    metadata = read_lora_metadata(safetensors_lora_path)
+    if str(metadata.get("ep_lora_version", "")).startswith("scene"):
+        return True
+    else:
+        return False
 
 
 def get_attribute_edit_ids():

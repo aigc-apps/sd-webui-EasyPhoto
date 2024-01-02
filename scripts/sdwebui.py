@@ -792,14 +792,14 @@ def get_lora_type(filename: str) -> int:
     return 1
 
 
-def get_scene_prompt(filename: str) -> Tuple[bool, str]:
+def get_scene_prompt(filename: str) -> str:
     """Check the scene lora and get the scene prompt from the path `filename`.
 
     Args:
         filename (str): the Lora file path.
 
     Returns:
-        A tuple representing the scene lora flag (bool) and the scene prompt (str).
+        A string represents the scene prompt.
     """
     metadata = read_lora_metadata(filename)
     if str(metadata.get("ep_lora_version", "")).startswith("scene"):
@@ -808,5 +808,5 @@ def get_scene_prompt(filename: str) -> Tuple[bool, str]:
         if prompt[0] == "[" and prompt[-1] == "]":
             prompt_list = re.findall(r"'(.*?)'", prompt)
             prompt = random.choice(prompt_list)
-        return True, prompt
-    return False, ""
+        return prompt
+    return ""
