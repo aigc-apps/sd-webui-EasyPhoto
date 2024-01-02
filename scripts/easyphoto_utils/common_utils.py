@@ -102,6 +102,7 @@ download_urls = {
     "sdxl": [
         # sdxl
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/thibaud_xl_openpose_256lora.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
     ],
@@ -286,6 +287,10 @@ save_filenames = {
         [
             os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"),
             os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors"),
+        ],
+        [
+            os.path.join(models_path, f"ControlNet/thibaud_xl_openpose_256lora.safetensors"),
+            os.path.join(controlnet_cache_path, f"models/thibaud_xl_openpose_256lora.safetensors"),
         ],
         os.path.join(easyphoto_models_path, "stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors"),
         os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),

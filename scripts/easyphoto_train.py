@@ -274,6 +274,9 @@ def easyphoto_train_forward(
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         if train_scene_lora_bool:
             command += ["--train_scene_lora_bool"]
+            # We do not train the text encoders for SDXL Scene Lora.
+            if sdxl_pipeline_flag:
+                command = [c for c in command if not c.startswith("--train_text_encoder")]
         try:
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:
@@ -373,6 +376,9 @@ def easyphoto_train_forward(
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
         if train_scene_lora_bool:
             command += ["--train_scene_lora_bool"]
+            # We do not train the text encoders for SDXL Scene Lora.
+            if sdxl_pipeline_flag:
+                command = [c for c in command if not c.startswith("--train_text_encoder")]
         try:
             subprocess.run(command, env=env, check=True)
         except subprocess.CalledProcessError as e:

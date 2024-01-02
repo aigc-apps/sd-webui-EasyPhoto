@@ -140,7 +140,7 @@ def get_controlnet_unit(
             model="control_v11p_sd15_openpose",
         )
 
-    elif unit == "sdxl_openpose":
+    elif unit == "sdxl_openpose_lora":
         control_unit = dict(
             input_image={"image": np.asarray(input_image), "mask": None},
             module="openpose_full",
@@ -149,7 +149,7 @@ def get_controlnet_unit(
             control_mode=1,
             processor_res=1024,
             resize_mode="Just Resize",
-            model="thibaud_xl_openpose",
+            model="thibaud_xl_openpose_256lora",
         )
 
     elif unit == "color":
@@ -757,12 +757,12 @@ def easyphoto_infer_forward(
             t2i_pose_template = Image.open(np.random.choice(t2i_pose_templates))
             controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
             if prompt_generate_sd_model_checkpoint_type == 3:
-                controlnet_pairs = [["sdxl_openpose", t2i_pose_template, 0.50, 1]]
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 0.50, 1]]
         elif t2i_control_way == "Control with uploaded template":
             t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
             controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
             if prompt_generate_sd_model_checkpoint_type == 3:
-                controlnet_pairs = [["sdxl_openpose", t2i_pose_template, 0.50, 1]]
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 0.50, 1]]
         else:
             controlnet_pairs = []
 
