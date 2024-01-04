@@ -17,9 +17,9 @@ import torchvision
 from modelscope.utils.logger import get_logger as ms_get_logger
 from tqdm import tqdm
 
+from modules import shared
 import scripts.easyphoto_infer
 from scripts.easyphoto_config import data_path, easyphoto_models_path, models_path, tryon_gallery_dir, DEFAULT_SLIDERS
-from modules import shared
 
 # Ms logger set
 ms_logger = ms_get_logger()
@@ -102,6 +102,7 @@ download_urls = {
     "sdxl": [
         # sdxl
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/diffusers_xl_canny_mid.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/thibaud_xl_openpose_256lora.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/madebyollin-sdxl-vae-fp16-fix.safetensors",
     ],
@@ -287,6 +288,10 @@ save_filenames = {
             os.path.join(models_path, f"ControlNet/diffusers_xl_canny_mid.safetensors"),
             os.path.join(controlnet_cache_path, f"models/diffusers_xl_canny_mid.safetensors"),
         ],
+        [
+            os.path.join(models_path, f"ControlNet/thibaud_xl_openpose_256lora.safetensors"),
+            os.path.join(controlnet_cache_path, f"models/thibaud_xl_openpose_256lora.safetensors"),
+        ],
         os.path.join(easyphoto_models_path, "stable-diffusion-xl/madebyollin_sdxl_vae_fp16_fix/diffusion_pytorch_model.safetensors"),
         os.path.join(models_path, f"VAE/madebyollin-sdxl-vae-fp16-fix.safetensors"),
     ],
@@ -423,16 +428,17 @@ save_filenames = {
 }
 
 
-def check_scene_valid(lora_path, models_path):
-    from scripts.sdwebui import get_lora_type
-
+def check_scene_valid(lora_path, models_path) -> bool:
+    from scripts.sdwebui import read_lora_metadata
+    
     safetensors_lora_path = os.path.join(models_path, "Lora", lora_path)
     if not safetensors_lora_path.endswith("safetensors"):
         return False
-    lora_type = get_lora_type(safetensors_lora_path)
-    if lora_type == 4:
+    metadata = read_lora_metadata(safetensors_lora_path)
+    if str(metadata.get("ep_lora_version", "")).startswith("scene"):
         return True
-    return False
+    else:
+        return False
 
 
 def get_attribute_edit_ids():

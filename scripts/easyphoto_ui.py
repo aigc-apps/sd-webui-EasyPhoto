@@ -99,7 +99,7 @@ def scene_change_function(scene_id_gallery, evt: gr.SelectData):
         check_files_exists_and_download(False, download_mode=scene_id)
     if not os.path.exists(lora_model_path):
         return gr.update(value="Please check scene lora is exist or not."), gr.update(value="none")
-    is_scene_lora, scene_lora_prompt = get_scene_prompt(lora_model_path)
+    scene_lora_prompt = get_scene_prompt(lora_model_path)
 
     return gr.update(value=scene_lora_prompt), gr.update(value=scene_id)
 
@@ -179,8 +179,29 @@ scene.insert(
 
 
 def upload_file(files, current_files):
-    file_paths = [file_d["name"] for file_d in current_files] + [file.name for file in files]
-    return file_paths
+    # Users can either upload only the training photos or upload both the training photos and corresponding caption files.
+    # If the user uploads caption files, the name of the caption file must match the photo file name and be in `.txt` extension.
+    caption_flag = False
+    if len(current_files) != 0 and isinstance(current_files[0], list):
+        caption_flag = True
+    for file in files:
+        if ".txt" in file.name:
+            caption_flag = True
+    if not caption_flag:
+        instance_images = [file_d["name"] for file_d in current_files] + [file.name for file in files]
+    else:
+        instance_images = [(file_d[0]["name"], file_d[1]) for file_d in current_files]
+        name2folder = {os.path.basename(file.name): os.path.dirname(file.name) for file in files}
+        for (name, folder) in name2folder.items():
+            base, extension = os.path.splitext(name)
+            if extension in (".bmp", ".dib", ".png", ".jpg", ".jpeg", ".pbm", ".pgm", ".ppm", ".tif", ".tiff"):
+                if (base + ".txt") not in name2folder:
+                    raise FileNotFoundError("Please upload the caption file {} with the photo file {}".format(base + ".txt", name))
+                else:
+                    caption_path = os.path.join(name2folder[(base + ".txt")], base + ".txt")
+                    with open(caption_path) as f:
+                        instance_images.append((os.path.join(folder, name), f.readline()))
+    return instance_images
 
 
 def refresh_display():
@@ -233,7 +254,7 @@ def on_ui_tabs():
                             instance_images = gr.Gallery().style(columns=[4], rows=[2], object_fit="contain", height="auto")
 
                             with gr.Row():
-                                upload_button = gr.UploadButton("Upload Photos", file_types=["image"], file_count="multiple")
+                                upload_button = gr.UploadButton("Upload Photos", file_types=["image", "text"], file_count="multiple")
                                 clear_button = gr.Button("Clear Photos")
                             clear_button.click(fn=lambda: [], inputs=None, outputs=instance_images)
 
