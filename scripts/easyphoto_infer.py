@@ -50,9 +50,10 @@ from scripts.easyphoto_process_utils import (
     compute_rotation_angle,
     expand_box_by_pad,
     expand_roi,
-    resize_to_512
+    resize_to_512,
+    find_connected_components
 )
-from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid
+from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, ep_logger
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
 from scripts.train_kohya.utils.gpu_info import gpu_monitor_decorator
 
@@ -118,8 +119,6 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
                 threshold_b=200,
                 model="control_v11p_sd15_canny",
             )
-            print("Processor is used for canny!")
-            print(input_image.shape)
         else:
             # direct use the inout canny image with inner line
             control_unit = ControlNetUnit(
@@ -133,8 +132,7 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
                 threshold_b=200,
                 model="control_v11p_sd15_canny",
             )
-            print("No processor is used for canny!")
-            print(input_image.shape)
+
     elif unit == "openpose":
         control_unit = ControlNetUnit(
             image=input_image,
@@ -262,27 +260,20 @@ def inpaint(
 
     return image
 
-
-retinaface_detection = None
-image_face_fusion = None
-skin_retouching = None
-portrait_enhancement = None
-face_skin = None
-face_recognition = None
 check_hash = True
-
+sam_predictor = None
 
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator()
 def easyphoto_infer_forward(
-    sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
+    sd_model_checkpoint, infer_way, template_image, template_mask, reference_image, reference_mask, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
     lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-    pure_image, global_inpaint, match_and_paste, remove_target, model_selected_tab, *user_ids,
+    pure_image, global_inpaint, match_and_paste, remove_target, user_ids,
 ):
     # global
     global check_hash, models_zero123
 
-    # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
+    # check & download weights
     check_files_exists_and_download(check_hash)
     check_hash = False
 
@@ -347,8 +338,8 @@ def easyphoto_infer_forward(
         Image.open(os.path.join(user_id_outpath_samples,
                    user_ids[0], "ref_image.jpg"))
     )  # main
-    img2 = np.uint8(Image.fromarray(np.uint8(init_image["image"])))  # template
-    mask2_input = np.uint8(Image.fromarray(np.uint8(init_image["mask"])))
+    img2 = np.uint8(Image.fromarray(np.uint8(template_image["image"])))  # template
+    mask2_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
 
     if mask2_input.max()==0:
         print('Please mark the target region on the inference template!')
@@ -1112,17 +1103,6 @@ def easyphoto_infer_forward(
             result_img = result_img.resize((target_width, target_height))
             input_mask = input_mask.resize((target_width, target_height))
 
-            # result_img.save('result_img.jpg')
-            # cv2.imwrite('template_copy.jpg', template_copy[:,:,::-1])
-            # cv2.imwrite('input_mask_copy.jpg', input_mask_copy)
-
-            print(box_pad)
-
-            # copy back
-            # mask_blur = cv2.GaussianBlur(
-            #     np.array(np.uint8(input_mask_copy)), (5, 5), 0)
-            # cv2.imwrite("mask_blur2.jpg", mask_blur)
-
             final_generation = copy_white_mask_to_template(
                 np.array(result_img), np.array(np.uint8(input_mask_copy)), template_copy, box_pad
             )
@@ -1167,3 +1147,65 @@ def easyphoto_infer_forward(
     torch.cuda.empty_cache()
 
     return "Success", return_res
+
+
+
+def easyphoto_mask_forward(input_image, refine_mask, img_type):
+    global check_hash, sam_predictor
+
+    check_files_exists_and_download(check_hash)
+    check_hash = False
+
+
+    if input_image is None:
+        info = f"Please upload a {img_type} image."
+        ep_logger.error(info)
+        return info, None
+
+    img = np.uint8(Image.fromarray(np.uint8(input_image["image"])))
+    mask = np.uint8(Image.fromarray(np.uint8(input_image["mask"])))
+
+    if mask.max() == 0:
+        # no input mask
+        info = f"({img_type}) No input hint given. Upload a mask image or give some hints."
+        ep_logger.info(info)
+        return info, None
+
+    if not refine_mask:
+        return f"[{img_type}] Use input mask.", mask
+    
+    num_connected, centroids = find_connected_components(mask[:, :, 0])
+    ep_logger.info(f"({img_type}) Find input mask connected num: {num_connected}.")
+
+    # model init
+    if sam_predictor is None:
+        sam_checkpoint = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
+            "sam_vit_l_0b3195.pth",
+        )
+
+        sam = sam_model_registry["vit_l"]()
+        sam.load_state_dict(torch.load(sam_checkpoint))
+        sam_predictor = SamPredictor(sam.cuda())
+
+    if num_connected < 2:
+        ep_logger.info(f"{(img_type)} Refine input mask of by mask.")
+        # support the input is a mask, we use box and sam to refine mask
+        _, box_template = mask_to_box(mask[:, :, 0])
+
+        mask = np.uint8(seg_by_box(np.array(img), box_template, sam_predictor))
+    else:
+        ep_logger.info(f"{(img_type)} Refine input mask of by points.")
+        # support points is given, points are used to refine mask
+        centroids = np.array(centroids)
+        input_label = np.array([1] * centroids.shape[0])
+        sam_predictor.set_image(np.array(img))
+        masks, _, _ = sam_predictor.predict(
+            point_coords=centroids,
+            point_labels=input_label,
+            multimask_output=False,
+        )
+        mask = masks[0].astype(np.uint8)  # mask = [sam_outputs_num, h, w]
+        mask = mask * 255
+
+    return f"[{img_type}] Show Mask Success", mask

@@ -6,11 +6,12 @@ import gradio as gr
 import requests
 import numpy as np
 from PIL import Image
+import cv2
 from modules import script_callbacks, shared
 import modules
 from scripts.easyphoto_config import (cache_log_file_path, models_path,
                                       user_id_outpath_samples,easyphoto_outpath_samples)
-from scripts.easyphoto_infer import easyphoto_infer_forward
+from scripts.easyphoto_infer import easyphoto_infer_forward, easyphoto_mask_forward
 from scripts.easyphoto_train import easyphoto_train_forward
 from scripts.easyphoto_utils import check_id_valid
 from modules import ui_common
@@ -287,182 +288,244 @@ def on_ui_tabs():
                                 
         with gr.TabItem('Inference'):
             dummy_component = gr.Label(visible=False)
-            training_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'training_templates/*.jpg'))
-            infer_templates = glob.glob(os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), 'infer_templates/*.jpg'))
-            preset_template = list(training_templates) + list(infer_templates)
-
+    
             with gr.Blocks() as demo:
                 with gr.Row():
                     with gr.Column():
-                        model_selected_tab = gr.State(0)
-                        init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload", tool='sketch')
-                        # init_image = gr.Image(label="Image for skybox", elem_id="{id_part}_image", show_label=False, source="upload")
-                        
-                        with gr.Row():
-                            def checkpoint_refresh_function():
+                        infer_way = gr.Radio(
+                            ["Infer with LoRA", "Infer with Anydoor"],
+                            value="Infer with LoRA",
+                            show_label=False,
+                        )
+
+                        with gr.Accordion("Template Image", open=True,):
+                            with gr.Row():
+                                with gr.Column():
+                                    template_image = gr.Image(
+                                        label="Template Image",
+                                        elem_id="{id_part}_tem_image",
+                                        show_label=False,
+                                        source="upload",
+                                        tool="sketch",
+                                        height=400,
+                                    )
+                                with gr.Column(visible=True):
+                                    template_mask = gr.Image(
+                                        label="Preview template mask",
+                                        elem_id="{id_part}_tem_mask",
+                                        show_label=False,
+                                        show_download_button=True,
+                                        interactive=True,
+                                        height=400,
+                                    )
+
+                                with gr.Row():
+                                    refine_template_mask = gr.Checkbox(label="Refine Template Mask", value=True)
+                                    template_mask_preview = ToolButton(value="👀")
+
+                        with gr.Accordion("Reference Image", open=True,):
+                            with gr.Row():
+                                with gr.Column():
+                                    reference_image = gr.Image(
+                                        label="Reference Image",
+                                        elem_id="{id_part}_ref_image",
+                                        show_label=False,
+                                        source="upload",
+                                        tool="sketch",
+                                        height=400,
+                                    )
+                                with gr.Column(visible=True):
+                                    reference_mask = gr.Image(
+                                        label="Preview reference mask",
+                                        elem_id="{id_part}_ref_mask",
+                                        show_label=False,
+                                        show_download_button=True,
+                                        interactive=True,
+                                        height=400,
+                                    )
+
+                                with gr.Row():
+                                    refine_reference_mask = gr.Checkbox(label="Refine Reference Mask", value=True)
+                                    show_default_mask = gr.Checkbox(label="Show Default Mask", value=False)
+                                    update_reference_mask = gr.Checkbox(label="Update Reference Mask", value=True)
+                                    reference_mask_preview = ToolButton(value="👀")
+
+                        with gr.Column() as infer_lora_option:
+                            with gr.Row():
+                                def checkpoint_refresh_function():
+                                    checkpoints = []
+                                    for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
+                                        if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
+                                            checkpoints.append(_checkpoint)
+                                    return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
+                                
                                 checkpoints = []
                                 for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
                                     if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
                                         checkpoints.append(_checkpoint)
-                                return gr.update(choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)))
-                            
-                            checkpoints = []
-                            for _checkpoint in os.listdir(os.path.join(models_path, "Stable-diffusion")):
-                                if _checkpoint.endswith(("pth", "safetensors", "ckpt")):
-                                    checkpoints.append(_checkpoint)
-                            sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
+                                sd_model_checkpoint = gr.Dropdown(value="Chilloutmix-Ni-pruned-fp16-fix.safetensors", choices=list(set(["Chilloutmix-Ni-pruned-fp16-fix.safetensors"] + checkpoints + external_checkpoints)), label="The base checkpoint you use.", visible=True)
 
-                            checkpoint_refresh = ToolButton(value="\U0001f504")
-                            checkpoint_refresh.click(
-                                fn=checkpoint_refresh_function,
-                                inputs=[],
-                                outputs=[sd_model_checkpoint]
-                            )
+                                checkpoint_refresh = ToolButton(value="\U0001f504")
+                                checkpoint_refresh.click(
+                                    fn=checkpoint_refresh_function,
+                                    inputs=[],
+                                    outputs=[sd_model_checkpoint]
+                                )
 
-                        with gr.Row():
-                            def select_function():
+                            with gr.Row():
+                                def select_function():
+                                    ids = []
+                                    if os.path.exists(user_id_outpath_samples):
+                                        _ids = os.listdir(user_id_outpath_samples)
+                                        for _id in _ids:
+                                            if check_id_valid(_id, user_id_outpath_samples, models_path):
+                                                ids.append(_id)
+                                    ids = sorted(ids)
+                                    return gr.update(choices=["none"] + ids)
+
                                 ids = []
                                 if os.path.exists(user_id_outpath_samples):
                                     _ids = os.listdir(user_id_outpath_samples)
                                     for _id in _ids:
                                         if check_id_valid(_id, user_id_outpath_samples, models_path):
                                             ids.append(_id)
-                                ids = sorted(ids)
-                                return gr.update(choices=["none"] + ids)
+                                    ids = sorted(ids)
 
-                            ids = []
-                            if os.path.exists(user_id_outpath_samples):
-                                _ids = os.listdir(user_id_outpath_samples)
-                                for _id in _ids:
-                                    if check_id_valid(_id, user_id_outpath_samples, models_path):
-                                        ids.append(_id)
-                                ids = sorted(ids)
-
-                            num_of_faceid = gr.Dropdown(value=str(1), elem_id='dropdown', choices=[1, 2, 3, 4, 5], label=f"Num of Faceid", visible=False)
-
-                            uuids           = []
-                            visibles        = [True, False, False, False, False]
-                            for i in range(int(5)):
-                                uuid = gr.Dropdown(value="none", elem_id='dropdown', choices=["none"] + ids, min_width=140, label=f"User_{i} id", visible=visibles[i])
-                                uuids.append(uuid)
-
-                            def update_uuids(_num_of_faceid):
-                                _uuids = []
-                                for i in range(int(_num_of_faceid)):
-                                    _uuids.append(gr.update(value="none", visible=True))
-                                for i in range(int(5 - int(_num_of_faceid))):
-                                    _uuids.append(gr.update(value="none", visible=False))
-                                return _uuids
-                            
-                            num_of_faceid.change(update_uuids, inputs=[num_of_faceid], outputs=uuids)
-                            
-                            refresh = ToolButton(value="\U0001f504")
-                            for i in range(int(5)):
+                                uuid = gr.Dropdown(
+                                        value="none",
+                                        elem_id="dropdown",
+                                        choices=["none"] + ids,
+                                        min_width=80,
+                                        label=f"User_id",
+                                )
+                                add_new_user_id = ToolButton(value="🆕")
+                                refresh = ToolButton(value="\U0001f504")
+                                
                                 refresh.click(
                                     fn=select_function,
                                     inputs=[],
-                                    outputs=[uuids[i]]
-                                )
-
-                        with gr.Row():
-                            match_and_paste = gr.Checkbox(
-                                label="Match and Paste",  
-                                value=True
-                            )
-                            
-                            remove_target = gr.Checkbox(
-                                label="Remove Target",  
-                                value=False
-                            )
-
-                        with gr.Accordion("Advanced Options", open=False):
-                            additional_prompt = gr.Textbox(
-                                label="Additional Prompt",
-                                lines=3,
-                                value='masterpiece, beauty',
-                                interactive=True
-                            )
-                            seed = gr.Textbox(
-                                label="Seed", 
-                                value=-1,
-                            )
-                            with gr.Row():
-                                first_diffusion_steps = gr.Slider(
-                                    minimum=15, maximum=50, value=50,
-                                    step=1, label='Diffusion steps'
-                                )
-                                first_denoising_strength = gr.Slider(
-                                    minimum=0.40, maximum=1.00, value=0.70,
-                                    step=0.05, label='Diffusion denoising strength'
+                                    outputs=[uuid]
                                 )
 
                             with gr.Row():
-                                lora_weight = gr.Slider(
-                                    minimum=0, maximum=1, value=0.8,
-                                    step=0.1, label='LoRA weight'
-                                )
-                                iou_threshold = gr.Slider(
-                                    minimum=0, maximum=1, value=0.7,
-                                    step=0.05, label='IoU Threshold '
-                                )
-
-                            with gr.Row():
-                                angle = gr.Slider(
-                                    minimum=-90, maximum=90, value=0.0,
-                                    step=1, label='Angle'
-                                )
-                                azimuth  = gr.Slider(
-                                    minimum=-60, maximum=60, value=0.0,
-                                    step=1, label='Azimuth'
-                                )
-                                ratio = gr.Slider(
-                                    minimum=0.5, maximum=5.5, value=1.0,
-                                    step=0.1, label='Ratio'
-                                )
-
-                            with gr.Row():
-                                batch_size = gr.Slider(
-                                    minimum=1, maximum=10, value=1,
-                                    step=1, label='Batch Size'
-                                )
-                               
-
-                            with gr.Row():
-                                refine_input_mask = gr.Checkbox(
-                                    label="Refine Input Mask",  
+                                match_and_paste = gr.Checkbox(
+                                    label="Match and Paste",  
                                     value=True
                                 )
-                                optimize_angle_and_ratio = gr.Checkbox(
-                                    label="Optimize Angle and Ratio", 
-                                    value=True
-                                )
-                                refine_bound = gr.Checkbox(
-                                    label="Refine Boundary",  
-                                    value=True
-                                )
-                                pure_image = gr.Checkbox(
-                                    label="Pure Image",  
-                                    value=True
-                                )
-                                global_inpaint = gr.Checkbox(
-                                    label="Global Inpaint", 
+                                
+                                remove_target = gr.Checkbox(
+                                    label="Remove Target",  
                                     value=False
                                 )
 
-                                # change_shape = gr.Checkbox(
-                                #     label="Change Shape",  
-                                #     value=True
-                                # )
-                                # optimize_vertex = gr.Checkbox(
-                                #     label="Optimize Vertex",  
-                                #     value=True
-                                # )
-                                # use_dragdiffusion = gr.Checkbox(
-                                #     label="Use Dragdiffusion",  
-                                #     value=True
-                                # )
-                            
-                        display_button = gr.Button('Start Generation')
+                            with gr.Accordion("Advanced Options", open=False):
+                                additional_prompt = gr.Textbox(
+                                    label="Additional Prompt",
+                                    lines=3,
+                                    value='masterpiece, beauty',
+                                    interactive=True
+                                )
+                                seed = gr.Textbox(
+                                    label="Seed", 
+                                    value=-1,
+                                )
+                                with gr.Row():
+                                    first_diffusion_steps = gr.Slider(
+                                        minimum=15, maximum=50, value=50,
+                                        step=1, label='Diffusion steps'
+                                    )
+                                    first_denoising_strength = gr.Slider(
+                                        minimum=0.40, maximum=1.00, value=0.70,
+                                        step=0.05, label='Diffusion denoising strength'
+                                    )
+
+                                with gr.Row():
+                                    lora_weight = gr.Slider(
+                                        minimum=0, maximum=1, value=0.8,
+                                        step=0.1, label='LoRA weight'
+                                    )
+                                    iou_threshold = gr.Slider(
+                                        minimum=0, maximum=1, value=0.7,
+                                        step=0.05, label='IoU Threshold '
+                                    )
+
+                                with gr.Row():
+                                    angle = gr.Slider(
+                                        minimum=-90, maximum=90, value=0.0,
+                                        step=1, label='Angle'
+                                    )
+                                    azimuth  = gr.Slider(
+                                        minimum=-60, maximum=60, value=0.0,
+                                        step=1, label='Azimuth'
+                                    )
+                                    ratio = gr.Slider(
+                                        minimum=0.5, maximum=5.5, value=1.0,
+                                        step=0.1, label='Ratio'
+                                    )
+
+                                with gr.Row():
+                                    batch_size = gr.Slider(
+                                        minimum=1, maximum=10, value=1,
+                                        step=1, label='Batch Size'
+                                    )
+                                
+
+                                with gr.Row():
+                                    refine_input_mask = gr.Checkbox(
+                                        label="Refine Input Mask",  
+                                        value=True
+                                    )
+                                    optimize_angle_and_ratio = gr.Checkbox(
+                                        label="Optimize Angle and Ratio", 
+                                        value=True
+                                    )
+                                    refine_bound = gr.Checkbox(
+                                        label="Refine Boundary",  
+                                        value=True
+                                    )
+                                    pure_image = gr.Checkbox(
+                                        label="Pure Image",  
+                                        value=True
+                                    )
+                                    global_inpaint = gr.Checkbox(
+                                        label="Global Inpaint", 
+                                        value=False
+                                    )
+
+                                    # change_shape = gr.Checkbox(
+                                    #     label="Change Shape",  
+                                    #     value=True
+                                    # )
+                                    # optimize_vertex = gr.Checkbox(
+                                    #     label="Optimize Vertex",  
+                                    #     value=True
+                                    # )
+                                    # use_dragdiffusion = gr.Checkbox(
+                                    #     label="Use Dragdiffusion",  
+                                    #     value=True
+                                    # )
+
+
+                        with gr.Column(visible=False) as infer_anydoor_option:
+                            enhance_with_lora = gr.Checkbox(
+                                label="Enhance with LoRA",  
+                                value=False
+                            )
+
+                        def infer_way_change(infer_way, enhance_with_lora):
+                            if infer_way == 'Infer with LoRA':
+                                return [infer_way, gr.update(visible=True), gr.update(visible=False)]
+                            elif infer_way == 'Infer with Anydoor':
+                                return [infer_way, gr.update(visible=enhance_with_lora), gr.update(visible=True)]
+
+                        enhance_with_lora.change(
+                            lambda x:gr.update(visible=x), inputs=[enhance_with_lora],outputs=[infer_lora_option]
+                        )
+
+                        infer_way.change(
+                            fn=infer_way_change, inputs=[infer_way, enhance_with_lora], outputs=[infer_way, infer_lora_option, infer_anydoor_option]
+                        )  
+                        
 
                     with gr.Column():
                         gr.Markdown('Generated Results')
@@ -486,20 +549,133 @@ def on_ui_tabs():
                                 paste_field_names=[]
                             ))
 
-
+                        display_button = gr.Button("Start Generation", variant="primary")
                         infer_progress = gr.Textbox(
                             label="Generation Progress",
                             value="No task currently",
                             interactive=False
                         )
 
+                # preview mask
+                def preview_mask(image, refine_mask, img_type, uuid='none', update_reference_mask=False):
+                    return_info, refined_mask = easyphoto_mask_forward(image, refine_mask, img_type)
+                    if uuid!='none' and update_reference_mask and refined_mask is not None:
+                        # update userid img mask
+                        user_id_dir = os.path.join(user_id_outpath_samples,uuid)
+                        user_id_ref_img_path = os.path.join(user_id_dir,'ref_image.jpg')
+                        user_id_ref_mask_path = os.path.join(user_id_dir,'ref_image_mask.jpg')
 
-            
+                        if os.path.exists(user_id_ref_img_path):
+                            return_info += f'\n Replace the ref_image of uid {uuid}'
+                        else:
+                            return_info += f'\n Add new ref_image of uid {uuid}'
+                        if os.path.exists(user_id_ref_mask_path):
+                            return_info += f'\n Replace the ref_mask of uid {uuid}'
+                        else:
+                            return_info += f'\n Add new ref_mask of uid {uuid}'
+
+                        os.makedirs(user_id_dir, exist_ok=True)
+                        cv2.imwrite(user_id_ref_img_path, image['image'][:,:,::-1])
+                        cv2.imwrite(user_id_ref_mask_path,refined_mask)
+   
+                    return return_info, refined_mask
+
+                template_mask_preview.click(
+                    fn=preview_mask,
+                    inputs=[template_image, refine_template_mask, gr.Text(label="Template", value="Template", visible=False)],
+                    outputs=[infer_progress, template_mask],
+                )
+                reference_mask_preview.click(
+                    fn=preview_mask,
+                    inputs=[reference_image, refine_reference_mask, gr.Text(label="Reference", value="Reference", visible=False), uuid, update_reference_mask],
+                    outputs=[infer_progress, reference_mask],
+                )
+
+                # clean mask
+                template_image.edit(lambda: None, outputs=[template_mask])
+                reference_image.edit(lambda: None, outputs=[reference_mask])
+
+                # show img & mask when click a userid
+                def show_ref_image(uuid, reference_image):
+                    user_id_dir = os.path.join(user_id_outpath_samples,uuid)
+                    user_id_ref_img_path = os.path.join(user_id_dir,'ref_image.jpg')
+                    return_info = ''
+                    if os.path.exists(user_id_ref_img_path):
+                        reference_image=user_id_ref_img_path
+                        return_info+='Load default reference image.\n'
+                    else:
+                        return_info+='Failed to load default reference image. Please upload.\n'
+                    return return_info, reference_image, gr.update(value=False)
+                    
+                uuid.change(
+                    fn=show_ref_image,
+                    inputs=[uuid],
+                    outputs=[infer_progress, reference_image, show_default_mask]
+                )
+
+                def show_ref_mask(uuid, show_default_mask):
+                    if show_default_mask:
+                        user_id_dir = os.path.join(user_id_outpath_samples,uuid)
+                        user_id_ref_mask_path = os.path.join(user_id_dir,'ref_image_mask.jpg')
+                        return_info = ''
+                        if os.path.exists(user_id_ref_mask_path):
+                            reference_mask=user_id_ref_mask_path
+                            return_info+='Load default reference image.\n'
+                            return return_info, reference_mask
+                        else:
+                            return_info+='Failed to load default reference mask. Please upload.\n'
+                            return return_info, gr.update(value=None)
+                    else:
+                        return '', gr.update(value=None)
+                    
+                show_default_mask.change(
+                    fn=show_ref_mask,
+                    inputs=[uuid, show_default_mask],
+                    outputs=[infer_progress, reference_mask]
+                )
+
+                # add new user
+                def add_new_user_and_seleced(new_id, reference_image, reference_mask):
+                    if os.path.exists(user_id_outpath_samples):
+                        ids = os.listdir(user_id_outpath_samples)
+                    else:
+                        ids = []
+                    
+                    if new_id == "" or new_id is None:
+                        return "User id cannot be set to empty.", gr.update(choices=["none"] + ids)
+                    if new_id == "none" :
+                        return "User id cannot be set to none.", gr.update(choices=["none"] + ids)
+                    if new_id in ids:
+                        return f"User id cannot be repeat in {ids}.", gr.update(choices=["none"] + ids)
+                    if reference_image is None or reference_mask is None:
+                        return 'Reference image and mask must be given when creating a new user id.', gr.update(choices=["none"] + ids)
+                    
+                    ids = sorted(ids+[new_id])
+                    # save mask & img
+                    user_id_dir = os.path.join(user_id_outpath_samples,new_id)
+                    os.makedirs(user_id_dir, exist_ok=True)
+
+                    user_id_ref_img_path = os.path.join(user_id_dir,'ref_image.jpg')
+                    user_id_ref_mask_path = os.path.join(user_id_dir,'ref_image_mask.jpg')
+
+                    cv2.imwrite(user_id_ref_img_path, reference_image['image'][:,:,::-1])
+                    cv2.imwrite(user_id_ref_mask_path, reference_mask)
+
+                    return f'Create userid {new_id} success.', gr.update(choices=["none"] + ids, value=new_id)
+
+                add_new_user_id.click(
+                    fn = add_new_user_and_seleced,
+                    _js="ask_for_add_new_user_id",
+                    inputs=[uuid, reference_image, reference_mask],
+                    outputs=[infer_progress, uuid]
+                )
+
+                # generte result
                 display_button.click(
                     fn=easyphoto_infer_forward,
-                    inputs=[sd_model_checkpoint, init_image, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
+                    inputs=[sd_model_checkpoint, infer_way, template_image, template_mask, reference_image, reference_mask, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
                             lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-                            pure_image, global_inpaint, match_and_paste, remove_target, model_selected_tab, *uuids],
+                            pure_image, global_inpaint, match_and_paste, remove_target, uuid],
                             
                     outputs=[infer_progress, output_images]
                 )

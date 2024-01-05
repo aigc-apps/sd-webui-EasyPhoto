@@ -16,6 +16,27 @@ log_level = os.environ.get('LOG_LEVEL', 'INFO')
 logging.getLogger().setLevel(log_level)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')  
 
+
+# ep logger set
+ep_logger_name = "EasyPhoto"
+ep_logger = logging.getLogger(ep_logger_name)
+ep_logger.propagate = False
+
+for handler in ep_logger.root.handlers:
+    if type(handler) is logging.StreamHandler:
+        handler.setLevel(logging.ERROR)
+
+stream_handler = logging.StreamHandler()
+handlers = [stream_handler]
+
+for handler in handlers:
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
+    handler.setLevel("INFO")
+    ep_logger.addHandler(handler)
+
+ep_logger.setLevel("INFO")
+
+
 def check_id_valid(user_id, user_id_outpath_samples, models_path):
     face_id_image_path = os.path.join(user_id_outpath_samples, user_id, "ref_image.jpg") 
     if not os.path.exists(face_id_image_path):

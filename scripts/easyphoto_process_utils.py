@@ -223,54 +223,6 @@ def merge_images(
 
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
 
-
-# def rotate_resize_image(
-#     array: np.ndarray,
-#     angle: float = 0.0,
-#     scale_ratio: float = 1.0,
-#     use_white_bg: Optional[bool] = False
-# ) -> np.ndarray:
-#     """
-#     Rotate and resize an image while optionally setting excess border to white.
-
-#     Args:
-#         array (np.ndarray): The input image.
-#         angle (float, optional): The rotation angle in degrees (default is 0.0).
-#         scale_ratio (float, optional): The scaling ratio (default is 1.0).
-#         use_white_bg (bool, optional): Whether to set the excess border to white (default is False).
-
-#     Returns:
-#         np.ndarray: The rotated and resized image.
-#     """
-#     height, width = array.shape[:2]
-#     image_center = (width / 2, height / 2)
-
-#     # Create a rotation matrix
-#     rotation_matrix = cv2.getRotationMatrix2D(image_center, angle, 1.0)
-
-#     # Apply rotation to the image
-#     rotated_mat = cv2.warpAffine(array, rotation_matrix, (width, height))
-
-#     # Scale the rotated image
-#     scaled_mat = cv2.resize(
-#         rotated_mat,
-#         None,
-#         fx=scale_ratio,
-#         fy=scale_ratio,
-#         interpolation=cv2.INTER_LINEAR,
-#     )
-
-#     if use_white_bg:
-#         # Create a white background with the same size
-#         white_bg = np.zeros_like(scaled_mat)
-#         white_bg.fill(255)  # Set the background to white
-
-#         # Combine the rotated and scaled image with the white background using a mask
-#         mask = scaled_mat == 0
-#         scaled_mat = np.where(mask, white_bg, scaled_mat)
-
-#     return scaled_mat
-
 def rotate_resize_image(
     array: np.ndarray,
     angle: float = 0.0,
@@ -721,6 +673,7 @@ def mask_to_box(mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]
     largest_connected_component_mask[:, x + width:] = 0
 
     return largest_connected_component_mask, (x, y, x + width, y + height)
+
 
 
 def draw_box_on_image(
@@ -1233,3 +1186,22 @@ def resize_to_512(image):
     result_img  = cv2.resize(image, new_size, interpolation=cv2.INTER_LANCZOS4)
 
     return result_img
+
+
+def find_connected_components(image: np.ndarray) -> Tuple[int, List[Tuple[float, float]]]:
+    """
+    Find connected components in a binary image.
+
+    Args:
+    - image (np.ndarray): The input binary image. 1 channel.
+
+    Returns:
+    - Tuple[int, List[Tuple[float, float]]]: A tuple containing the maximum label value and a list of
+      centroids of connected components. The centroid is represented as a tuple of (x, y) coordinates.
+    """
+    _, labels, stats, centroids = cv2.connectedComponentsWithStats(image)
+
+    stats = stats[1:]
+    centroids = centroids[1:]
+
+    return labels.max(), [(float(x), float(y)) for x, y in centroids]
