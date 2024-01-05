@@ -1,21 +1,22 @@
 import argparse
 import json
 import logging
-import math
 import os
 import platform
 import sys
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import time
 from collections import defaultdict
 from glob import glob
 from operator import itemgetter
-from shutil import copyfile
 
 import cv2
 import numpy as np
+
 # Third-party libraries
 import torch
+
 # Custom libraries
 from lightglue import DISK, LightGlue, SuperPoint, viz2d
 from lightglue.utils import load_image, rbd
@@ -30,77 +31,63 @@ from segment_anything import SamPredictor, sam_model_registry
 from easyphoto_process_utils import rotate_resize_image, apply_mask_to_image, mask_to_box, crop_image
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
     parser.add_argument(
         "--validation_prompt",
         type=str,
         default=None,
-        help=(
-            "The validation_prompt of the user."
-        ),
+        help=("The validation_prompt of the user."),
     )
     parser.add_argument(
         "--ref_image_path",
         type=str,
         default=None,
-        help=(
-            "The ref_image_path."
-        ),
+        help=("The ref_image_path."),
     )
     parser.add_argument(
         "--main_image_path",
         type=str,
         default=None,
-        help=(
-            "The main_image_path."
-        ),
+        help=("The main_image_path."),
     )
     parser.add_argument(
         "--images_save_path",
         type=str,
         default=None,
-        help=(
-            "The images_save_path."
-        ),
+        help=("The images_save_path."),
     )
     parser.add_argument(
         "--json_save_path",
         type=str,
         default=None,
-        help=(
-            "The json_save_path."
-        ),
+        help=("The json_save_path."),
     )
     parser.add_argument(
         "--inputs_dir",
         type=str,
         default=None,
-        help=(
-            "The inputs dir of the data for preprocessing."
-        ),
+        help=("The inputs dir of the data for preprocessing."),
     )
     parser.add_argument(
         "--sam_model_path",
         type=str,
         default=None,
-        help=(
-            "The path of Sam model."
-        ),
+        help=("The path of Sam model."),
     )
     parser.add_argument(
-        "--refine_mask", 
+        "--refine_mask",
         action="store_true",
         help="whether to refine mask by salient detection.",
     )
     parser.add_argument(
-        "--use_mask", 
+        "--use_mask",
         action="store_true",
         help="whether to use masked training images.",
     )
     args = parser.parse_args()
     return args
+
 
 def get_match_points(img_path1, img_path2, extractor, matcher):
     key = (img_path1, img_path2)
@@ -114,94 +101,97 @@ def get_match_points(img_path1, img_path2, extractor, matcher):
         feats = extractor.extract(image)
 
         # Running the matcher
-        matches = matcher({'image0': base_feats, 'image1': feats})
+        matches = matcher({"image0": base_feats, "image1": feats})
 
         # Prepare for visualization
         feats0, feats1, matches = [rbd(x) for x in [base_feats, feats, matches]]
-        kpts0, kpts1, matches = feats0['keypoints'], feats1['keypoints'], matches['matches']
+        kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches["matches"]
         m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
-        MATCH_CACHE[key] = {'m_kpts0':m_kpts0.cpu().numpy(), 'm_kpts1':m_kpts1.cpu().numpy(), 'matches':matches.cpu().numpy()}
+        MATCH_CACHE[key] = {"m_kpts0": m_kpts0.cpu().numpy(), "m_kpts1": m_kpts1.cpu().numpy(), "matches": matches.cpu().numpy()}
         torch.cuda.empty_cache()
-        
+
     return MATCH_CACHE[key]
-    
+
+
 def find_farthest_points(points, k):
     # 初始化结果列表和起始点
     result = []
     result.append(points[np.random.randint(len(points))])
-    
+
     for _ in range(k - 1):
         max_avg_distance = -1
         farthest_point = None
-        
+
         for point in points:
             avg_distance = np.mean(np.linalg.norm(result - point, axis=1))
-            
+
             if avg_distance > max_avg_distance:
                 max_avg_distance = avg_distance
                 farthest_point = point
-                
+
         result.append(farthest_point)
-        
+
     return np.array(result)
+
 
 def find_farthest_points_kmeans(points, k):
     # 使用 KMeans 对数据点进行聚类
     kmeans = KMeans(n_clusters=k).fit(points)
-    
+
     # 获得每个聚类的中心
     cluster_centers = kmeans.cluster_centers_
-    
+
     # 初始化一个数组来保存最终的 k 个点
     farthest_points = np.zeros((k, 2))
-    
+
     for i, center in enumerate(cluster_centers):
         # 对于每个聚类中心，找到距离它最远的点
         cluster_points = points[kmeans.labels_ == i]
         distances = np.linalg.norm(cluster_points - center, axis=1)
         farthest_point = cluster_points[np.argmax(distances)]
-        
+
         # 将找到的点保存到结果数组中
         farthest_points[i] = farthest_point
-    
+
     return farthest_points
+
 
 def refine_matched_pairs_per_image(matched_pairs_per_image, sam_points=5):
     def find_k_centers(matched_pairs_per_image, k=5):
         all_points = []
-        
+
         for pairs in matched_pairs_per_image.values():
             for ref_point, _ in pairs:
                 all_points.append(ref_point)
-        
+
         all_points = np.array(all_points)
         kmeans = KMeans(n_clusters=k).fit(all_points)
         centers = kmeans.cluster_centers_
-        
+
         return centers
-    
+
     def filter_pairs_by_centers(matched_pairs_per_image, centers):
         filtered_pairs_per_image = {}
-        
+
         for key, pairs in matched_pairs_per_image.items():
             closest_pairs = []
-            
+
             for center in centers:
-                min_distance = float('inf')
+                min_distance = float("inf")
                 closest_pair = None
-                
+
                 for ref_point, match_point in pairs:
                     distance = np.linalg.norm(np.array(ref_point) - center)
-                    
+
                     if distance < min_distance:
                         min_distance = distance
                         closest_pair = (ref_point, match_point)
-                        
+
                 closest_pairs.append(closest_pair)
-            
+
             filtered_pairs_per_image[key] = closest_pairs
-        
+
         return filtered_pairs_per_image
 
     centers = find_k_centers(matched_pairs_per_image, sam_points)
@@ -231,14 +221,14 @@ def plot_sam_result(image_list, matched_pairs_per_image, idx, pair_idx=1):
         pair_1 = matched_pairs_per_image[list(matched_pairs_per_image.keys())[0]]
     else:
         pair_1 = matched_pairs_per_image[idx]
-        
+
     kpts1 = np.array([pair[pair_idx] for pair in pair_1])
     # print(len(kpts1))
     # img_plot = draw_points_on_image(image1,kpts1)
     # cv2.imwrite(f'point_{idx}_{pair_idx}.jpg',img_plot)
 
     input_point = kpts1
-    input_label = np.array([1]*kpts1.shape[0])
+    input_label = np.array([1] * kpts1.shape[0])
     predictor.set_image(image1)
     masks, scores, logits = predictor.predict(
         point_coords=input_point,
@@ -247,6 +237,7 @@ def plot_sam_result(image_list, matched_pairs_per_image, idx, pair_idx=1):
     )
 
     return masks, kpts1, image1
+
 
 def safe_expand(x, y, w, h, img_width, img_height, expand_ratio=1.2):
     """
@@ -276,16 +267,17 @@ def safe_expand(x, y, w, h, img_width, img_height, expand_ratio=1.2):
 
     return new_x, new_y, new_w, new_h
 
+
 def extract_subimage_with_mask_and_kpts(image, mask, kpts, kernel_size=5, safe_expand_ratio=1.2, background=255):
     mask = mask[0].astype(np.uint8)  # mask = [sam_outputs_num, h, w]
     mask = mask * 255
 
-    kernel_size = min(kernel_size, min(mask.shape[0], mask.shape[1])//20)
+    kernel_size = min(kernel_size, min(mask.shape[0], mask.shape[1]) // 20)
     kernel = np.ones((kernel_size, kernel_size), np.uint8)
 
     eroded_mask = cv2.erode(mask, kernel)
     dilated_mask = cv2.dilate(eroded_mask, kernel)
-    
+
     # get mask box
     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     max_contour = max(contours, key=cv2.contourArea)
@@ -293,101 +285,101 @@ def extract_subimage_with_mask_and_kpts(image, mask, kpts, kernel_size=5, safe_e
     x, y, w, h = cv2.boundingRect(max_contour)
     # expand
     x, y, w, h = safe_expand(x, y, w, h, image.shape[1], image.shape[0], safe_expand_ratio)
-    
+
     # mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
     # # print(mask.shape, image.shape, mask_3d.shape)
     # image[mask_3d == 0] = background
-    cropped_image = image[y:y+h, x:x+w]
-    cropped_mask = mask[y:y+h, x:x+w]
+    cropped_image = image[y : y + h, x : x + w]
+    cropped_mask = mask[y : y + h, x : x + w]
 
-    background = np.full((cropped_mask.shape[0], cropped_mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+    background = np.full((cropped_mask.shape[0], cropped_mask.shape[1], 3), [255, 255, 255], dtype=np.uint8)
     cropped_image_mask = apply_mask_to_image(cropped_image, background, cropped_mask, expand_kernal=3)
 
     return cropped_image_mask, cropped_mask, cropped_image
 
 
 if __name__ == "__main__":
-    args                = parse_args()
-    images_save_path    = args.images_save_path
-    json_save_path      = args.json_save_path
-    validation_prompt   = args.validation_prompt
-    inputs_dir          = args.inputs_dir
-    main_image_path     = args.main_image_path
-    ref_image_path      = args.ref_image_path
-    sam_model_path      = args.sam_model_path
-    refine_mask         = args.refine_mask
-    use_mask            = args.use_mask
+    args = parse_args()
+    images_save_path = args.images_save_path
+    json_save_path = args.json_save_path
+    validation_prompt = args.validation_prompt
+    inputs_dir = args.inputs_dir
+    main_image_path = args.main_image_path
+    ref_image_path = args.ref_image_path
+    sam_model_path = args.sam_model_path
+    refine_mask = args.refine_mask
+    use_mask = args.use_mask
 
     print(refine_mask, use_mask)
-    
-    max_match_num       = 2048
-    final_point         = 50
-    sigma_ratio         = -0.4
-    K                   = 5
-    point_url           = 'http://pai-vision-exp.oss-cn-zhangjiakou.aliyuncs.com/wzh-zhoulou/lightglue/superpoint_v1.pth'
-    glue_url            = 'http://pai-vision-exp.oss-cn-zhangjiakou.aliyuncs.com/wzh-zhoulou/lightglue/superpoint_lightglue.pth'
 
-    default_extractor   = SuperPoint(max_num_keypoints=max_match_num, url=point_url).eval().cuda()
-    default_matcher     = LightGlue(features='superpoint', url=glue_url).eval().cuda()
-    sam                 = sam_model_registry['vit_l'](checkpoint=sam_model_path)
-    predictor           = SamPredictor(sam)
-    
+    max_match_num = 2048
+    final_point = 50
+    sigma_ratio = -0.4
+    K = 5
+    point_url = "http://pai-vision-exp.oss-cn-zhangjiakou.aliyuncs.com/wzh-zhoulou/lightglue/superpoint_v1.pth"
+    glue_url = "http://pai-vision-exp.oss-cn-zhangjiakou.aliyuncs.com/wzh-zhoulou/lightglue/superpoint_lightglue.pth"
+
+    default_extractor = SuperPoint(max_num_keypoints=max_match_num, url=point_url).eval().cuda()
+    default_matcher = LightGlue(features="superpoint", url=glue_url).eval().cuda()
+    sam = sam_model_registry["vit_l"](checkpoint=sam_model_path)
+    predictor = SamPredictor(sam)
+
     # image list and main image
-    image_list          = glob(f'{inputs_dir}/*.jpg')  + glob(f'{inputs_dir}/*.png') + glob(f'{inputs_dir}/*.jpeg') 
-    main_path           = main_image_path
+    image_list = glob(f"{inputs_dir}/*.jpg") + glob(f"{inputs_dir}/*.png") + glob(f"{inputs_dir}/*.jpeg")
+    main_path = main_image_path
 
     # preprocess main path
     remove_background = True
-    salient_detect = pipeline(Tasks.semantic_segmentation, model='damo/cv_u2net_salient-detection')
+    salient_detect = pipeline(Tasks.semantic_segmentation, model="damo/cv_u2net_salient-detection")
     if remove_background:
         result = salient_detect(main_path)
         mask = result[OutputKeys.MASKS]
-        background = np.full((mask.shape[0], mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+        background = np.full((mask.shape[0], mask.shape[1], 3), [255, 255, 255], dtype=np.uint8)
         result_img = apply_mask_to_image(cv2.imread(main_path), background, mask)
-        cv2.imwrite(main_path,result_img)
+        cv2.imwrite(main_path, result_img)
 
     if main_path is not None:
-        image_list      = [main_path] + image_list
+        image_list = [main_path] + image_list
 
-    N                   = len(image_list)
-    
+    N = len(image_list)
+
     # cache init
-    MATCH_CACHE         = defaultdict(lambda: {'m_kpts0':[], 'm_kpts1':[]})
+    MATCH_CACHE = defaultdict(lambda: {"m_kpts0": [], "m_kpts1": []})
     # keypoint_counter    = defaultdict(lambda: {'count': 0, 'score': 0})
     # keypoint_matches    = defaultdict(list)
-    image_pair_scores   = defaultdict(int) # {'(i,j)':num_match_points)}
+    image_pair_scores = defaultdict(int)  # {'(i,j)':num_match_points)}
     # keypoints_info      = {}
-    num_matches_list    = []
+    num_matches_list = []
 
     # Loop to collect data
     start_time = time.time()
     for i in range(1, N):
-        print(f'Matching {image_list[0]} to {image_list[i]}')
-        iter_start_time             = time.time()
-        match_points                = get_match_points(image_list[0], image_list[i], default_extractor, default_matcher)
-        m_kpts0, m_kpts1, matches   = match_points['m_kpts0'], match_points['m_kpts1'], match_points['matches']
+        print(f"Matching {image_list[0]} to {image_list[i]}")
+        iter_start_time = time.time()
+        match_points = get_match_points(image_list[0], image_list[i], default_extractor, default_matcher)
+        m_kpts0, m_kpts1, matches = match_points["m_kpts0"], match_points["m_kpts1"], match_points["matches"]
 
-        num_matches                 = m_kpts0.shape[0]
-        print(f'Matched Points: {num_matches}')
+        num_matches = m_kpts0.shape[0]
+        print(f"Matched Points: {num_matches}")
 
         # keypoints_info[(0, i)]      = matches
-        image_pair_scores[(0, i)]   = num_matches
+        image_pair_scores[(0, i)] = num_matches
         num_matches_list.append(num_matches)
-        
+
         # Update the number of occurrences and trust scores of keypoints and record the matches in the top K images
         # for idx, (kpt0, kpt1) in enumerate(zip(m_kpts0, m_kpts1)):
-            # key_tuple = tuple(map(int, kpt0))
-            # keypoint_counter[key_tuple]['count'] += 1
-            # keypoint_counter[key_tuple]['score'] += 1 / (idx + 1)
-            # if i < K:
-            #     keypoint_matches[key_tuple].append(tuple(map(int, kpt1)))
+        # key_tuple = tuple(map(int, kpt0))
+        # keypoint_counter[key_tuple]['count'] += 1
+        # keypoint_counter[key_tuple]['score'] += 1 / (idx + 1)
+        # if i < K:
+        #     keypoint_matches[key_tuple].append(tuple(map(int, kpt1)))
         logging.info(f"Time taken for image {i}: {time.time() - iter_start_time:.2f} seconds")
 
     # set threshold dynamic
     logging.info(num_matches_list)
-    mean_matches    = np.mean(num_matches_list)
-    std_matches     = np.std(num_matches_list)
-    threshold       = mean_matches + sigma_ratio * std_matches 
+    mean_matches = np.mean(num_matches_list)
+    std_matches = np.std(num_matches_list)
+    threshold = mean_matches + sigma_ratio * std_matches
     logging.info(mean_matches, std_matches, threshold)
 
     # choose image based on threshold
@@ -405,10 +397,10 @@ if __name__ == "__main__":
     if len(list(selected_image_indices)):
         image_list = [image_list[i] for i in sorted(selected_image_indices)]
     else:
-        print('Warning! All images are filtered using the input image list.')
+        print("Warning! All images are filtered using the input image list.")
 
     N = len(image_list)  # Number of images
-    keypoint_counter = defaultdict(lambda: {'count': 0, 'score': 0.0, 'matches': {}})
+    keypoint_counter = defaultdict(lambda: {"count": 0, "score": 0.0, "matches": {}})
     matched_pairs_per_image = defaultdict(list)
 
     final_point = int(threshold) - 1
@@ -420,69 +412,64 @@ if __name__ == "__main__":
     for i in range(1, N):
         iter_start_time = time.time()
         match_points = get_match_points(image_list[0], image_list[i], default_extractor, default_matcher)
-        m_kpts0, m_kpts1, matches = itemgetter('m_kpts0', 'm_kpts1', 'matches')(match_points)
-
+        m_kpts0, m_kpts1, matches = itemgetter("m_kpts0", "m_kpts1", "matches")(match_points)
 
         # Update keypoint counter and collect matches
         for idx, (kpt0, kpt1) in enumerate(zip(m_kpts0, m_kpts1)):
             key_tuple = tuple(map(int, kpt0))
             kpt_counter = keypoint_counter[key_tuple]
-            
-            kpt_counter['count'] += 1
-            kpt_counter['score'] += 1 / (idx + 1)
-            kpt_counter['matches'].setdefault(i, []).append(tuple(map(int, kpt1)))
+
+            kpt_counter["count"] += 1
+            kpt_counter["score"] += 1 / (idx + 1)
+            kpt_counter["matches"].setdefault(i, []).append(tuple(map(int, kpt1)))
 
         logging.info(f"Time taken for image {i}: {time.time() - iter_start_time:.2f} seconds")
 
     # Sort and Select Top 50 Keypoints
     # sorted_keypoints = sorted(
-    #     keypoint_counter.keys(), 
-    #     key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']), 
+    #     keypoint_counter.keys(),
+    #     key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']),
     #     reverse=True)[:final_point]
-    # keypoint_counter (key: point in main) " 'count':match_nums, matches: {img_id: [point_lists]} 
+    # keypoint_counter (key: point in main) " 'count':match_nums, matches: {img_id: [point_lists]}
     sorted_keypoints = sorted(
-            keypoint_counter.keys(), 
-            key=lambda k: (keypoint_counter[k]['count'], keypoint_counter[k]['score']), 
-            reverse=True)
+        keypoint_counter.keys(), key=lambda k: (keypoint_counter[k]["count"], keypoint_counter[k]["score"]), reverse=True
+    )
 
     # Collect Matched Pairs for Each Image
     # matched_pairs_per_image {key(img_id): key points}
-    for kpt in sorted_keypoints: 
-        for image_idx, matched_kpts in keypoint_counter[kpt]['matches'].items():
+    for kpt in sorted_keypoints:
+        for image_idx, matched_kpts in keypoint_counter[kpt]["matches"].items():
             matched_pairs_per_image[image_idx].extend((kpt, mkpt) for mkpt in matched_kpts)
-
 
     # plot_num = min(5, len(image_list))
     plot_num = len(image_list)
     # key point pairs [((img1 point,)(img2 point,)), ..., ...]
     filtered_pairs_per_image = refine_matched_pairs_per_image(matched_pairs_per_image, 5)
 
-
     mask_list = []
     ref_list = []
-
 
     os.makedirs(images_save_path, exist_ok=True)
     for i in range(0, plot_num):
         logging.info(f"show sam result on matched points of image{i}")
         mask, kpts, image = plot_sam_result(image_list, filtered_pairs_per_image, i)
-        
+
         if i == 0:
-            tkpts =  np.array([pair[0] for pair in matched_pairs_per_image[1]])
+            tkpts = np.array([pair[0] for pair in matched_pairs_per_image[1]])
         else:
-            tkpts =  np.array([pair[1] for pair in matched_pairs_per_image[i]])
+            tkpts = np.array([pair[1] for pair in matched_pairs_per_image[i]])
 
         sub_image_mask, sub_mask, sub_image = extract_subimage_with_mask_and_kpts(image, mask, tkpts)
         # cv2.imwrite(f'sub_image_{i}.jpg',sub_image)
         # cv2.imwrite(f'sub_mask_bf_{i}.jpg',sub_mask)
-        
+
         # refine_mask = False
-        if i!=0 and refine_mask:
+        if i != 0 and refine_mask:
             # ref image not refined to get correct background color
             # refine sam mask
             result = salient_detect(sub_image)
             sub_mask = result[OutputKeys.MASKS]
-            background = np.full((sub_mask.shape[0], sub_mask.shape[1], 3), [255,255,255], dtype=np.uint8)
+            background = np.full((sub_mask.shape[0], sub_mask.shape[1], 3), [255, 255, 255], dtype=np.uint8)
             sub_image_mask = apply_mask_to_image(sub_image, background, sub_mask)
             # cv2.imwrite(f'sub_image_refine_{i}.jpg',sub_image_mask)
             # cv2.imwrite(f'sub_mask_{i}.jpg',sub_mask)
@@ -495,10 +482,10 @@ if __name__ == "__main__":
         # angle_high = 60
         # angle_num = 5
         # angles = np.linspace(angle_low, angle_high, angle_num)
-        
+
         # if 0 not in angles:
         #     angles = np.insert(angles, 0, 0)
-    
+
         # for angle_id, angle in enumerate(angles):
         #     rotate_sub = rotate_resize_image(sub_image, angle, 1.0)
 
@@ -509,29 +496,28 @@ if __name__ == "__main__":
         mask_list.append(sub_mask)
         ref_list.append(sub_image)
 
-        cv2.imwrite(f'{images_save_path}/{i}.jpg',sub_image[:, :, ::-1])
+        cv2.imwrite(f"{images_save_path}/{i}.jpg", sub_image[:, :, ::-1])
         with open(os.path.join(images_save_path, str(i) + ".txt"), "w") as f:
             f.write(validation_prompt)
 
         if i == 0:
             cv2.imwrite(ref_image_path, sub_image_mask[:, :, ::-1])
-            cv2.imwrite(os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), sub_mask)
+            cv2.imwrite(
+                os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), sub_mask
+            )
 
-    with open(json_save_path, 'w', encoding="utf-8") as f:
+    with open(json_save_path, "w", encoding="utf-8") as f:
         for root, dirs, files in os.walk(images_save_path, topdown=False):
             for file in files:
                 path = os.path.join(root, file)
-                if not file.endswith('txt'):
+                if not file.endswith("txt"):
                     txt_path = ".".join(path.split(".")[:-1]) + ".txt"
                     if os.path.exists(txt_path):
-                        prompt = open(txt_path, 'r').readline().strip()
-                        if platform.system() == 'Windows':
-                            path = path.replace('\\', '/')
+                        prompt = open(txt_path, "r").readline().strip()
+                        if platform.system() == "Windows":
+                            path = path.replace("\\", "/")
                         jpg_path_split = path.split("/")
                         file_name = os.path.join(*jpg_path_split[-2:])
-                        a = {
-                            "file_name": file_name, 
-                            "text": prompt
-                        }
+                        a = {"file_name": file_name, "text": prompt}
                         f.write(json.dumps(eval(str(a))))
                         f.write("\n")

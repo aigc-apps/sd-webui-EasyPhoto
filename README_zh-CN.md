@@ -34,14 +34,14 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 
 请阅读我们的开发者公约，共建美好社区 [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md)
 
-如果您在训练中遇到一些问题，请参考 [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki)。  
+如果您在训练中遇到一些问题，请参考 [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki)。
 
 我们现在支持从不同平台快速启动，请参阅 [快速启动](#快速启动)。
 
 这些是我们的生成结果:
 ![results_1](images/results.png)
 
-我们的ui界面如下:  
+我们的ui界面如下:
 **训练部分:**
 ![train_ui](images/train_ui.png)
 **预测部分:**
@@ -79,10 +79,10 @@ cd /workspace
 
 ### 2. 本地安装: 环境检查/下载/安装
 #### a. 环境检查
-我们已验证EasyPhoto可在以下环境中执行：  
+我们已验证EasyPhoto可在以下环境中执行：
 如果你遇到内存使用过高而导致WebUI进程自动被kill掉，请参考[ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21)，设置一些参数，例如num_threads=0，如果你也发现了其他解决的好办法，请及时联系我们。
 
-Linux 的详细信息：  
+Linux 的详细信息：
 - 操作系统 Ubuntu 20.04, CentOS
 - python: python3.10 & python3.11
 - pytorch: torch2.0.1
@@ -94,7 +94,7 @@ Linux 的详细信息：
 我们需要大约 60GB 的可用磁盘空间（用于保存权重和数据集），请检查！
 
 #### b. 相关资料库和权重下载
-##### i. Controlnet 
+##### i. Controlnet
 我们需要使用 Controlnet 进行推理。相关软件源是[Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet)。在使用 EasyPhoto 之前，您需要安装这个软件源。
 
 
@@ -157,11 +157,11 @@ EasyPhoto训练界面如下：
 TBD
 
 # 参考文献
-- insightface：https://github.com/deepinsight/insightface    
-- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary  
-- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary 
-- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary   
-- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary  
+- insightface：https://github.com/deepinsight/insightface
+- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary
+- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary
+- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary
+- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary
 - kohya：https://github.com/bmaltais/kohya_ss
 - controlnet-webui：https://github.com/Mikubill/sd-webui-controlnet
 

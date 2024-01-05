@@ -32,14 +32,14 @@ English | [简体中文](./README_zh-CN.md)
 # Introduction
 EasyPhoto can be used to generate your AI portraits within 5 to 20 images. We're working to expand the EasyPhoto pipeline, allowing you to create images for any desired identity (ID). By providing a set of training images featuring your target ID, you are allowed to first train a specific LoRA model. This empowers you to effortlessly generate personalized ID photos by seamlessly replacing the target in your template image. We now support for virtual try-on applications, and we're continuously exploring more exciting fetaures.
 
-Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).   
+Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](./COVENANT_zh-CN.md).
 
-If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).   
+If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).
 
 These are our generated results:
 ![results_1](images/results.png)
 
-Our ui interface is as follows:  
+Our ui interface is as follows:
 **train part:**
 ![train_ui](images/train_ui.png)
 **inference part:**
@@ -48,8 +48,8 @@ Our ui interface is as follows:
 
 # Quick Start
 
-## a. From docker 
-If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.  
+## a. From docker
+If you are using docker, please make sure that the graphics card driver and CUDA environment have been installed correctly in your machine.
 
 Then execute the following commands in this way:
 ```
@@ -63,9 +63,9 @@ docker run -it -p 7860:7860 --network host --gpus all registry.cn-shanghai.aliyu
 python launch.py --xformers
 ```
 
-If you've already pulled the images provided in the EasyPhoto master, you can navigate to the EasyPhoto directory and switch to the "anyid" branch. Then, refer to the [Install LightGlue](#####install-lightglue) to install lightglue. 
+If you've already pulled the images provided in the EasyPhoto master, you can navigate to the EasyPhoto directory and switch to the "anyid" branch. Then, refer to the [Install LightGlue](#####install-lightglue) to install lightglue.
 
-The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first. 
+The docker updates may be slightly slower than the github repository of sd-webui-EasyPhoto, so you can go to extensions/sd-webui-EasyPhoto and do a git pull first.
 ```
 cd extensions/sd-webui-EasyPhoto/
 # checkout anyid
@@ -79,10 +79,10 @@ cd /workspace
 
 ## b. Local install: Environment Check/Downloading/Installation
 
-We have verified EasyPhoto execution on the following environment:  
+We have verified EasyPhoto execution on the following environment:
 If you meet problem with WebUI auto killed by OOM, please refer to [ISSUE21](https://github.com/aigc-apps/sd-webui-EasyPhoto/issues/21), and setting some num_threads to 0 and report other fix to us, thanks.
 
-The detailed of Linux:  
+The detailed of Linux:
 - OS: Ubuntu 20.04, CentOS
 - python: py3.10 & py3.11
 - pytorch: torch2.0.1
@@ -94,7 +94,7 @@ The detailed of Linux:
 We need about 60GB available on disk (for saving weights and datasets process), please check!
 
 ### Relevant Repositories & Weights Downloading
-#### i. Controlnet 
+#### i. Controlnet
 We need to use Controlnet for inference. The related repo is [Mikubill/sd-webui-controlnet](https://github.com/Mikubill/sd-webui-controlnet). You need install this repo before using EasyPhoto.
 
 #### ii. Other Dependencies.
@@ -104,7 +104,7 @@ The weights we need will be downloaded automatically when you start training fir
 
 - Install LightGlue
 
-[LightGlue](https://github.com/cvg/LightGlue) is used for preprocess when training. You should mannually install LightGlue before start EasyPhoto of anyid version. 
+[LightGlue](https://github.com/cvg/LightGlue) is used for preprocess when training. You should mannually install LightGlue before start EasyPhoto of anyid version.
 (Since the latest version of LightGlue misses the setup.py and allow only to download model from github, we recommend you to install LightGlue using our provided version.)
 ```
 wget https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/LightGlue.zip
@@ -127,7 +127,7 @@ The process closely resembles the EasyPhoto master pipeline, with the additional
 ### 1. Model Training
 The EasyPhoto training interface is as follows:
 
-- On the left is the training image. First upload a main image, and click Upload Photos to upload the image. 
+- On the left is the training image. First upload a main image, and click Upload Photos to upload the image.
 - On the right are the training parameters, which shares the same meaning as the master pipeline.
 
 The main image is used to match the ROI in the training image that is used to segment the target id. Therefore, please choose a clean front image as the main image. Then, click the Upload Photos button to upload training images, the training images will be processed by LightGlue and SAM to obtain the main target. Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
@@ -149,7 +149,7 @@ If you want to set parameters, the parsing of each parameter is as follows:
 |Rank Lora | The feature length of the weight, default to 128|
 |Network alpha | The regularization parameter for Lora training, usually half of the rank, defaults to 64|
 
-### 2. Inference 
+### 2. Inference
 - Step 1: Click the refresh button to query the model corresponding to the trained user ID.
 - Step 2: Select the user ID.
 - Step 3: Select the template and mask the target region that needs to be generated.
@@ -161,11 +161,11 @@ If you want to set parameters, the parsing of each parameter is as follows:
 TBD
 
 # Reference
-- insightface：https://github.com/deepinsight/insightface    
-- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary  
-- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary 
-- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary   
-- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary  
+- insightface：https://github.com/deepinsight/insightface
+- cv_resnet50_face：https://www.modelscope.cn/models/damo/cv_resnet50_face-detection_retinaface/summary
+- cv_u2net_salient：https://www.modelscope.cn/models/damo/cv_u2net_salient-detection/summary
+- cv_unet_skin_retouching_torch：https://www.modelscope.cn/models/damo/cv_unet_skin_retouching_torch/summary
+- cv_unet-image-face-fusion：https://www.modelscope.cn/models/damo/cv_unet-image-face-fusion_damo/summary
 - kohya：https://github.com/bmaltais/kohya_ss
 - controlnet-webui：https://github.com/Mikubill/sd-webui-controlnet
 

@@ -36,7 +36,7 @@ def precalculate_safetensors_hashes(tensors, metadata):
     model_hash = addnet_hash_safetensors(b)
     legacy_hash = addnet_hash_legacy(b)
     return model_hash, legacy_hash
-        
+
 
 def addnet_hash_legacy(b):
     """Old model hash used by sd-webui-additional-networks for .safetensors format files"""
@@ -368,9 +368,7 @@ class LoRAInfModule(LoRAModule):
         lx1 = self.lora_up(self.lora_down(x1)) * self.multiplier * self.scale
 
         if self.network.is_last_network:
-            lx = torch.zeros(
-                (self.network.num_sub_prompts * self.network.batch_size, *lx1.size()[1:]), device=lx1.device, dtype=lx1.dtype
-            )
+            lx = torch.zeros((self.network.num_sub_prompts * self.network.batch_size, *lx1.size()[1:]), device=lx1.device, dtype=lx1.dtype)
             self.network.shared[self.lora_name] = (lx, masks)
 
         # print("to_out_forward", lx.size(), lx1.size(), self.network.sub_prompt_index, self.network.num_sub_prompts)
@@ -524,6 +522,7 @@ def create_network(
 
     return network
 
+
 def get_block_dims_and_alphas(
     block_dims, block_alphas, network_dim, network_alpha, conv_block_dims, conv_block_alphas, conv_dim, conv_alpha
 ):
@@ -587,13 +586,11 @@ def get_block_dims_and_alphas(
     return block_dims, block_alphas, conv_block_dims, conv_block_alphas
 
 
-def get_block_lr_weight(
-    down_lr_weight, mid_lr_weight, up_lr_weight, zero_threshold
-) -> Tuple[List[float], List[float], List[float]]:
+def get_block_lr_weight(down_lr_weight, mid_lr_weight, up_lr_weight, zero_threshold) -> Tuple[List[float], List[float], List[float]]:
     if up_lr_weight is None and mid_lr_weight is None and down_lr_weight is None:
         return None, None, None
 
-    max_len = LoRANetwork.NUM_OF_BLOCKS 
+    max_len = LoRANetwork.NUM_OF_BLOCKS
 
     def get_list(name_with_suffix) -> List[float]:
         import math
@@ -662,9 +659,7 @@ def get_block_lr_weight(
     return down_lr_weight, mid_lr_weight, up_lr_weight
 
 
-def remove_block_dims_and_alphas(
-    block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight
-):
+def remove_block_dims_and_alphas(block_dims, block_alphas, conv_block_dims, conv_block_alphas, down_lr_weight, mid_lr_weight, up_lr_weight):
     # set 0 to block dim without learning rate to remove the block
     if down_lr_weight != None:
         for i, lr in enumerate(down_lr_weight):
@@ -758,7 +753,7 @@ def create_network_from_weights(multiplier, file, vae, text_encoder, unet, weigh
 
 
 class LoRANetwork(torch.nn.Module):
-    NUM_OF_BLOCKS = 12 
+    NUM_OF_BLOCKS = 12
 
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel"]
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
@@ -1234,6 +1229,7 @@ def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
     for lora_load, ratio in zip(loras_load_path, ratios):
         if os.path.splitext(lora_load)[1] == ".safetensors":
             from safetensors.torch import load_file
+
             weights_sd = load_file(lora_load)
         else:
             weights_sd = torch.load(lora_load, map_location="cpu")
@@ -1255,37 +1251,37 @@ def merge_different_loras(loras_load_path, lora_save_path, ratios=None):
             save_file(state_dict, lora_save_path, metadata)
         else:
             torch.save(state_dict, lora_save_path)
-    return 
+    return
 
 
-def merge_from_name_and_index(name, index_list, output_dir='output_dir/'):
-    loras_load_path = [os.path.join(output_dir, f'checkpoint-{i}.safetensors') for i in index_list]
-    lora_save_path  = os.path.join(output_dir,f'{name}.safetensors')
+def merge_from_name_and_index(name, index_list, output_dir="output_dir/"):
+    loras_load_path = [os.path.join(output_dir, f"checkpoint-{i}.safetensors") for i in index_list]
+    lora_save_path = os.path.join(output_dir, f"{name}.safetensors")
     for l in loras_load_path:
-        assert os.path.exists(l)==True
+        assert os.path.exists(l) == True
     merge_different_loras(loras_load_path, lora_save_path)
     return lora_save_path
 
 
 def convert_lora_to_safetensors(in_lora_file: str, out_lora_file: str):
-    """Converts the diffusers format (.bin/.pkl) lora file `in_lora_file` 
+    """Converts the diffusers format (.bin/.pkl) lora file `in_lora_file`
     into the SD webUI format (.safetensors) lora file `out_lora_file`.
     """
     if torch.cuda.is_available():
-        checkpoint = torch.load(in_lora_file, map_location=torch.device('cuda'))
+        checkpoint = torch.load(in_lora_file, map_location=torch.device("cuda"))
     else:
         # if on CPU or want to have maximum precision on GPU, use default full-precision setting
-        checkpoint = torch.load(in_lora_file, map_location=torch.device('cpu'))
-    
+        checkpoint = torch.load(in_lora_file, map_location=torch.device("cpu"))
+
     new_dict = dict()
     for idx, key in enumerate(checkpoint):
-        new_key = re.sub('\.processor\.', '_', key)
-        new_key = re.sub('mid_block\.', 'mid_block_', new_key)
-        new_key = re.sub('_lora.up.', '.lora_up.', new_key)
-        new_key = re.sub('_lora.down.', '.lora_down.', new_key)
-        new_key = re.sub('\.(\d+)\.', '_\\1_', new_key)
-        new_key = re.sub('to_out', 'to_out_0', new_key)
-        new_key = 'lora_unet_' + new_key
+        new_key = re.sub("\.processor\.", "_", key)
+        new_key = re.sub("mid_block\.", "mid_block_", new_key)
+        new_key = re.sub("_lora.up.", ".lora_up.", new_key)
+        new_key = re.sub("_lora.down.", ".lora_down.", new_key)
+        new_key = re.sub("\.(\d+)\.", "_\\1_", new_key)
+        new_key = re.sub("to_out", "to_out_0", new_key)
+        new_key = "lora_unet_" + new_key
 
         new_dict[new_key] = checkpoint[key]
 

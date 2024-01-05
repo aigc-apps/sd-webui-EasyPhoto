@@ -1,8 +1,6 @@
 import copy
-import glob
 import logging
 import os
-import sys
 import cv2
 import numpy as np
 import torch
@@ -24,7 +22,7 @@ from scripts.easyphoto_config import (
     user_id_outpath_samples,
     validation_prompt,
     easyphoto_outpath_samples,
-    zero123_model_path
+    zero123_model_path,
 )
 
 from scripts.easyphoto_process_utils import (
@@ -51,7 +49,7 @@ from scripts.easyphoto_process_utils import (
     expand_box_by_pad,
     expand_roi,
     resize_to_512,
-    find_connected_components
+    find_connected_components,
 )
 from scripts.easyphoto_utils import check_files_exists_and_download, check_id_valid, ep_logger
 from scripts.sdwebui import ControlNetUnit, i2i_inpaint_call, t2i_call
@@ -62,7 +60,6 @@ from shapely.geometry import Polygon
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 from modelscope.outputs import OutputKeys
-import time
 
 try:
     from scripts.thirdparty.zero123.infer import zero123_infer, load_model_from_config
@@ -73,11 +70,10 @@ try:
     from transformers import AutoFeatureExtractor
     from torchvision import transforms
     from scripts.thirdparty.zero123.ldm_zero123.models.diffusion.ddim import DDIMSampler
-    from contextlib import nullcontext
     from einops import rearrange
-    import math
 except:
-    print('Please install Zero123 following the instruction of https://github.com/cvlab-columbia/zero123')
+    print("Please install Zero123 following the instruction of https://github.com/cvlab-columbia/zero123")
+
 
 def resize_image(input_image, resolution, nearest=False, crop264=True):
     H, W, C = input_image.shape
@@ -156,11 +152,8 @@ def get_controlnet_unit(unit, input_image, weight, use_preprocess=True):
             (int(now_w // blur_ratio), int(now_h // blur_ratio)),
             interpolation=cv2.INTER_CUBIC,
         )
-        color_image = cv2.resize(
-            color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST
-        )
-        color_image = cv2.resize(
-            color_image, (w, h), interpolation=cv2.INTER_CUBIC)
+        color_image = cv2.resize(color_image, (now_w, now_h), interpolation=cv2.INTER_NEAREST)
+        color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
         color_image = Image.fromarray(np.uint8(color_image))
 
         control_unit = ControlNetUnit(
@@ -231,9 +224,7 @@ def inpaint(
 
     # if controlnet_pairs:
     for pair in controlnet_pairs:
-        controlnet_units_list.append(
-            get_controlnet_unit(pair[0], pair[1], pair[2], pair[3])
-        )
+        controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], pair[3]))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -260,15 +251,37 @@ def inpaint(
 
     return image
 
+
 check_hash = True
 sam_predictor = None
 
 # this decorate is default to be closed, not every needs this, more for developers
 # @gpu_monitor_decorator()
 def easyphoto_infer_forward(
-    sd_model_checkpoint, infer_way, template_image, template_mask, reference_image, reference_mask, additional_prompt, seed, first_diffusion_steps, first_denoising_strength, \
-    lora_weight, iou_threshold, angle, azimuth, ratio, batch_size, refine_input_mask, optimize_angle_and_ratio, refine_bound, \
-    pure_image, global_inpaint, match_and_paste, remove_target, user_ids,
+    sd_model_checkpoint,
+    infer_way,
+    template_image,
+    template_mask,
+    reference_image,
+    reference_mask,
+    additional_prompt,
+    seed,
+    first_diffusion_steps,
+    first_denoising_strength,
+    lora_weight,
+    iou_threshold,
+    angle,
+    azimuth,
+    ratio,
+    batch_size,
+    refine_input_mask,
+    optimize_angle_and_ratio,
+    refine_bound,
+    pure_image,
+    global_inpaint,
+    match_and_paste,
+    remove_target,
+    user_ids,
 ):
     # global
     global check_hash, models_zero123
@@ -289,7 +302,7 @@ def easyphoto_infer_forward(
             passed_userid_list.append(idx)
 
     if len(user_ids) == len(passed_userid_list):
-        print('Please choose a user id.')
+        print("Please choose a user id.")
         return "Please choose a user id.", [], []
 
     # get random seed
@@ -297,17 +310,14 @@ def easyphoto_infer_forward(
         seed = np.random.randint(0, 65536)
 
     # path init
-    model_path = os.path.join(
-        models_path, f"Stable-diffusion", sd_model_checkpoint)
+    model_path = os.path.join(models_path, f"Stable-diffusion", sd_model_checkpoint)
     lora_path = os.path.join(models_path, f"Lora/{user_ids[0]}.safetensors")
     sd_base15_checkpoint = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)
-                        ).replace("scripts", "models"),
+        os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
         "stable-diffusion-v1-5",
     )
     sam_checkpoint = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)
-                        ).replace("scripts", "models"),
+        os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"),
         "sam_vit_l_0b3195.pth",
     )
 
@@ -329,35 +339,25 @@ def easyphoto_infer_forward(
     sam = sam_model_registry["vit_l"]()
     sam.load_state_dict(torch.load(sam_checkpoint))
     predictor = SamPredictor(sam.cuda())
-    salient_detect = pipeline(
-        Tasks.semantic_segmentation, model="damo/cv_u2net_salient-detection"
-    )
+    salient_detect = pipeline(Tasks.semantic_segmentation, model="damo/cv_u2net_salient-detection")
 
     # open image
-    img1 = np.uint8(
-        Image.open(os.path.join(user_id_outpath_samples,
-                   user_ids[0], "ref_image.jpg"))
-    )  # main
+    img1 = np.uint8(Image.open(os.path.join(user_id_outpath_samples, user_ids[0], "ref_image.jpg")))  # main
     img2 = np.uint8(Image.fromarray(np.uint8(template_image["image"])))  # template
     mask2_input = np.uint8(Image.fromarray(np.uint8(template_image["mask"])))
 
-    if mask2_input.max()==0:
-        print('Please mark the target region on the inference template!')
-        return 'Please mark the target region on the inference template!', [], []
+    if mask2_input.max() == 0:
+        print("Please mark the target region on the inference template!")
+        return "Please mark the target region on the inference template!", [], []
 
     # get mask1
-    mask1 = np.uint8(
-        Image.open(
-            os.path.join(user_id_outpath_samples,
-                         user_ids[0], "ref_image_mask.jpg")
-        )
-    )
+    mask1 = np.uint8(Image.open(os.path.join(user_id_outpath_samples, user_ids[0], "ref_image_mask.jpg")))
 
     # box cal & refine mask
-    if len(mask1.shape)==2:
+    if len(mask1.shape) == 2:
         mask1 = np.repeat(mask1[:, :, np.newaxis], 3, axis=2)
 
-    _, box_main = mask_to_box(np.uint8(mask1[:,:,0]))
+    _, box_main = mask_to_box(np.uint8(mask1[:, :, 0]))
     # draw_box_on_image(img1, box_main, "box1.jpg")
 
     # get mask2
@@ -371,28 +371,26 @@ def easyphoto_infer_forward(
     if remove_target:
         # remove mask2 on img2
         expand_kernal = 20
-        mask_expand = cv2.dilate(np.array(mask2), np.ones(
-                    (expand_kernal, expand_kernal), np.uint8), iterations=5)
+        mask_expand = cv2.dilate(np.array(mask2), np.ones((expand_kernal, expand_kernal), np.uint8), iterations=5)
         input = {
-                'img':Image.fromarray(np.uint8(img2)),
-                'mask':Image.fromarray(np.uint8(mask_expand)),
+            "img": Image.fromarray(np.uint8(img2)),
+            "mask": Image.fromarray(np.uint8(mask_expand)),
         }
 
-        print('before refine:',img2.shape)
+        print("before refine:", img2.shape)
         W, H = img2.shape[0], img2.shape[1]
-        inpainting = pipeline(Tasks.image_inpainting, model='damo/cv_fft_inpainting_lama', refine=True)
+        inpainting = pipeline(Tasks.image_inpainting, model="damo/cv_fft_inpainting_lama", refine=True)
         result = inpainting(input)
         print(result.keys())
         img2_bg = result[OutputKeys.OUTPUT_IMG]
         img2_bg = cv2.resize(img2_bg, (H, W))
-        print('after refine:',img2_bg.shape)
-        cv2.imwrite('template_refine.jpg', img2_bg)
-
+        print("after refine:", img2_bg.shape)
+        cv2.imwrite("template_refine.jpg", img2_bg)
 
     # for final paste
     _, box_template = mask_to_box(mask2)
     if remove_target:
-        template_copy = copy.deepcopy(img2_bg[:,:,::-1])
+        template_copy = copy.deepcopy(img2_bg[:, :, ::-1])
     else:
         template_copy = copy.deepcopy(img2)
     mask_copy = copy.deepcopy(mask2)
@@ -421,7 +419,7 @@ def easyphoto_infer_forward(
 
     if match_and_paste:
         # clothes or something that needs high detail texture
-        # generate image background 
+        # generate image background
         if pure_image:
             # main background with most frequent color
             color = get_background_color(img1, mask1[:, :, 0])
@@ -430,7 +428,7 @@ def easyphoto_infer_forward(
             # mask_blur = cv2.GaussianBlur(
             #     np.array(np.uint8(mask2)), (5, 5), 0
             # )
-        
+
             # color_img = np.full((img2.shape[0], img2.shape[1], 3), color, dtype=np.uint8)
 
             # mask_blur = np.stack((mask_blur,) * 3, axis=-1)
@@ -439,45 +437,46 @@ def easyphoto_infer_forward(
         else:
             # generate background_image with ipa (referenced img1)
             controlnet_pairs = [
-                    ["ipa", img1, 2.0, True],
-                    ["depth", img2, 1.0, True],
-                ]
+                ["ipa", img1, 2.0, True],
+                ["depth", img2, 1.0, True],
+            ]
 
             background_diffusion_steps = 20
             background_denoising_strength = 0.8
             background_img = inpaint(
-                    Image.fromarray(np.uint8(img2)),
-                    Image.fromarray(np.uint8(mask2)),
-                    controlnet_pairs,
-                    diffusion_steps=background_diffusion_steps,
-                    denoising_strength=background_denoising_strength,
-                    input_prompt=input_prompt,
-                    hr_scale=1.0,
-                    seed=str(seed),
-                    sd_model_checkpoint=sd_model_checkpoint,
-                )
+                Image.fromarray(np.uint8(img2)),
+                Image.fromarray(np.uint8(mask2)),
+                controlnet_pairs,
+                diffusion_steps=background_diffusion_steps,
+                denoising_strength=background_denoising_strength,
+                input_prompt=input_prompt,
+                hr_scale=1.0,
+                seed=str(seed),
+                sd_model_checkpoint=sd_model_checkpoint,
+            )
 
-            background_img = background_img.resize((img2.shape[1],img2.shape[0]), Image.Resampling.LANCZOS)
+            background_img = background_img.resize((img2.shape[1], img2.shape[0]), Image.Resampling.LANCZOS)
             background_img = np.array(background_img)
 
-
-        cv2.imwrite('background_img.jpg', background_img[:,:,::-1])
+        cv2.imwrite("background_img.jpg", background_img[:, :, ::-1])
         # background_img.save('background_img.jpg')
 
-        if azimuth !=0:
-            # zero123   
+        if azimuth != 0:
+            # zero123
             try:
                 # no need to always load zero123 model
-                x,y,z = 0,azimuth,0
-                result = zero123_infer(models_zero123, x, y, z, Image.fromarray(np.uint8(img1))) # TODO [PIL.Image] May choose the best merge one by lightglue 
-                
+                x, y, z = 0, azimuth, 0
+                result = zero123_infer(
+                    models_zero123, x, y, z, Image.fromarray(np.uint8(img1))
+                )  # TODO [PIL.Image] May choose the best merge one by lightglue
+
                 # result[0].save('res_zero123.jpg')
-                success=1
+                success = 1
             except Exception as e:
                 print(e)
-                success=0
-           
-            print('success:',success)
+                success = 0
+
+            print("success:", success)
             if not success:
                 try:
                     # from scripts.thirdparty.zero123.infer import zero123_infer, load_model_from_config
@@ -493,54 +492,53 @@ def easyphoto_infer_forward(
                     # import math
 
                     # load model
-                    print(f'Loading zero123 model from {zero123_model_path}')
-                    ckpt = os.path.join(zero123_model_path, '105000.ckpt')
-                    config = os.path.join(zero123_model_path, 'configs/sd-objaverse-finetune-c_concat-256.yaml')
+                    print(f"Loading zero123 model from {zero123_model_path}")
+                    ckpt = os.path.join(zero123_model_path, "105000.ckpt")
+                    config = os.path.join(zero123_model_path, "configs/sd-objaverse-finetune-c_concat-256.yaml")
 
                     config = OmegaConf.load(config)
                     models_zero123 = dict()
-                    print('Instantiating LatentDiffusion...')
-                    device = 'cuda'
-                    models_zero123['turncam'] = load_model_from_config(config, ckpt, device=device)
-                    models_zero123['nsfw'] = StableDiffusionSafetyChecker.from_pretrained(zero123_model_path).to(device)
-                    print('Instantiating AutoFeatureExtractor...')
-                    models_zero123['clip_fe'] = AutoFeatureExtractor.from_pretrained(zero123_model_path)
-                    print('Instantiating Carvekit HiInterface...')
-                    models_zero123['carvekit'] = create_carvekit_interface()
+                    print("Instantiating LatentDiffusion...")
+                    device = "cuda"
+                    models_zero123["turncam"] = load_model_from_config(config, ckpt, device=device)
+                    models_zero123["nsfw"] = StableDiffusionSafetyChecker.from_pretrained(zero123_model_path).to(device)
+                    print("Instantiating AutoFeatureExtractor...")
+                    models_zero123["clip_fe"] = AutoFeatureExtractor.from_pretrained(zero123_model_path)
+                    print("Instantiating Carvekit HiInterface...")
+                    models_zero123["carvekit"] = create_carvekit_interface()
 
-                    x,y,z = 0,azimuth,0
-                    result, has_nsfw_concept = zero123_infer(models_zero123, x, y, z, Image.fromarray(np.uint8(img1))) # TODO [PIL.Image] May choose the best merge one by lightglue 
+                    x, y, z = 0, azimuth, 0
+                    result, has_nsfw_concept = zero123_infer(
+                        models_zero123, x, y, z, Image.fromarray(np.uint8(img1))
+                    )  # TODO [PIL.Image] May choose the best merge one by lightglue
                     if not has_nsfw_concept:
                         # crop and get mask
                         img1_3d = np.array(result[0])
                         mask1 = salient_detect(img1_3d)[OutputKeys.MASKS]
                         mask1, box_gen = mask_to_box(mask1)
 
-                        mask1 = cv2.erode(np.array(mask1),
-                                            np.ones((10, 10), np.uint8), iterations=1)
+                        mask1 = cv2.erode(np.array(mask1), np.ones((10, 10), np.uint8), iterations=1)
 
                         # crop image again
-                        img1 = crop_image(img1_3d, box_gen,expand_ratio=expand_ratio)
-                        mask1 = crop_image(mask1, box_gen,expand_ratio=expand_ratio)
+                        img1 = crop_image(img1_3d, box_gen, expand_ratio=expand_ratio)
+                        mask1 = crop_image(mask1, box_gen, expand_ratio=expand_ratio)
 
-                        cv2.imwrite('img1_3d_crop.jpg', img1)
-                        cv2.imwrite('mask1_3d_crop.jpg', mask1)
+                        cv2.imwrite("img1_3d_crop.jpg", img1)
+                        cv2.imwrite("mask1_3d_crop.jpg", mask1)
                     else:
-                        print('To 3d failed. NSFW Image occured!')
+                        print("To 3d failed. NSFW Image occured!")
 
                     # result[0].save('res_zero123.jpg')
                 except:
-                    raise ImportError('Please install Zero123 following the instruction of https://github.com/cvlab-columbia/zero123')    
+                    raise ImportError("Please install Zero123 following the instruction of https://github.com/cvlab-columbia/zero123")
 
         # first paste: paste img1 to img2 to get the control image
         if optimize_angle_and_ratio:
-            print('Start Optimize!')
+            print("Start Optimize!")
 
             # find optimzal angle and ratio
             # resize mask1 to same size as mask2 (init ratio as 1)
-            resized_mask1 = resize_and_stretch(
-                mask1, target_size=(mask2.shape[1], mask2.shape[0])
-            )
+            resized_mask1 = resize_and_stretch(mask1, target_size=(mask2.shape[1], mask2.shape[0]))
             resized_mask1 = resized_mask1[:, :, 0]
 
             # cv2.imwrite("before_optimize_mask1.jpg", resized_mask1)
@@ -564,10 +562,9 @@ def easyphoto_infer_forward(
             if rotation_angle1 > 20:
                 rotation_angle1 = 0
             # polygon angle is reverse to img angle
-            angle_target =  rotation_angle2 - rotation_angle1
+            angle_target = rotation_angle2 - rotation_angle1
 
-            print(
-                f"target rotation: 1 to 0: {rotation_angle1}, 2 to 0: {rotation_angle2}, final_rotate: {angle_target}")
+            print(f"target rotation: 1 to 0: {rotation_angle1}, 2 to 0: {rotation_angle2}, final_rotate: {angle_target}")
 
             # center
             x, y = mask2.shape[1] // 2, mask2.shape[0] // 2
@@ -585,14 +582,14 @@ def easyphoto_infer_forward(
                 max_iters,
                 iou_threshold,
             )
-        
+
         # paste first
         print("before first paste:", img1.shape)
         print("before first paste:", img2.shape)
         print("before first paste:", mask1.shape)
         print("before first paste:", mask2.shape)
 
-        print(f'Set angle:{angle}, ratio: {ratio}, azimuth: {azimuth}')
+        print(f"Set angle:{angle}, ratio: {ratio}, azimuth: {azimuth}")
 
         # cv2.imwrite('first_img1.jpg',img1)
         # cv2.imwrite('first_img2.jpg',img2)
@@ -600,7 +597,7 @@ def easyphoto_infer_forward(
         # cv2.imwrite('first_mask2.jpg',mask2)
         # cv2.imwrite('first_background.jpg',background_img)
 
-        print('before align!')
+        print("before align!")
         print(img2.shape)
         print(background_img.shape)
 
@@ -639,7 +636,7 @@ def easyphoto_infer_forward(
         first_paste = crop_image(result_img, crop_img2_box_first)
         first_paste = Image.fromarray(np.uint8(first_paste))
 
-        first_paste.save('first_paste.jpg')
+        first_paste.save("first_paste.jpg")
 
         second_paste = Image.fromarray(np.uint8(np.zeros((512, 512, 3))))
 
@@ -740,16 +737,12 @@ def easyphoto_infer_forward(
             if use_dragdiffusion:
                 # drag the input image to target polygon by drag diffusion
                 # source_image cal
-                source_image = rotate_img1 * np.float32(
-                    np.array(np.expand_dims(mask1, -1), np.uint8) > 128
-                ) + np.ones_like(rotate_img1) * 255 * (
-                    1 -
-                    np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128)
-                )
+                source_image = rotate_img1 * np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128) + np.ones_like(
+                    rotate_img1
+                ) * 255 * (1 - np.float32(np.array(np.expand_dims(mask1, -1), np.uint8) > 128))
                 source_image = np.pad(
                     source_image,
-                    [(padding_size, padding_size),
-                    (padding_size, padding_size), (0, 0)],
+                    [(padding_size, padding_size), (padding_size, padding_size), (0, 0)],
                     constant_values=255,
                 )
 
@@ -758,15 +751,10 @@ def easyphoto_infer_forward(
 
                 # mask cal
                 mask = np.uint8(
-                    cv2.dilate(np.array(mask1), np.ones(
-                        (30, 30), np.uint8), iterations=1)
-                    - cv2.erode(np.array(mask1),
-                                np.ones((30, 30), np.uint8), iterations=1)
+                    cv2.dilate(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1)
+                    - cv2.erode(np.array(mask1), np.ones((30, 30), np.uint8), iterations=1)
                 )
-                mask = np.pad(
-                    mask, [(padding_size, padding_size),
-                        (padding_size, padding_size)]
-                )
+                mask = np.pad(mask, [(padding_size, padding_size), (padding_size, padding_size)])
 
                 print("drag_diffusion_mask:", mask.shape)
                 # cv2.imwrite("drag_diffusion_mask.jpg", mask)
@@ -781,14 +769,8 @@ def easyphoto_infer_forward(
                 final_points = np.array(final_points) + padding_size
 
                 # print(len(final_points))
-                draw_vertex_polygon(
-                    source_image, np.array(source_points) +
-                    padding_size, "pad_source"
-                )
-                draw_vertex_polygon(
-                    source_image, np.array(target_points) +
-                    padding_size, "pad_target"
-                )
+                draw_vertex_polygon(source_image, np.array(source_points) + padding_size, "pad_source")
+                draw_vertex_polygon(source_image, np.array(target_points) + padding_size, "pad_target")
 
                 out_image = run_drag(
                     source_image,
@@ -808,9 +790,7 @@ def easyphoto_infer_forward(
                 print("drag out:", out_image.shape)
 
                 # cv2.imwrite("drag_diffusion_out.jpg", out_image[:, :, ::-1])
-                out_image = out_image[
-                    padding_size:-padding_size, padding_size:-padding_size
-                ]
+                out_image = out_image[padding_size:-padding_size, padding_size:-padding_size]
 
                 print("after crop:", out_image.shape)
                 mask1 = salient_detect(out_image)[OutputKeys.MASKS]
@@ -883,9 +863,7 @@ def easyphoto_infer_forward(
         result_img = Image.fromarray(np.uint8(result_img))
 
         # get inner canny and resize img to 512
-        resize_image, res_canny = merge_with_inner_canny(
-            np.array(result_img).astype(np.uint8), mask1, mask2
-        )
+        resize_image, res_canny = merge_with_inner_canny(np.array(result_img).astype(np.uint8), mask1, mask2)
 
         resize_mask2, remove_pad = resize_image_with_pad(mask2, resolution=512)
         resize_mask2 = remove_pad(resize_mask2)
@@ -896,8 +874,7 @@ def easyphoto_infer_forward(
         resize_mask1, remove_pad = resize_image_with_pad(mask1, resolution=512)
         resize_mask1 = remove_pad(resize_mask1)
 
-        resize_img1, remove_pad = resize_image_with_pad(
-            resize_img1, resolution=512)
+        resize_img1, remove_pad = resize_image_with_pad(resize_img1, resolution=512)
         resize_img1 = remove_pad(resize_img1)
 
         print(
@@ -916,9 +893,8 @@ def easyphoto_infer_forward(
         # cv2.imwrite("after_canny_res_control_depth.jpg", resize_img2[:, :, ::-1])
         # cv2.imwrite("after_canny_res_mask1.jpg", resize_mask1)
         # cv2.imwrite("after_canny_res_image1.jpg", resize_img1[:, :, ::-1])
-         
-        mask2 = Image.fromarray(
-            np.uint8(resize_mask2))
+
+        mask2 = Image.fromarray(np.uint8(resize_mask2))
 
         resize_image = Image.fromarray(resize_image)
         resize_image_input = copy.deepcopy(resize_image)
@@ -932,12 +908,10 @@ def easyphoto_infer_forward(
         resize_mask2 = resize_to_512(mask2)
 
         resize_image_input = Image.fromarray(np.uint8(resize_img2))
-        mask2 = Image.fromarray(
-            np.uint8(resize_mask2))
+        mask2 = Image.fromarray(np.uint8(resize_mask2))
 
         mask2_input = copy.deepcopy(mask2)
 
-   
     # generation
     return_res = []
     for i in range(batch_size):
@@ -950,11 +924,10 @@ def easyphoto_infer_forward(
             ]
         else:
             controlnet_pairs = [
-                
                 ["depth", resize_img2, 1.0, True],
                 # ["ipa", resize_img1, 1.0, True],
             ]
-        
+
         result_img = inpaint(
             resize_image_input,
             mask2_input,
@@ -1005,7 +978,7 @@ def easyphoto_infer_forward(
         #     np.array(np.uint8(resize_mask2))[:, :, 0], (5, 5), 0
         # )
 
-        if len(np.array(np.uint8(resize_mask2)).shape)==2:
+        if len(np.array(np.uint8(resize_mask2)).shape) == 2:
             init_generation = copy_white_mask_to_template(
                 np.array(result_img), np.array(np.uint8(resize_mask2)), template_copy, box_template
             )
@@ -1032,21 +1005,18 @@ def easyphoto_infer_forward(
             padding_size = abs(np.array(box_pad) - np.array(box_template))
             print("padding_size:", padding_size)
 
-            input_img = init_generation[box_pad[1]: box_pad[3], box_pad[0]: box_pad[2]]
-            input_control_img = template_copy[
-                box_pad[1]: box_pad[3], box_pad[0]: box_pad[2]
-            ]
+            input_img = init_generation[box_pad[1] : box_pad[3], box_pad[0] : box_pad[2]]
+            input_control_img = template_copy[box_pad[1] : box_pad[3], box_pad[0] : box_pad[2]]
             # up down left right
 
-            if len(np.array(np.uint8(resize_mask2)).shape)==2:
+            if len(np.array(np.uint8(resize_mask2)).shape) == 2:
                 mask_array = np.array(np.uint8(resize_mask2))
             else:
                 mask_array = np.array(np.uint8(resize_mask2))[:, :, 0]
-            
+
             input_mask = np.pad(
                 mask_array,
-                ((padding_size[1], padding_size[3]),
-                (padding_size[0], padding_size[2])),
+                ((padding_size[1], padding_size[3]), (padding_size[0], padding_size[2])),
                 mode="constant",
                 constant_values=0,
             )
@@ -1055,12 +1025,9 @@ def easyphoto_infer_forward(
             print("input_mask_copy:", input_mask_copy.shape)
 
             input_mask = np.uint8(
-                cv2.dilate(np.array(input_mask), np.ones(
-                    (10, 10), np.uint8), iterations=1)
-                - cv2.erode(np.array(input_mask),
-                            np.ones((10, 10), np.uint8), iterations=1)
+                cv2.dilate(np.array(input_mask), np.ones((10, 10), np.uint8), iterations=1)
+                - cv2.erode(np.array(input_mask), np.ones((10, 10), np.uint8), iterations=1)
             )
-
 
             # cv2.imwrite("input_mask_outline.jpg", input_mask)
             # cv2.imwrite("input_img.jpg", input_img)
@@ -1075,7 +1042,7 @@ def easyphoto_infer_forward(
             # input_mask = Image.fromarray(
             #     np.uint8(np.clip((np.float32(input_mask) * 255), 0, 255))
             # )
-            
+
             print(input_mask.max())
             input_mask = Image.fromarray(np.uint8(input_mask))
             input_img = Image.fromarray(input_img)
@@ -1133,21 +1100,30 @@ def easyphoto_infer_forward(
             )
             final_generation = np.array(result_img.resize((template_copy.shape[1], template_copy.shape[0])))
 
-
-        save_image(Image.fromarray(np.uint8(final_generation)), easyphoto_outpath_samples, "EasyPhoto", None, None, opts.grid_format, info=None, short_filename=not opts.grid_extended_filename, grid=True, p=None)
+        save_image(
+            Image.fromarray(np.uint8(final_generation)),
+            easyphoto_outpath_samples,
+            "EasyPhoto",
+            None,
+            None,
+            opts.grid_format,
+            info=None,
+            short_filename=not opts.grid_extended_filename,
+            grid=True,
+            p=None,
+        )
         return_res.append(Image.fromarray(np.uint8(final_generation)))
 
     if match_and_paste:
         # show paste result for debug
         return_res.append(first_paste)
-    
-    if azimuth !=0 and not has_nsfw_concept:
+
+    if azimuth != 0 and not has_nsfw_concept:
         return_res.append(Image.fromarray(np.uint8(img1_3d)))
-    
+
     torch.cuda.empty_cache()
 
     return "Success", return_res
-
 
 
 def easyphoto_mask_forward(input_image, refine_mask, img_type):
@@ -1155,7 +1131,6 @@ def easyphoto_mask_forward(input_image, refine_mask, img_type):
 
     check_files_exists_and_download(check_hash)
     check_hash = False
-
 
     if input_image is None:
         info = f"Please upload a {img_type} image."
@@ -1173,7 +1148,7 @@ def easyphoto_mask_forward(input_image, refine_mask, img_type):
 
     if not refine_mask:
         return f"[{img_type}] Use input mask.", mask
-    
+
     num_connected, centroids = find_connected_components(mask[:, :, 0])
     ep_logger.info(f"({img_type}) Find input mask connected num: {num_connected}.")
 

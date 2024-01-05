@@ -2,9 +2,7 @@ import cv2
 from PIL import Image, ImageEnhance, ImageFilter
 import math
 import time
-import random
 import scipy.spatial
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -18,9 +16,7 @@ from scipy.optimize import minimize
 from typing import List, Tuple, Union, Optional
 
 
-def mask_to_polygon(
-    mask: np.ndarray, epsilon_multiplier: float = 0.005
-) -> List[List[int]]:
+def mask_to_polygon(mask: np.ndarray, epsilon_multiplier: float = 0.005) -> List[List[int]]:
     """
     Convert a binary mask to a polygon by finding the largest contour and approximating it.
 
@@ -32,8 +28,7 @@ def mask_to_polygon(
         List[List[int]]: List of polygon vertices represented as coordinate pairs.
     """
     # Find contours
-    contours, _ = cv2.findContours(
-        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Find the largest contour
     largest_contour = max(contours, key=cv2.contourArea)
@@ -133,13 +128,9 @@ def resize_and_stretch(
     img = img.resize((new_width, new_height))
 
     if is_mask:
-        resized_img = Image.new(
-            "L", target_size, color="white" if white_back else "black"
-        )
+        resized_img = Image.new("L", target_size, color="white" if white_back else "black")
     else:
-        resized_img = Image.new(
-            "RGB", target_size, color="white" if white_back else "black"
-        )
+        resized_img = Image.new("RGB", target_size, color="white" if white_back else "black")
 
     # Add to the center
     offset_x = (target_size[0] - img.size[0]) // 2
@@ -200,15 +191,13 @@ def merge_images(
     expand_mask1 = paste_image_center(mask1, expand_mask1)
     expand_mask2 = paste_image_center(mask2, expand_mask2)
 
-    cv2.imwrite('expand_mask1.jpg',expand_mask1)
-    cv2.imwrite('expand_mask2.jpg',expand_mask2)
+    cv2.imwrite("expand_mask1.jpg", expand_mask1)
+    cv2.imwrite("expand_mask2.jpg", expand_mask2)
     # Calculate IoU between the expanded masks
     iou = calculate_mask_iou(expand_mask1, expand_mask2)
 
     # Create a merge mask to determine which pixels to use from each image
-    merge_mask = np.where(
-        np.logical_and(expand_mask1 > 128, expand_mask2 > 128), 255, 0
-    )
+    merge_mask = np.where(np.logical_and(expand_mask1 > 128, expand_mask2 > 128), 255, 0)
 
     # Combine images based on the merge mask
     result_img[merge_mask == 255] = expand_img1[merge_mask == 255]
@@ -223,11 +212,9 @@ def merge_images(
 
     return result_img, expand_img1, expand_img2, expand_mask1, expand_mask2, iou
 
+
 def rotate_resize_image(
-    array: np.ndarray,
-    angle: float = 0.0,
-    scale_ratio: float = 1.0,
-    use_white_bg: Optional[bool] = False
+    array: np.ndarray, angle: float = 0.0, scale_ratio: float = 1.0, use_white_bg: Optional[bool] = False
 ) -> np.ndarray:
     """
     Rotate and resize an image while optionally setting excess border to white.
@@ -318,8 +305,7 @@ def crop_and_paste(
     mask1 = rotate_resize_image(mask1, angle, ratio)
 
     # Paste img1 onto img2, considering masks
-    result_img, img1, img2, mask1, mask2, iou = merge_images(
-        img1, img2, mask1, mask2, x, y)
+    result_img, img1, img2, mask1, mask2, iou = merge_images(img1, img2, mask1, mask2, x, y)
 
     return result_img, img1, img2, mask1, mask2, iou
 
@@ -383,7 +369,7 @@ def paste_image_center(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
     result_img = img2.copy()
 
     # Paste img1 onto result_img using the calculated coordinates
-    result_img[paste_y: paste_y + h1, paste_x: paste_x + w1] = img1
+    result_img[paste_y : paste_y + h1, paste_x : paste_x + w1] = img1
 
     return result_img
 
@@ -421,21 +407,13 @@ def align_and_overlay_images(
     # Crop img1 to the same size as img2 based on the provided bounding box or default center.
     if box2:
         x, y = calculate_box_center(box2)
-        resized_img1 = resize_and_stretch(
-            img1, target_size=(box2[2] - box2[0], box2[3] - box2[1]), white_back=True
-        )
-        resized_mask1 = resize_and_stretch(
-            mask1, target_size=(box2[2] - box2[0], box2[3] - box2[1])
-        )
+        resized_img1 = resize_and_stretch(img1, target_size=(box2[2] - box2[0], box2[3] - box2[1]), white_back=True)
+        resized_mask1 = resize_and_stretch(mask1, target_size=(box2[2] - box2[0], box2[3] - box2[1]))
         resized_mask1 = resized_mask1[:, :, 0]
     else:
         x, y = img2.shape[1] / 2, img2.shape[0] / 2
-        resized_img1 = resize_and_stretch(
-            img1, target_size=(img2.shape[1], img2.shape[0]), white_back=True
-        )
-        resized_mask1 = resize_and_stretch(
-            mask1, target_size=(mask2.shape[1], mask2.shape[0])
-        )
+        resized_img1 = resize_and_stretch(img1, target_size=(img2.shape[1], img2.shape[0]), white_back=True)
+        resized_mask1 = resize_and_stretch(mask1, target_size=(mask2.shape[1], mask2.shape[0]))
         resized_mask1 = resized_mask1[:, :, 0]
 
     # cv2.imwrite("resized_img1.jpg", resized_img1)
@@ -451,14 +429,12 @@ def align_and_overlay_images(
         resized_img1, resized_mask1, img2, mask2, angle, x, y, ratio
     )
 
-    print(f'Merge img1, img2! Mask IoU: {iou}')
+    print(f"Merge img1, img2! Mask IoU: {iou}")
 
     return final_res, final_img1, final_mask1, final_mask2
 
 
-def expand_roi(
-    box: List[int], ratio: float, max_box: List[int], eps: int = 0
-) -> List[int]:
+def expand_roi(box: List[int], ratio: float, max_box: List[int], eps: int = 0) -> List[int]:
     """
     Expand a region of interest (ROI) box by a given ratio while ensuring it doesn't exceed the specified maximum box.
 
@@ -487,9 +463,7 @@ def expand_roi(
     return [b0, b1, b2, b3]
 
 
-def crop_image(
-    img: np.ndarray, box: Tuple[int, int, int, int], expand_ratio: float = 1.0
-) -> np.ndarray:
+def crop_image(img: np.ndarray, box: Tuple[int, int, int, int], expand_ratio: float = 1.0) -> np.ndarray:
     """
     Crop an image by box and expand by expand_ratio.
 
@@ -545,14 +519,11 @@ def expand_polygon_vertex(A: np.ndarray, n: int) -> np.ndarray:
     num_edges = len(A)
 
     # Calculate the number of points to sample on each edge
-    edge_lengths = [
-        np.linalg.norm(A[(i + 1) % num_edges] - A[i]) for i in range(num_edges)
-    ]
+    edge_lengths = [np.linalg.norm(A[(i + 1) % num_edges] - A[i]) for i in range(num_edges)]
     total_length = sum(edge_lengths)
 
     # Calculate the number of points on each edge, rounding to the nearest integer
-    points_per_edge = [int(round(n * length / total_length))
-                       for length in edge_lengths]
+    points_per_edge = [int(round(n * length / total_length)) for length in edge_lengths]
 
     # Calculate the remaining points
     remaining_points = n - sum(points_per_edge)
@@ -607,11 +578,7 @@ def adjust_B_to_match_A(A: np.ndarray, B: np.ndarray) -> np.ndarray:
 
 
 def draw_vertex_polygon(
-    image: np.ndarray,
-    polygon: np.ndarray,
-    name: str,
-    line_color: tuple = (0, 0, 255),
-    font_color: tuple = (0, 0, 255)
+    image: np.ndarray, polygon: np.ndarray, name: str, line_color: tuple = (0, 0, 255), font_color: tuple = (0, 0, 255)
 ):
     """
     Draw a polygon on an image and label its vertices with numbers.
@@ -628,8 +595,7 @@ def draw_vertex_polygon(
     """
     plot_image = copy.deepcopy(image)
     polygon = np.array(polygon, dtype=np.int32)
-    cv2.polylines(plot_image, [polygon], isClosed=True,
-                  color=line_color, thickness=2)
+    cv2.polylines(plot_image, [polygon], isClosed=True, color=line_color, thickness=2)
 
     # Label vertex numbers
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -655,9 +621,7 @@ def mask_to_box(mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
 
     # Find the largest connected component
-    largest_label = (
-        np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1
-    )  # Ignore the background label
+    largest_label = np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1  # Ignore the background label
 
     # Create a new mask with only the largest connected component
     largest_connected_component_mask = np.zeros_like(mask)
@@ -668,19 +632,14 @@ def mask_to_box(mask: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int, int]
 
     # Set all regions outside of the bounding box to black
     largest_connected_component_mask[:y, :] = 0
-    largest_connected_component_mask[y + height:, :] = 0
+    largest_connected_component_mask[y + height :, :] = 0
     largest_connected_component_mask[:, :x] = 0
-    largest_connected_component_mask[:, x + width:] = 0
+    largest_connected_component_mask[:, x + width :] = 0
 
     return largest_connected_component_mask, (x, y, x + width, y + height)
 
 
-
-def draw_box_on_image(
-    image: np.ndarray,
-    box: tuple,
-    det_path: str
-):
+def draw_box_on_image(image: np.ndarray, box: tuple, det_path: str):
     """
     Draw a bounding box on an image and save the result to a file.
 
@@ -705,12 +664,7 @@ def draw_box_on_image(
     cv2.imwrite(det_path, plot_image)
 
 
-def seg_by_box(
-    raw_image_rgb: np.ndarray,
-    boxes_filt: np.ndarray,
-    segmentor,
-    point_coords: np.ndarray = None
-) -> np.ndarray:
+def seg_by_box(raw_image_rgb: np.ndarray, boxes_filt: np.ndarray, segmentor, point_coords: np.ndarray = None) -> np.ndarray:
     """
     Segment regions within specified boxes in an RGB image.
 
@@ -729,9 +683,7 @@ def seg_by_box(
     segmentor.set_image(raw_image_rgb)
 
     # Transform the bounding boxes to match the image dimensions
-    transformed_boxes = segmentor.transform.apply_boxes_torch(
-        torch.from_numpy(np.expand_dims(boxes_filt, 0)), (h, w)
-    ).cuda()
+    transformed_boxes = segmentor.transform.apply_boxes_torch(torch.from_numpy(np.expand_dims(boxes_filt, 0)), (h, w)).cuda()
 
     # Predict masks, scores, etc.
     masks, scores, _ = segmentor.predict_torch(
@@ -750,7 +702,9 @@ def seg_by_box(
     return mask_image
 
 
-def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=1) -> np.ndarray:
+def apply_mask_to_image(
+    img_foreground: np.ndarray, img_background: np.ndarray, mask: np.ndarray, mask_blur: int = 5, expand_kernal=1
+) -> np.ndarray:
     """
     Apply a mask to an image to keep pixels where the mask is 255 and set other areas to white.
 
@@ -771,13 +725,10 @@ def apply_mask_to_image(img_foreground: np.ndarray, img_background: np.ndarray, 
 
     # # Set areas not retained by the mask to white
     # result[np.where(mask == 0)] = [255, 255, 255]
-    mask = cv2.dilate(np.array(mask), np.ones(
-            (expand_kernal, expand_kernal), np.uint8), iterations=1)
-    mask_blur = cv2.GaussianBlur(
-        np.array(np.uint8(mask)), (mask_blur, mask_blur), 0
-    )
+    mask = cv2.dilate(np.array(mask), np.ones((expand_kernal, expand_kernal), np.uint8), iterations=1)
+    mask_blur = cv2.GaussianBlur(np.array(np.uint8(mask)), (mask_blur, mask_blur), 0)
     mask_blur = np.stack((mask_blur,) * 3, axis=-1)
-    result = np.array(img_foreground, np.uint8)*(mask_blur/255.) + np.array(img_background, np.uint8)*((255-mask_blur)/255.)
+    result = np.array(img_foreground, np.uint8) * (mask_blur / 255.0) + np.array(img_background, np.uint8) * ((255 - mask_blur) / 255.0)
 
     return result
 
@@ -855,8 +806,7 @@ def fill_mask(mask: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: The filled binary mask with the connected components completely filled.
     """
-    contours, _ = cv2.findContours(
-        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     filled_mask = np.zeros_like(mask)
 
@@ -912,15 +862,13 @@ def merge_with_inner_canny(image: np.ndarray, mask1: np.ndarray, mask2: np.ndarr
 
     # erode_kernal = int(0.1* min(resize_mask1.shape[0], resize_mask1.shape[1]))
     mask1_outline = np.uint8(
-            cv2.dilate(np.array(resize_mask1), np.ones(
-                (10, 10), np.uint8), iterations=1)
-            - cv2.erode(np.array(resize_mask1),
-                        np.ones((10, 10), np.uint8), iterations=1)
-        )
+        cv2.dilate(np.array(resize_mask1), np.ones((10, 10), np.uint8), iterations=1)
+        - cv2.erode(np.array(resize_mask1), np.ones((10, 10), np.uint8), iterations=1)
+    )
 
     mask1_outline = cv2.cvtColor(np.uint8(mask1_outline), cv2.COLOR_BGR2GRAY)
 
-    cv2.imwrite('mask1_outline.jpg', mask1_outline)
+    cv2.imwrite("mask1_outline.jpg", mask1_outline)
 
     # Remove the mask1 outline from the Canny image to obtain inner edges
     canny_image_inner = remove_outline(canny_image, mask1_outline)
@@ -949,9 +897,9 @@ def copy_white_mask_to_template(img: np.ndarray, mask: np.ndarray, template: np.
 
     # result = np.zeros_like(template)
     result = template
-    template_crop = template[box[1]:box[3], box[0]:box[2]]
+    template_crop = template[box[1] : box[3], box[0] : box[2]]
     # result[box[1]:box[3], box[0]:box[2]] = np.array(img, np.uint8)*(mask/255.) + np.array(template_crop, np.uint8)*((255-mask)/255.)
-    result[box[1]:box[3], box[0]:box[2]] = apply_mask_to_image(img, template_crop, mask)
+    result[box[1] : box[3], box[0] : box[2]] = apply_mask_to_image(img, template_crop, mask)
 
     # Copy the region from the template to the result where the mask is 0
     # result[expand_mask == 0] = template[expand_mask == 0]
@@ -973,10 +921,11 @@ def compute_color_similarity(color1, color2):
 
 def get_no_white(colors, threshold=10):
     for color in colors:
-        dis = compute_color_similarity(color,[255,255,255])
-        if dis>threshold:
+        dis = compute_color_similarity(color, [255, 255, 255])
+        if dis > threshold:
             return color
     return colors[0]
+
 
 def get_background_color(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
@@ -994,8 +943,7 @@ def get_background_color(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
     # Calculate the pixel value distribution within the masked region
     img_mask_area = img[mask_area]
-    unique_values, counts = np.unique(
-        img_mask_area, axis=0, return_counts=True)
+    unique_values, counts = np.unique(img_mask_area, axis=0, return_counts=True)
 
     # print(np.array(counts).max(), np.array(counts).sum())
     # print(np.array(counts).max()/ np.array(counts).sum())
@@ -1066,14 +1014,12 @@ def find_best_angle_ratio(
 
     # Define the optimization target function
     def target_function(parameters: Tuple[float, float]) -> float:
-        iou, in_iou = align_and_compute_iou(
-            polygon1, polygon2, x, y, parameters
-        )
-        return - iou - 0.1* in_iou + 0.1 * angle_loss(angle_target, parameters)
+        iou, in_iou = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
+        return -iou - 0.1 * in_iou + 0.1 * angle_loss(angle_target, parameters)
 
     # Define the constraint function
     def constraint_function(parameters: Tuple[float, float]) -> float:
-        iou,_ = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
+        iou, _ = align_and_compute_iou(polygon1, polygon2, x, y, parameters)
         return iou - iou_threshold
 
     # Define the angle loss function
@@ -1128,7 +1074,7 @@ def find_best_angle_ratio(
             iou = poly1.intersection(poly2).area / poly1.union(poly2).area
             in_iou = poly1.intersection(poly2).area / poly2.area
 
-        print(f'iou: {iou}, in_iou: {in_iou}, angle:{angle}, ratio:{ratio}')
+        print(f"iou: {iou}, in_iou: {in_iou}, angle:{angle}, ratio:{ratio}")
 
         return iou, in_iou
 
@@ -1153,7 +1099,7 @@ def find_best_angle_ratio(
 
     # Get the optimal parameters and maximum IoU value
     optimal_parameters = result.x
-    max_iou = -result.fun
+    -result.fun
 
     return optimal_parameters[0], optimal_parameters[1]
 
@@ -1179,11 +1125,11 @@ def expand_box_by_pad(box, max_size, padding_size):
     return expanded_box
 
 
-def resize_to_512(image): 
-    short_side  = min(image.shape[0], image.shape[1])
-    resize      = float(short_side / 512.0)
-    new_size    = (int(image.shape[1] // resize // 32 * 32), int(image.shape[0] // resize // 32 * 32))
-    result_img  = cv2.resize(image, new_size, interpolation=cv2.INTER_LANCZOS4)
+def resize_to_512(image):
+    short_side = min(image.shape[0], image.shape[1])
+    resize = float(short_side / 512.0)
+    new_size = (int(image.shape[1] // resize // 32 * 32), int(image.shape[0] // resize // 32 * 32))
+    result_img = cv2.resize(image, new_size, interpolation=cv2.INTER_LANCZOS4)
 
     return result_img
 
