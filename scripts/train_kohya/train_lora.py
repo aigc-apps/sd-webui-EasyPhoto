@@ -15,6 +15,7 @@
 """Fine-tuning script for Stable Diffusion for text2image with support for LoRA."""
 import os
 import sys
+import gc
 
 import argparse
 import logging
@@ -1234,24 +1235,30 @@ def main():
                             f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
                             f" {args.validation_prompt}."
                         )
-                        log_validation(
-                            network,
-                            noise_scheduler,
-                            vae,
-                            text_encoder,
-                            tokenizer,
-                            unet,
-                            args,
-                            accelerator,
-                            weight_dtype,
-                            epoch,
-                            global_step,
-                            input_images=input_images,
-                            input_images_shape=input_images_shape,
-                            control_images=control_images,
-                            input_masks=input_masks,
-                            new_size=new_size,
-                        )
+                        try:
+                            log_validation(
+                                network,
+                                noise_scheduler,
+                                vae,
+                                text_encoder,
+                                tokenizer,
+                                unet,
+                                args,
+                                accelerator,
+                                weight_dtype,
+                                epoch,
+                                global_step,
+                                input_images=input_images,
+                                input_images_shape=input_images_shape,
+                                control_images=control_images,
+                                input_masks=input_masks,
+                                new_size=new_size,
+                            )
+                        except Exception as e:
+                            gc.collect()
+                            torch.cuda.empty_cache()
+                            torch.cuda.ipc_collect()
+                            logger.info(f"Running validation error, skip it." f"Error info: {e}.")
 
         if accelerator.is_main_process:
             if (
@@ -1263,6 +1270,41 @@ def main():
                 logger.info(
                     f"Running validation... \n Generating {args.num_validation_images} images with prompt:" f" {args.validation_prompt}."
                 )
+                try:
+                    log_validation(
+                        network,
+                        noise_scheduler,
+                        vae,
+                        text_encoder,
+                        tokenizer,
+                        unet,
+                        args,
+                        accelerator,
+                        weight_dtype,
+                        epoch,
+                        global_step,
+                        input_images=input_images,
+                        input_images_shape=input_images_shape,
+                        control_images=control_images,
+                        input_masks=input_masks,
+                        new_size=new_size,
+                    )
+                except Exception as e:
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
+                    logger.info(f"Running validation error, skip it." f"Error info: {e}.")
+    # Save the lora layers
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        safetensor_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights.safetensors")
+        accelerator_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights")
+        save_model(safetensor_save_path, accelerator.unwrap_model(network))
+        if args.save_state:
+            accelerator.save_state(accelerator_save_path)
+
+        if args.validation:
+            try:
                 log_validation(
                     network,
                     noise_scheduler,
@@ -1281,34 +1323,12 @@ def main():
                     input_masks=input_masks,
                     new_size=new_size,
                 )
-    # Save the lora layers
-    accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        safetensor_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights.safetensors")
-        accelerator_save_path = os.path.join(args.output_dir, f"pytorch_lora_weights")
-        save_model(safetensor_save_path, accelerator.unwrap_model(network))
-        if args.save_state:
-            accelerator.save_state(accelerator_save_path)
+            except Exception as e:
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+                logger.info(f"Running validation error, skip it." f"Error info: {e}.")
 
-        if args.validation:
-            log_validation(
-                network,
-                noise_scheduler,
-                vae,
-                text_encoder,
-                tokenizer,
-                unet,
-                args,
-                accelerator,
-                weight_dtype,
-                epoch,
-                global_step,
-                input_images=input_images,
-                input_images_shape=input_images_shape,
-                control_images=control_images,
-                input_masks=input_masks,
-                new_size=new_size,
-            )
         if args.merge_best_lora_based_face_id and args.validation:
             pivot_dir = os.path.join(args.train_data_dir, "train")
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
