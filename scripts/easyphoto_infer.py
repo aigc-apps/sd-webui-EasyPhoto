@@ -633,7 +633,7 @@ def easyphoto_infer_forward(
                 prompt_generate_vae = "madebyollin-sdxl-vae-fp16-fix.safetensors"
             else:
                 prompt_generate_vae = "vae-ft-mse-840000-ema-pruned.ckpt"
-            
+
             if scene_id != "none":
                 sdxl_scene_flag = True if prompt_generate_sd_model_checkpoint_type == 3 else False
                 scene_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{scene_id}.safetensors"))
@@ -646,7 +646,7 @@ def easyphoto_infer_forward(
                     )
                     ep_logger.error(error_info)
                     return error_info, [], []
-                
+
                 if scene_lora_sdxl_flag != user_lora_sdxl_flag:
                     scene_lora_type_name = "SDXL" if scene_lora_sdxl_flag else "SD1"
                     user_lora_type_name = "SDXL" if user_lora_sdxl_flag else "SD1"
@@ -1190,10 +1190,11 @@ def easyphoto_infer_forward(
                             )
                         )
                         y_coords, _, _ = np.where(np.array(brow_mask) > 0)
-                        min_y = max(int(np.min(y_coords)), 1)
-                        ipa_image_face = np.array(ipa_image_face, np.uint8)
-                        ipa_image_face[:min_y, :, :] = 255
-                        ipa_image_face = Image.fromarray(ipa_image_face)
+                        if len(y_coords) != 0:
+                            min_y = max(int(np.min(y_coords)), 1)
+                            ipa_image_face = np.array(ipa_image_face, np.uint8)
+                            ipa_image_face[:min_y, :, :] = 255
+                            ipa_image_face = Image.fromarray(ipa_image_face)
 
                     padded_size = (max(ipa_image_face.size), max(ipa_image_face.size))
                     ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
@@ -2386,10 +2387,11 @@ def easyphoto_video_infer_forward(
                                 )
                             )
                             y_coords, _, _ = np.where(np.array(_brow_mask) > 0)
-                            min_y = max(int(np.min(y_coords)), 1)
-                            _ipa_image_face = np.array(_ipa_image_face, np.uint8)
-                            _ipa_image_face[:min_y, :, :] = 255
-                            _ipa_image_face = Image.fromarray(_ipa_image_face)
+                            if len(y_coords) != 0:
+                                min_y = max(int(np.min(y_coords)), 1)
+                                _ipa_image_face = np.array(_ipa_image_face, np.uint8)
+                                _ipa_image_face[:min_y, :, :] = 255
+                                _ipa_image_face = Image.fromarray(_ipa_image_face)
 
                         _padded_size = (max(_ipa_image_face.size), max(_ipa_image_face.size))
                         _ipa_image_face = ImageOps.pad(_ipa_image_face, _padded_size, color=(255, 255, 255))

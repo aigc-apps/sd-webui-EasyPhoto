@@ -160,13 +160,6 @@ if __name__ == "__main__":
                 angle = 0 if x == 0 else abs(math.atan(y / x) * 180 / math.pi)
                 angle = (90 - angle) / 90
 
-                # face size judge
-                face_width = (retinaface_box[2] - retinaface_box[0]) / (3 - 1)
-                face_height = (retinaface_box[3] - retinaface_box[1]) / (3 - 1)
-                if min(face_width, face_height) < 128:
-                    print("Face size in {} is small than 128. Ignore it.".format(jpg))
-                    continue
-
                 # face crop
                 sub_image = image.crop(retinaface_box)
                 if skin_retouching_bool:
