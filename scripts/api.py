@@ -172,7 +172,9 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         selected_template_images = str(_selected_template_images)
 
         if init_image is not None:
-            init_image = np.uint8(init_image)
+            if init_image.mode in ('P'):
+                init_image = init_image.convert('RGB')
+            init_image = np.array(init_image)
 
         _uploaded_template_images = []
         for uploaded_template_image in uploaded_template_images:
