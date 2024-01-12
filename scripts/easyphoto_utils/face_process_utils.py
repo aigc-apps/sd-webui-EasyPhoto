@@ -677,9 +677,6 @@ class Face_Skin(object):
             else:
                 sub_image = image
 
-            # sub_face for seg skin
-            sub_image = image.crop(retinaface_box)
-
             image_h, image_w, c = np.shape(np.uint8(sub_image))
             PIL_img = Image.fromarray(np.uint8(sub_image))
             PIL_img = PIL_img.resize((512, 512), Image.BILINEAR)
@@ -693,14 +690,17 @@ class Face_Skin(object):
 
             masks = []
             for _needs_index in needs_index:
-                total_mask = np.zeros_like(np.uint8(image))
                 sub_mask = np.zeros_like(model_mask)
                 for index in _needs_index:
                     sub_mask += np.uint8(model_mask == index)
 
                 sub_mask = np.clip(sub_mask, 0, 1) * 255
                 sub_mask = np.tile(np.expand_dims(cv2.resize(np.uint8(sub_mask), (image_w, image_h)), -1), [1, 1, 3])
-                total_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2], :] = sub_mask
+                if len(retinaface_boxes) > 0:
+                    total_mask = np.zeros_like(np.uint8(image))
+                    total_mask[retinaface_box[1] : retinaface_box[3], retinaface_box[0] : retinaface_box[2], :] = sub_mask
+                else:
+                    total_mask = sub_mask
                 masks.append(Image.fromarray(np.uint8(total_mask)))
 
             return masks
