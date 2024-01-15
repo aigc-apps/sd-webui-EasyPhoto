@@ -74,7 +74,7 @@ if not is_installed("einops"):
     print("Installing requirements for easyphoto-webui")
     launch.run_pip("install einops", "requirements for diffusers")
 
-if not is_installed("imageio"):
+if not is_installed("imageio>=2.29.0"):
     print("Installing requirements for easyphoto-webui")
     # The '>' will be interpreted as redirection (in linux) since SD WebUI uses `shell=True` in `subprocess.run`.
     launch.run_pip("install \"imageio>=2.29.0\"", "requirements for imageio")
