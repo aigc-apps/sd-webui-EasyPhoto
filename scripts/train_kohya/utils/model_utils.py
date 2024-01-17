@@ -790,7 +790,7 @@ def convert_sdxl_text_encoder_2_checkpoint(checkpoint, max_length):
 
 
 # load state_dict without allocating new tensors
-def _load_state_dict_on_device(model, state_dict, device, dtype=None):
+def _load_state_dict_on_device(model, state_dict, device, dtype=None, strict=False):
     # dtype will use fp32 as default
     missing_keys = list(model.state_dict().keys() - state_dict.keys())
     unexpected_keys = list(state_dict.keys() - model.state_dict().keys())
@@ -807,8 +807,9 @@ def _load_state_dict_on_device(model, state_dict, device, dtype=None):
         error_msgs.insert(0, "Missing key(s) in state_dict: {}. ".format(", ".join('"{}"'.format(k) for k in missing_keys)))
     if unexpected_keys:
         error_msgs.insert(0, "Unexpected key(s) in state_dict: {}. ".format(", ".join('"{}"'.format(k) for k in unexpected_keys)))
-
-    raise RuntimeError("Error(s) in loading state_dict for {}:\n\t{}".format(model.__class__.__name__, "\n\t".join(error_msgs)))
+    if strict:
+        raise RuntimeError("Error(s) in loading state_dict for {}:\n\t{}".format(model.__class__.__name__, "\n\t".join(error_msgs)))
+    return "Error(s) in loading state_dict for {}:\n\t{}".format(model.__class__.__name__, "\n\t".join(error_msgs))
 
 
 def load_models_from_sdxl_checkpoint(model_version, ckpt_path, map_location, dtype=None):
