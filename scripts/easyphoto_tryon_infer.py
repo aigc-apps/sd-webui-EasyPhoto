@@ -85,6 +85,8 @@ def easyphoto_tryon_infer_forward(
     # change system ckpt if not match
     reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
 
+    if not shared.opts.data.get("easyphoto_check_hash", True):
+        ep_logger.warning("EasyPhoto will not check model hash since the user set easyphoto_check_hash=False.")
     check_files_exists_and_download(check_hash.get("base", True), "base")
     check_files_exists_and_download(check_hash.get("add_tryon", True), "add_tryon")
     check_hash["base"] = False

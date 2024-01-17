@@ -504,6 +504,8 @@ def check_files_exists_and_download(check_hash, download_mode="base"):
 
 # Calculate the hash value of the download link and downloaded_file by sha256
 def compare_hash_link_file(url, file_path):
+    if not shared.opts.data.get("easyphoto_check_hash", True):
+        return True
     r = requests.head(url)
     total_size = int(r.headers["Content-Length"])
 

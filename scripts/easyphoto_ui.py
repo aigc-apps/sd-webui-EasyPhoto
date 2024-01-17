@@ -2218,6 +2218,17 @@ def on_ui_settings():
     shared.opts.add_option(
         "easyphoto_cache_model", shared.OptionInfo(True, "Cache preprocess model in Inference", gr.Checkbox, {}, section=section)
     )
+    shared.opts.add_option(
+        "easyphoto_check_hash",
+        shared.OptionInfo(
+            True,
+            "Check model hash (EasyPhoto will check the integrity of the required models in the first inference. It is recommended to ensure"
+            "that the required models has been downloaded and checked at least once before turning this option off.)",
+            gr.Checkbox,
+            {},
+            section=section
+        )
+    )
 
 
 script_callbacks.on_ui_settings(on_ui_settings)  # 注册进设置页

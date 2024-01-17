@@ -489,6 +489,8 @@ def easyphoto_infer_forward(
         return "Please choose a user id.", [], []
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
+    if not shared.opts.data.get("easyphoto_check_hash", True):
+        ep_logger.warning("EasyPhoto will not check model hash since the user set easyphoto_check_hash=False.")
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
     if check_hash.get("base", True) or check_hash.get("portrait", True):
@@ -1857,6 +1859,8 @@ def easyphoto_video_infer_forward(
         return "Please choose a user id.", None, None, []
 
     # check & download weights of basemodel/controlnet+annotator/VAE/face_skin/buffalo/validation_template
+    if not shared.opts.data.get("easyphoto_check_hash", True):
+        ep_logger.warning("EasyPhoto will not check model hash since the user set easyphoto_check_hash=False.")
     check_files_exists_and_download(check_hash.get("base", True), download_mode="base")
     check_files_exists_and_download(check_hash.get("portrait", True), download_mode="portrait")
     check_files_exists_and_download(check_hash.get("add_video", True), download_mode="add_video")
