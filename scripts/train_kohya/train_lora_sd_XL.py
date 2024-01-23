@@ -41,6 +41,7 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 from packaging import version
 from torchvision import transforms
+from torchvision.transforms.functional import crop
 from tqdm.auto import tqdm
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -763,11 +764,13 @@ def main():
         emb = torch.reshape(emb, (b, dims * outdim))
         return emb
 
-    def compute_time_ids():
-        # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
-        original_size = torch.LongTensor((1024, 1024)).unsqueeze(0)
-        target_size = torch.LongTensor((1024, 1024)).unsqueeze(0)
-        crops_coords_top_left = torch.LongTensor((0, 0)).unsqueeze(0)
+    def compute_time_ids(original_size, crops_coords_top_left):
+        # The shape of `added_cond_kwargs["time_ids"]` in `original_unet_sd_XL.py` (kohya) is difference with diffusers,
+        # since the Fourier feature encoding of the former is calculated separately and then concated,
+        # while the latter is concated and then calculated.
+        original_size = torch.LongTensor(original_size).unsqueeze(0)
+        target_size = torch.LongTensor((args.resolution, args.resolution)).unsqueeze(0)
+        crops_coords_top_left = torch.LongTensor(crops_coords_top_left).unsqueeze(0)
 
         emb1 = get_timestep_embedding(original_size, 256)
         emb2 = get_timestep_embedding(crops_coords_top_left, 256)
@@ -775,9 +778,6 @@ def main():
         vector = torch.cat([emb1, emb2, emb3], dim=1).to("cuda")
         return vector
 
-    # Pack the statically computed variables appropriately. This is so that we don't
-    # have to pass them to the dataloader.
-    add_time_ids = compute_time_ids()
 
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
@@ -796,36 +796,70 @@ def main():
         tokens_two = tokenize_prompt(tokenizer_two, captions)
         return tokens_one, tokens_two
 
+
     # Preprocessing the datasets.
+    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
+    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
+    train_flip = transforms.RandomHorizontalFlip(p=1.0)
     train_transforms = transforms.Compose(
         [
-            transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
-            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
-            transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ]
     )
 
+    
     def preprocess_train(examples):
         images = [image.convert("RGB") for image in examples[image_column]]
-        examples["pixel_values"] = [train_transforms(image) for image in images]
-        examples["input_ids_0"], examples["input_ids_1"] = tokenize_captions(examples)
+        # image aug
+        original_sizes = []
+        all_images = []
+        crop_top_lefts = []
+        for image in images:
+            original_sizes.append((image.height, image.width))
+            image = train_resize(image)
+            if args.random_flip and random.random() < 0.5:
+                # flip
+                image = train_flip(image)
+            if args.center_crop:
+                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
+                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+                image = train_crop(image)
+            else:
+                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+                image = crop(image, y1, x1, h, w)
+            crop_top_left = (y1, x1)
+            crop_top_lefts.append(crop_top_left)
+            image = train_transforms(image)
+            all_images.append(image)
+
+        examples["original_sizes"] = original_sizes
+        examples["crop_top_lefts"] = crop_top_lefts
+        examples["pixel_values"] = all_images
+        tokens_one, tokens_two = tokenize_captions(examples)
+        examples["input_ids_one"] = tokens_one
+        examples["input_ids_two"] = tokens_two
         return examples
 
     with accelerator.main_process_first():
         # Set the training transforms
         train_dataset = dataset["train"].with_transform(preprocess_train)
-
+    
+    
     def collate_fn(examples):
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-        # [print(example["input_ids"]) for example in examples]
-        input_ids = [
-            torch.stack([example["input_ids_0"] for example in examples]),
-            torch.stack([example["input_ids_1"] for example in examples]),
-        ]
-        return {"pixel_values": pixel_values, "input_ids": input_ids}
+        original_sizes = [example["original_sizes"] for example in examples]
+        crop_top_lefts = [example["crop_top_lefts"] for example in examples]
+        input_ids_one = torch.stack([example["input_ids_one"] for example in examples])
+        input_ids_two = torch.stack([example["input_ids_two"] for example in examples])
+        return {
+            "pixel_values": pixel_values,
+            "input_ids_one": input_ids_one,
+            "input_ids_two": input_ids_two,
+            "original_sizes": original_sizes,
+            "crop_top_lefts": crop_top_lefts,
+        }
 
     # DataLoaders creation:
     persistent_workers = True
@@ -981,12 +1015,16 @@ def main():
                 # (this is the forward diffusion process)
                 noisy_model_input = noise_scheduler.add_noise(model_input, noise, timesteps)
 
+                add_time_ids = torch.cat(
+                    [compute_time_ids(s, c) for s, c in zip(batch["original_sizes"], batch["crop_top_lefts"])]
+                )
+
                 # Predict the noise residual
                 prompt_embeds, pooled_prompt_embeds = encode_prompt(
                     text_encoders=[text_encoder_one, text_encoder_two],
                     tokenizers=None,
                     prompt=None,
-                    text_input_ids_list=[batch["input_ids"][0], batch["input_ids"][1]],
+                    text_input_ids_list=[batch["input_ids_one"], batch["input_ids_two"]],
                 )
                 unet_added_conditions = {"time_ids": add_time_ids.repeat(bsz, 1)}
                 unet_added_conditions.update({"text_embeds": pooled_prompt_embeds})
