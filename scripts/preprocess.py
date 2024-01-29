@@ -28,7 +28,7 @@ import torch
 import cv2
 from sklearn.cluster import KMeans
 from segment_anything import SamPredictor, sam_model_registry
-from easyphoto_process_utils import rotate_resize_image, apply_mask_to_image, mask_to_box, crop_image
+from easyphoto_process_utils import apply_mask_to_image
 
 
 def parse_args():

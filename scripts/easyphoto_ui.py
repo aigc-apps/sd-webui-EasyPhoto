@@ -574,7 +574,7 @@ def on_ui_tabs():
                     if new_id in ids:
                         return f"User id cannot be repeat in {ids}.", gr.update(choices=["none"] + ids)
                     if reference_image is None or reference_mask is None:
-                        return "Reference image and mask must be given when creating a new user id.", gr.update(choices=["none"] + ids)
+                        return "Reference image and mask must be provided when creating a new user id.", gr.update(choices=["none"] + ids)
 
                     ids = sorted(ids + [new_id])
                     # save mask & img
@@ -588,6 +588,18 @@ def on_ui_tabs():
                     cv2.imwrite(user_id_ref_mask_path, reference_mask)
 
                     return f"Create userid {new_id} success.", gr.update(choices=["none"] + ids, value=new_id)
+
+                add_new_user_id.click(
+                    fn=preview_mask,
+                    inputs=[
+                        reference_image,
+                        refine_reference_mask,
+                        gr.Text(label="Reference", value="Reference", visible=False),
+                        uuid,
+                        update_reference_mask,
+                    ],
+                    outputs=[infer_progress, reference_mask],
+                )
 
                 add_new_user_id.click(
                     fn=add_new_user_and_seleced,
@@ -624,8 +636,9 @@ def on_ui_tabs():
                         match_and_paste,
                         remove_target,
                         uuid,
+                        enhance_with_lora
                     ],
-                    outputs=[infer_progress, output_images],
+                    outputs=[infer_progress, output_images, template_mask, reference_mask],
                 )
 
     return [(easyphoto_tabs, "EasyPhoto", f"EasyPhoto_tabs")]

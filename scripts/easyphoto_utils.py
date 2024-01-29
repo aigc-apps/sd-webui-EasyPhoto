@@ -59,46 +59,57 @@ def urldownload_progressbar(url, file_path):
     progress_bar.close()
 
 
-def check_files_exists_and_download(check_hash):
-    controlnet_extensions_path = os.path.join(data_path, "extensions", "sd-webui-controlnet")
-    controlnet_extensions_builtin_path = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
-    models_annotator_path = os.path.join(data_path, "models")
+controlnet_extensions_path = os.path.join(data_path, "extensions", "sd-webui-controlnet")
+controlnet_extensions_builtin_path = os.path.join(data_path, "extensions-builtin", "sd-webui-controlnet")
+models_annotator_path = os.path.join(data_path, "models")
 
-    if os.path.exists(controlnet_extensions_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-    elif os.path.exists(controlnet_extensions_builtin_path):
-        controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-    else:
-        controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
-        controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+if os.path.exists(controlnet_extensions_path):
+    controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
+    controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+elif os.path.exists(controlnet_extensions_builtin_path):
+    controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
+    controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+else:
+    controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+    controlnet_annotator_cache_path_ipa = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
 
-    # The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
-    urls = [
+# The models are from civitai/6424 & civitai/118913, we saved them to oss for your convenience in downloading the models.
+download_urls = {
+    "base": [
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/Chilloutmix-Ni-pruned-fp16-fix.safetensors",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11p_sd15_canny.pth",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/dpt_hybrid-midas-501f0c75.pt",
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/control_v11f1p_sd15_depth.pth",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_sd15_random_color.pth",
+    ],
+    "seg": [
         "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/sam_vit_l_0b3195.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/clip_h.pth",
-        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/ip-adapter_sd15.pth"
-        # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_v1.pth",
-        # "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/superpoint_lightglue.pth",
+    ],
+    "anydoor": [
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/anydoor/epoch%3D1-step%3D8687.ckpt",
+        "https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/aigc-data/easyphoto/models/anydoor/dinov2_vitg14_pretrain.pth"
     ]
+}
 
-    filenames = [
+save_filenames = {
+    "base": [
         os.path.join(models_path, f"Stable-diffusion/Chilloutmix-Ni-pruned-fp16-fix.safetensors"),
         os.path.join(models_path, f"ControlNet/control_v11p_sd15_canny.pth"),
         os.path.join(controlnet_annotator_cache_path, f"dpt_hybrid-midas-501f0c75.pt"),
         os.path.join(models_path, f"ControlNet/control_v11f1p_sd15_depth.pth"),
+        os.path.join(models_path, f"ControlNet/control_sd15_random_color.pth"),    
+    ],
+    "seg": [
         os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "sam_vit_l_0b3195.pth"),
-        os.path.join(controlnet_annotator_cache_path_ipa, f"clip_h.pth"),
-        os.path.join(models_path, f"ControlNet/ip-adapter_sd15.pth"),
-        # os.path.join('~/.cache/torch/hub/checkpoints', "superpoint_v1.pth"),
-        # os.path.join('~/.cache/torch/hub/checkpoints', "superpoint_lightglue.pth"),
-    ]
+    ],
+    "anydoor": [
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "epoch=1-step=8687.ckpt"),
+        os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "dinov2_vitg14_pretrain.pth"),
+    ]   
+}
 
+def check_files_exists_and_download(check_hash, download_mode="base"):
+    urls, filenames = download_urls[download_mode], save_filenames[download_mode]
     # This print will introduce some misundertand
     # print("Start Downloading weights")
     for url, filename in zip(urls, filenames):
@@ -143,3 +154,20 @@ def compare_hasd_link_file(url, file_path):
     else:
         print(f" {file_path} : Hash mismatch")
         return False
+
+
+def check_image_mask_input(image, mask, type):
+    if image is None:
+        info = f"Please upload a {type} image."
+        return False, info
+
+    if mask is None and image["mask"].max() == 0:
+        info = f"Please give a hint of {type}, or upload {type} mask."
+        return False, info
+
+    if mask is not None and mask.shape != image["image"].shape:
+        info = f"Please upload a mask with the same size as {type}. Or remove the uploaded mask and generate automatically by given hints"
+        return False, info
+    
+    return True, ''
+    
