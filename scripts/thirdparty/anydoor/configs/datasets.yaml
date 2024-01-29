@@ -1,0 +1,68 @@
+Train:
+  YoutubeVOS:
+    image_dir: path/YTBVOS/train/JPEGImages/
+    anno: path/YTBVOS/train/Annotations
+    meta: path/YTBVOS/train/meta.json
+
+  YoutubeVIS:
+    image_dir: path/youtubevis/train/JPEGImages/
+    anno: path/youtubevis/train/Annotations/
+    meta: path/youtubevis/train/meta.json
+
+  VIPSeg:
+    image_dir: path/VIPSeg/VIPSeg_720P/images/
+    anno: path/VIPSeg/VIPSeg_720P/panomasksRGB/
+
+  UVO:
+    train:
+      image_dir: path/UVO/uvo_frames_sparse
+      video_json: path/UVO/UVO_sparse_train_video_with_interpolation.json
+      image_json: path/UVO/UVO_sparse_train_video_with_interpolation_reorg.json
+    val:
+      image_dir: path/UVO/uvo_frames_sparse
+      video_json: path/UVO/VideoSparseSet/UVO_sparse_val_video_with_interpolation.json
+      image_json: path/UVO/VideoSparseSet/UVO_sparse_val_video_interpolation_reorg.json
+
+  Mose:
+    image_dir: path/MOSE/train/JPEGImages/
+    anno: path/MOSE/train/Annotations/
+
+  MVImageNet:
+    txt: ./datasets/Preprocess/mvimagenet.txt
+    image_dir: /mnt/workspace/xizhi/data/MVImgNet/
+
+  VitonHD:
+    image_dir: path/TryOn/VitonHD/train/cloth/
+
+  Dresscode:
+    image_dir: /mnt/workspace/xizhi/data/dresscode/DressCode/upper_body/label_maps/
+
+  FashionTryon:
+    image_dir: path/TryOn/FashionTryOn/train
+
+  Lvis:
+    image_dir: path/COCO/train2017
+    json_path: path/lvis_v1/lvis_v1_train.json
+
+  SAM:
+    sub1: path/SAM/0000
+    sub2: path/SAM/0001
+    sub3: path/SAM/0002
+    sub4: path/SAM/0004
+
+  Saliency:
+    MSRA_root: path/Saliency/MSRA10K_Imgs_GT/
+    TR_root: path/Saliency/DUTS-TR/DUTS-TR-Image/
+    TE_root: path/Saliency/DUTS-TE/DUTS-TE-Image/
+    HFlickr_root: path/HFlickr/masks/
+
+Test:
+  DreamBooth:
+    fg_dir: path/DreamBooth/AnyDoor_DreamBooth
+    bg_dir: path/DreamBooth/v1_800
+
+  VitonHDTest:
+    image_dir: path/TryOn/VitonHD/test/cloth
+
+
+
