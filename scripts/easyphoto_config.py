@@ -11,6 +11,7 @@ user_id_outpath_samples = os.path.join(data_dir, "outputs/easyphoto-user-id-info
 cache_log_file_path = os.path.join(data_dir, "outputs/easyphoto-tmp/train_kohya_log.txt")
 zero123_model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "thirdparty/zero123/models")
 DINOv2_weight_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "dinov2_vitg14_pretrain.pth")
+anydoor_weight_path = os.path.join(os.path.abspath(os.path.dirname(__file__)).replace("scripts", "models"), "epoch=1-step=8687.ckpt")
 
 # prompts
 validation_prompt = "easyphoto, 1thing"

@@ -11,6 +11,10 @@ import torch
 from PIL import Image
 from scipy.optimize import minimize
 from shapely.geometry import Polygon
+from glob import glob
+from modelscope.outputs import OutputKeys
+from modelscope.pipelines import pipeline
+from modelscope.utils.constant import Tasks
 
 
 def timing_decorator(func):
@@ -955,3 +959,53 @@ def prepare_train_data_with_single_input(reference_image, reference_mask, ref_im
                         a = {"file_name": file_name, "text": prompt}
                         f.write(json.dumps(eval(str(a))))
                         f.write("\n")
+
+def prepare_train_data_without_lightglue(images_save_path, json_save_path, validation_prompt, inputs_dir, main_image_path, ref_image_path, use_mask):
+    # image list and main image
+    image_list = glob(f"{inputs_dir}/*.jpg") + glob(f"{inputs_dir}/*.png") + glob(f"{inputs_dir}/*.jpeg")
+    image_list = [main_image_path] + image_list
+    
+    universal_matting = pipeline(Tasks.universal_matting, model='damo/cv_unet_universal-matting')
+
+    for i, img in enumerate(image_list):
+        print(f"Preprocess image {i}/{len(image_list)}")
+        result = universal_matting(img)[OutputKeys.OUTPUT_IMG]
+        mask = result[:,:,3]
+        mask_3d = np.repeat(mask[..., np.newaxis], 3, axis=-1)
+        img = cv2.imread(img)
+        masked_img = img*(mask_3d/255)+ np.ones(img.shape)*(255-mask_3d)
+
+        cv2.imwrite(f"{images_save_path}/{i}.jpg", masked_img)
+        with open(os.path.join(images_save_path, str(i) + ".txt"), "w") as f:
+            f.write(validation_prompt)
+
+        if i == 0:
+            cv2.imwrite(ref_image_path, masked_img)
+            cv2.imwrite(
+                os.path.join(os.path.dirname(ref_image_path), os.path.basename(ref_image_path).split(".")[0] + "_mask.jpg"), mask
+            )
+
+    with open(json_save_path, "w", encoding="utf-8") as f:
+        for root, dirs, files in os.walk(images_save_path, topdown=False):
+            for file in files:
+                path = os.path.join(root, file)
+                if not file.endswith("txt"):
+                    txt_path = ".".join(path.split(".")[:-1]) + ".txt"
+                    if os.path.exists(txt_path):
+                        prompt = open(txt_path, "r").readline().strip()
+                        if platform.system() == "Windows":
+                            path = path.replace("\\", "/")
+                        jpg_path_split = path.split("/")
+                        file_name = os.path.join(*jpg_path_split[-2:])
+                        a = {"file_name": file_name, "text": prompt}
+                        f.write(json.dumps(eval(str(a))))
+                        f.write("\n")
+
+
+def resize_to_512(image): 
+    short_side  = min(image.shape[0], image.shape[1])
+    resize      = float(short_side / 512.0)
+    new_size    = (int(image.shape[1] // resize // 32 * 32), int(image.shape[0] // resize // 32 * 32))
+    result_img  = cv2.resize(image, new_size, interpolation=cv2.INTER_LANCZOS4)
+
+    return result_img

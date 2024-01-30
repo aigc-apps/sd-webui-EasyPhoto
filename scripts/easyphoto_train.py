@@ -106,6 +106,7 @@ def easyphoto_train_forward(
         f"--ref_image_path={ref_image_path}",
         f"--sam_model_path={model_path}",
     ]
+    
 
     if refine_mask:
         command += ["--refine_mask"]
