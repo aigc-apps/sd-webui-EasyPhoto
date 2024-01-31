@@ -227,6 +227,28 @@ def get_controlnet_unit(
             resize_mode="Just Resize",
             model="ip-adapter-plus-face_sdxl_vit-h",
         )
+    elif unit == "instantid_sdxl_face_embedding":
+        control_unit = dict(
+            input_image={"image": np.asarray(input_image), "mask": None},
+            module="instant_id_face_embedding",
+            weight=weight,
+            guidance_end=1,
+            control_mode=2,
+            processor_res=512,
+            resize_mode="Just Resize",
+            model="ip-adapter_instant_id_sdxl",
+        )
+    elif unit == "instantid_sdxl_face_keypoints":
+        control_unit = dict(
+            input_image={"image": np.asarray(input_image), "mask": None},
+            module="instant_id_face_keypoints",
+            weight=weight,
+            guidance_end=1,
+            control_mode=2,
+            processor_res=512,
+            resize_mode="Just Resize",
+            model="control_instant_id_sdxl",
+        )
     elif unit == "depth":
         control_unit = dict(
             input_image=input_image,
@@ -455,9 +477,16 @@ def easyphoto_infer_forward(
     ipa_control,
     ipa_weight,
     ipa_image_path,
+    instantid_control,
+    instantid_id_weight,
+    instantid_ipa_weight,
+    instantid_image_path,
     ref_mode_choose,
     ipa_only_weight,
     ipa_only_image_path,
+    instantid_only_id_weight,
+    instantid_only_ipa_weight,
+    instantid_only_image_path,
     lcm_accelerate,
     enable_second_diffusion,
     *user_ids,
@@ -471,6 +500,14 @@ def easyphoto_infer_forward(
         ipa_weight = ipa_only_weight
         ipa_image_path = ipa_only_image_path
         user_ids = ["ipa_control_only", "none", "none", "none", "none"]
+    
+    # infer with InstantID only
+    if ref_mode_choose == "Infer with InstantID only(without Pretraining Lora)":
+        instantid_control = True
+        instantid_id_weight = instantid_only_id_weight
+        instantid_ipa_weight = instantid_only_ipa_weight
+        instantid_image_path = instantid_only_image_path
+        user_ids = ["instantid_control_only", "none", "none", "none", "none"]
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -504,6 +541,10 @@ def easyphoto_infer_forward(
         ep_logger.error("EasyPhoto does not support the SD2 checkpoint.")
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
+    
+    if not sdxl_pipeline_flag and instantid_control:
+        ep_logger.error("EasyPhoto does not support InstantID Control with the SD1 checkpoint.")
+        return "EasyPhoto does not support InstantID Control with the SD1 checkpoint.", [], []
 
     # check & download weights of others models
     if sdxl_pipeline_flag or tabs == 3:
@@ -527,16 +568,22 @@ def easyphoto_infer_forward(
             if check_hash.get("add_ipa_sdxl", True):
                 refresh_model_vae()
             check_hash["add_ipa_sdxl"] = False
+    if instantid_control:
+        check_files_exists_and_download(check_hash.get("add_instantid_sdxl", True), download_mode="add_instantid_sdxl")
+        if check_hash.get("add_instantid_sdxl", True):
+            refresh_model_vae()
+        check_hash["add_instantid_sdxl"] = False
     if lcm_accelerate:
         check_files_exists_and_download(check_hash.get("lcm", True), download_mode="lcm")
         check_hash["lcm"] = False
 
     # Check if the user_id is valid and if the type of the stable diffusion model and the user LoRA match
     for user_id in user_ids:
-        if user_id != "none" and user_id != "ipa_control_only":
+        if user_id != "none" and user_id != "ipa_control_only" and user_id != "instantid_control_only":
             # Check if the user_id is valid
             if not check_id_valid(user_id, user_id_outpath_samples, models_path):
-                return "User id is not exist", [], []
+                ep_logger.error("User id is not exist.")
+                return "User id is not exist.", [], []
             # Check if the type of the stable diffusion model and the user LoRA match
             user_lora_type = get_lora_type(os.path.join(models_path, f"Lora/{user_id}.safetensors"))
             user_lora_sdxl_flag = True if user_lora_type == 3 else False
@@ -572,6 +619,10 @@ def easyphoto_infer_forward(
         if major < 1 or minor < 1 or patch < 417:
             ep_logger.error("To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.")
             return "To use IP-Adapter Control, please upgrade sd-webui-controlnet to the latest version.", [], []
+    if instantid_control:
+        if major < 1 or minor < 1 or patch < 440:
+            ep_logger.error("To use InstantID Control, please upgrade sd-webui-controlnet to the latest version.")
+            return "To use InstantID Control, please upgrade sd-webui-controlnet to the latest version.", [], []
 
     # check the number of controlnets
     max_control_net_unit_count = 3 if not ipa_control else 4
@@ -608,6 +659,30 @@ def easyphoto_infer_forward(
         if not display_score:
             display_score = True
             ep_logger.warning("Display score is forced to be true when IP-Adapter Control is enabled.")
+    
+    if instantid_control:
+        instantid_image_paths = ["none"] * 5  # consistent with user_ids
+        instantid_flag = False
+        valid_user_id_num, valid_instantid_image_path_num = 0, 0
+        for index, user_id in enumerate(user_ids):
+            if not instantid_flag and user_id != "none" and instantid_image_path is not None:
+                instantid_image_paths[index] = instantid_image_path
+                instantid_flag = True
+                valid_instantid_image_path_num += 1
+            if user_id != "none":
+                valid_user_id_num += 1
+
+        if valid_user_id_num > 1:
+            ep_logger.error("EasyPhoto does not support InstantID Control with multiple user ids currently.")
+            return "EasyPhoto does not support InstantID Control with multiple user ids currently.", [], []
+        if instantid_control and valid_user_id_num != valid_instantid_image_path_num:
+            ep_logger.warning(
+                "Found {} user id(s), but only {} image prompt(s) for InstantID Control. Use the reference image "
+                "corresponding to the user instead.".format(valid_user_id_num, valid_ipa_image_path_num)
+            )
+        if not display_score:
+            display_score = True
+            ep_logger.warning("Display score is forced to be true when InstantID Control is enabled.")
 
     if lcm_accelerate:
         lcm_lora_name_and_weight = "lcm_lora_sdxl:0.40" if sdxl_pipeline_flag else "lcm_lora_sd15:0.80"
@@ -743,6 +818,8 @@ def easyphoto_infer_forward(
         ipa_retinaface_keypoints = []
         ipa_retinaface_masks = []
         ipa_face_part_only = False
+    if instantid_control:
+        instantid_images = []
 
     if lcm_accelerate:
         input_prompt_without_lora += f"<lora:{lcm_lora_name_and_weight}>, "
@@ -780,7 +857,7 @@ def easyphoto_infer_forward(
 
             # get lora scene prompt
             # add user lora for kind of WARMUP, better result in t2i final result
-            if user_ids[0] != "ipa_control_only":
+            if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
                 last_scene_lora_prompt_high_weight = (
                     text_to_image_input_prompt
                     + f", <lora:{scene_id}:0.80>, look at viewer, "
@@ -833,7 +910,7 @@ def easyphoto_infer_forward(
         else:
             text_to_image_input_prompt += ", look at viewer"
             # get lora scene prompt
-            if user_ids[0] != "ipa_control_only":
+            if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
                 text_to_image_input_prompt = text_to_image_input_prompt + f", {validation_prompt}, <lora:{user_ids[0]}:0.25>, "
 
             # text to image for template
@@ -881,11 +958,15 @@ def easyphoto_infer_forward(
                 ipa_retinaface_boxes.append([])
                 ipa_retinaface_keypoints.append([])
                 ipa_retinaface_masks.append([])
+            if instantid_control:
+                instantid_images.append("none")
         elif user_id == "ipa_control_only":
             # get prompt
             input_prompt = f"1person, face, portrait, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
+            if sdxl_pipeline_flag:
+                input_prompt = f"1person, face, portrait, " + additional_prompt
             if lcm_accelerate:
-                input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
+                input_prompt += f" <lora:{lcm_lora_name_and_weight}>"
             ipa_image = Image.open(ipa_image_paths[index])
             ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
 
@@ -914,6 +995,25 @@ def easyphoto_infer_forward(
                 ipa_retinaface_boxes.append(_ipa_retinaface_boxes[0])
                 ipa_retinaface_keypoints.append(_ipa_retinaface_keypoints[0])
                 ipa_retinaface_masks.append(_ipa_retinaface_masks[0])
+        elif user_id == "instantid_control_only":
+            # get prompt
+            input_prompt = "1person " + additional_prompt
+            if lcm_accelerate:
+                input_prompt += f" <lora:{lcm_lora_name_and_weight}>"
+            instantid_image = Image.open(instantid_image_paths[index])
+            instantid_image = ImageOps.exif_transpose(instantid_image).convert("RGB")
+
+            roop_image = instantid_image
+            # We leave the face sanity check to ControlNet.
+
+            input_prompts.append(input_prompt)
+            face_id_images.append("none")
+            roop_images.append(roop_image)
+            face_id_retinaface_boxes.append([])
+            face_id_retinaface_keypoints.append([])
+            face_id_retinaface_masks.append([])
+            if instantid_control:
+                instantid_images.append(instantid_image)
         else:
             # get prompt
             input_prompt = f"{validation_prompt}, <lora:{user_id}:{lora_weights}>, " + "<lora:FilmVelvia3:0.65>, " + additional_prompt
@@ -958,6 +1058,13 @@ def easyphoto_infer_forward(
                         "{} faces are detected in the uploaded image prompt. "
                         "Only the left one will be used.".format(len(_ipa_retinaface_boxes))
                     )
+            if instantid_control:
+                if instantid_image_paths[index] != "none":
+                    instantid_image = Image.open(instantid_image_paths[index])
+                    instantid_image = ImageOps.exif_transpose(instantid_image).convert("RGB")
+                else:
+                    instantid_image = copy.deepcopy(roop_image)
+                # We leave the face sanity check to ControlNet.
 
             # Crop user images to obtain portrait boxes, facial keypoints, and masks
             _face_id_retinaface_boxes, _face_id_retinaface_keypoints, _face_id_retinaface_masks = call_face_crop(
@@ -978,6 +1085,8 @@ def easyphoto_infer_forward(
                 ipa_retinaface_boxes.append(_ipa_retinaface_boxes[0])
                 ipa_retinaface_keypoints.append(_ipa_retinaface_keypoints[0])
                 ipa_retinaface_masks.append(_ipa_retinaface_masks[0])
+            if instantid_control:
+                instantid_images.append(instantid_image)
 
     outputs, face_id_outputs = [], []
     loop_message = ""
@@ -1010,10 +1119,17 @@ def easyphoto_infer_forward(
             face_shape_match                        : {str(face_shape_match)}
             ipa_control                             : {str(ipa_control)}
             ipa_weight                              : {str(ipa_weight)}
+            instantid_control                       : {str(instantid_control)}
+            instantid_id_weight                     : {str(instantid_id_weight)}
+            instantid_ipa_weight                    : {str(instantid_ipa_weight)}
+            instantid_image_path                    : {str(instantid_image_path)}
             ipa_image_path                          : {str(ipa_image_path)}
             ref_mode_choose                         : {str(ref_mode_choose)}
             ipa_only_weight                         : {str(ipa_only_weight)}
             ipa_only_image_path                     : {str(ipa_only_image_path)}
+            instantid_only_id_weight                : {str(instantid_only_id_weight)}
+            instantid_only_ipa_weight               : {str(instantid_only_ipa_weight)}
+            instantid_only_image_path               : {str(instantid_only_image_path)}
         """
         ep_logger.info(template_idx_info)
         try:
@@ -1130,7 +1246,7 @@ def easyphoto_infer_forward(
                 copy.deepcopy(input_mask)
                 original_input_template = copy.deepcopy(input_image)
 
-                if user_ids[index] == "ipa_control_only":
+                if user_ids[index] == "ipa_control_only" or user_ids[index] == "instantid_control_only":
                     replaced_input_image = None
                 else:
                     # Paste user images onto template images
@@ -1200,6 +1316,12 @@ def easyphoto_infer_forward(
 
                     padded_size = (max(ipa_image_face.size), max(ipa_image_face.size))
                     ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
+
+                    ipa_image_face = copy.deepcopy(instantid_images[index])
+                
+                # We leave the face preprocess to ControlNet.
+                if instantid_control:
+                    pass
 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
@@ -1271,7 +1393,7 @@ def easyphoto_infer_forward(
                     :,
                 ]
 
-                if user_ids[index] == "ipa_control_only":
+                if user_ids[index] == "ipa_control_only" or user_ids[index] == "instantid_control_only":
                     replaced_input_image = input_image
 
                 # First diffusion, facial reconstruction
@@ -1289,17 +1411,25 @@ def easyphoto_infer_forward(
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                         if ipa_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
+                        if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
+                    cfg_scale = 7 if not lcm_accelerate else 2
+                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
+                    if instantid_control:
+                        cfg_scale = 5
+                        sampler = "Euler"
                     first_diffusion_output_image = inpaint(
                         input_image,
                         input_mask,
                         controlnet_pairs,
                         diffusion_steps=first_diffusion_steps,
-                        cfg_scale=7 if not lcm_accelerate else 2,
+                        cfg_scale=cfg_scale,
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                        sampler=sampler,
                         loractl_flag=loractl_flag,
                     )
                     # We only save the lora weight image in the first diffusion.
@@ -1316,17 +1446,25 @@ def easyphoto_infer_forward(
                         controlnet_pairs = [["sdxl_canny_mid", input_image, 0.50]]
                         if ipa_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
+                        if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
+                    cfg_scale = 7 if not lcm_accelerate else 2
+                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
+                    if instantid_control:
+                        cfg_scale = 5
+                        sampler = "Euler"
                     first_diffusion_output_image = inpaint(
                         input_image,
                         None,
                         controlnet_pairs,
                         diffusion_steps=first_diffusion_steps,
-                        cfg_scale=7 if not lcm_accelerate else 2,
+                        cfg_scale=cfg_scale,
                         denoising_strength=first_denoising_strength,
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                        sampler=sampler,
                     )
                     if loractl_flag:
                         first_diffusion_output_image, lora_weight_image = first_diffusion_output_image[:2]
@@ -1462,19 +1600,26 @@ def easyphoto_infer_forward(
                     else:
                         controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00]]
                         if ipa_control:
-                            controlnet_pairs = [["sdxl_canny_mid", fusion_image, 1.00], ["ipa_sdxl_plus_face", ipa_image_face, ipa_weight]]
-
+                            controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
+                        if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
+                    cfg_scale = 7 if not lcm_accelerate else 2
+                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
+                    if instantid_control:
+                        cfg_scale = 5
+                        sampler = "Euler"
                     second_diffusion_output_image = inpaint(
                         input_image,
                         input_mask,
                         controlnet_pairs,
                         input_prompts[index],
                         diffusion_steps=second_diffusion_steps,
-                        cfg_scale=7 if not lcm_accelerate else 2,
+                        cfg_scale=cfg_scale,
                         denoising_strength=second_denoising_strength,
                         hr_scale=default_hr_scale,
                         seed=seed,
-                        sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                        sampler=sampler,
                     )
                     second_diffusion_output_image = second_diffusion_output_image[0]
                 else:
@@ -1582,6 +1727,7 @@ def easyphoto_infer_forward(
                     face_id_outputs.append(
                         (roop_images[index], "{:.2f}, {}, the reference image".format(loop_output_image_faceid, user_ids[index]))
                     )
+                    # When the IP-Adapter/InstantID Control is enabled, append the Face ID of the generation w.r.t the image prompt.
                     if ipa_control and user_ids[index] != "ipa_control_only":
                         ipa_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(ipa_images[index]))))[
                             OutputKeys.IMG_EMBEDDING
@@ -1589,6 +1735,14 @@ def easyphoto_infer_forward(
                         ipa_image_faceid = np.dot(embedding, np.transpose(ipa_image_embedding))[0][0]
                         face_id_outputs.append(
                             (ipa_images[index], "{:.2f}, {}, the image prompt".format(ipa_image_faceid, user_ids[index]))
+                        )
+                    if instantid_control and user_ids[index] != "instantid_control_only":
+                        instantid_image_embedding = face_recognition(dict(user=Image.fromarray(np.uint8(instantid_images[index]))))[
+                            OutputKeys.IMG_EMBEDDING
+                        ]
+                        instantid_image_faceid = np.dot(embedding, np.transpose(instantid_image_embedding))[0][0]
+                        face_id_outputs.append(
+                            (instantid_images[index], "{:.2f}, {}, the image prompt".format(instantid_image_faceid, user_ids[index]))
                         )
                     loop_output_image = Image.fromarray(loop_output_image)
 

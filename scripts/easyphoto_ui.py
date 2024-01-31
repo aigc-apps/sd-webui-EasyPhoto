@@ -689,7 +689,7 @@ def on_ui_tabs():
 
                             with gr.Row():
                                 ref_mode_choose = gr.Radio(
-                                    ["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)"],
+                                    ["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)", "Infer with InstantID only(without Pretraining Lora)"],
                                     value="Infer with Pretrained Lora",
                                     show_label=False,
                                 )
@@ -757,6 +757,27 @@ def on_ui_tabs():
                                         step=0.05,
                                         label="IP-Adapter Only Control Weight",
                                     )
+                            
+                            with gr.Row(visible=False) as instantid_only_row:
+                                with gr.Column():
+                                    instantid_only_image_path = gr.Image(
+                                        label="Image Prompt for InstantID Only", show_label=True, source="upload", type="filepath"
+                                    )
+                                    with gr.Row():
+                                        instantid_only_id_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="IdentityNet Weight (for fedility)",
+                                        )
+                                        instantid_only_ipa_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="Image Adapter Weight (for detail)",
+                                        )
 
                             with gr.Accordion("Advanced Options", open=False):
                                 additional_prompt = gr.Textbox(
@@ -830,7 +851,7 @@ def on_ui_tabs():
                                 with gr.Row():
                                     display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
                                     ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
-                                    face_shape_match = gr.Checkbox(label="Face Shape Match", value=False)
+                                    instantid_control = gr.Checkbox(label="InstantID Control", value=False)
 
                                     def ipa_update_score(ipa_control):
                                         if ipa_control:
@@ -849,11 +870,21 @@ def on_ui_tabs():
                                                 gr.update(value=False, visible=False),
                                                 gr.update(visible=False),
                                                 gr.update(visible=True),
+                                                gr.update(visible=False),
+                                            )
+                                        if ref_mode_choose == "Infer with InstantID only(without Pretraining Lora)":
+                                            return (
+                                                gr.update(value=True),
+                                                gr.update(value=False, visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=True),
                                             )
                                         return (
                                             gr.update(visible=True),
                                             gr.update(value=False, visible=True),
                                             gr.update(visible=True),
+                                            gr.update(visible=False),
                                             gr.update(visible=False),
                                         )
 
@@ -866,9 +897,10 @@ def on_ui_tabs():
                                     ref_mode_choose.change(
                                         use_ipa_only,
                                         inputs=[ref_mode_choose],
-                                        outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row],
+                                        outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row, instantid_only_row],
                                     )
                                 with gr.Row():
+                                    face_shape_match = gr.Checkbox(label="Face Shape Match", value=False)
                                     lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
                                     enable_second_diffusion = gr.Checkbox(label="Enable Second Diffusion", value=True)
 
@@ -985,6 +1017,31 @@ def on_ui_tabs():
                                 )
                                 ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
 
+                                with gr.Row(visible=False) as instant_id_row:
+                                    with gr.Column():
+                                        instantid_image_path = gr.Image(
+                                            label="Image Prompt for InstantID Control", show_label=True, source="upload", type="filepath"
+                                        )
+                                        with gr.Row():
+                                            instantid_id_weight = gr.Slider(
+                                                minimum=0.10,
+                                                maximum=1.00,
+                                                value=0.5,
+                                                step=0.05,
+                                                label="IdentityNet Weight (for fedility)",
+                                            )
+                                            instantid_ipa_weight = gr.Slider(
+                                                minimum=0.10,
+                                                maximum=1.00,
+                                                value=0.5,
+                                                step=0.05,
+                                                label="Image Adapter Weight (for detail)",
+                                            )
+                                
+                                instantid_control.change(
+                                    lambda x: instant_id_row.update(visible=x), inputs=[instantid_control], outputs=[instant_id_row]
+                                )
+
                                 with gr.Box():
                                     gr.Markdown(
                                         """
@@ -1098,9 +1155,16 @@ def on_ui_tabs():
                             ipa_control,
                             ipa_weight,
                             ipa_image_path,
+                            instantid_control,
+                            instantid_id_weight,
+                            instantid_ipa_weight,
+                            instantid_image_path,
                             ref_mode_choose,
                             ipa_only_weight,
                             ipa_only_image_path,
+                            instantid_only_id_weight,
+                            instantid_only_ipa_weight,
+                            instantid_only_image_path,
                             lcm_accelerate,
                             enable_second_diffusion,
                             *uuids,
