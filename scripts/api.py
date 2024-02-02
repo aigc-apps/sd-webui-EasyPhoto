@@ -142,13 +142,20 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         face_shape_match = datas.get("face_shape_match", False)
         tabs = datas.get("tabs", 1)
 
-        ipa_control = datas.get("ipa_control", False)
+        id_control = datas.get("id_control", True)
+        id_control_method = datas.get("id_control", "IP-Adapter Face")
         ipa_weight = datas.get("ipa_weight", 0.50)
         ipa_image = datas.get("ipa_image", None)
-
-        ref_mode_choose = datas.get("ref_mode_choose", "Infer with Pretrained Lora")
+        instantid_id_weight = datas.get("instantid_id_weight", 0.50)
+        instantid_ipa_weight = = datas.get("instantid_ipa_weight", 0.50)
+        instantid_image = datas.get("instantid_image", None)
+        ref_mode_choose = datas.get("ref_mode_choose", "Infer with User Lora")
+        no_user_lora_mode = datas.get("no_user_lora_mode", "IP-Adapter Face")
         ipa_only_weight = datas.get("ipa_only_weight", 0.60)
         ipa_only_image = datas.get("ipa_only_image", None)
+        instantid_only_id_weight = datas.get("instantid_only_id_weight", 0.50)
+        instantid_only_ipa_weight = datas.get("instantid_only_ipa_weight", 0.50)
+        instantid_only_image = datas.get("instantid_only_image", None)
 
         lcm_accelerate = datas.get("lcm_accelerate", None)
         enable_second_diffusion = datas.get("enable_second_diffusion", True)
@@ -162,6 +169,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         t2i_pose_template = None if t2i_pose_template is None else api.decode_base64_to_image(t2i_pose_template)
         ipa_image = None if ipa_image is None else api.decode_base64_to_image(ipa_image)
         ipa_only_image = None if ipa_only_image is None else api.decode_base64_to_image(ipa_only_image)
+        instantid_image = None if instantid_image is None else api.decode_base64_to_image(instantid_image)
+        instantid_only_image = None if instantid_only_image is None else api.decode_base64_to_image(instantid_only_image)
 
         _selected_template_images = []
         for selected_template_image in selected_template_images:
@@ -202,6 +211,22 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             ipa_only_image_path = save_path
         else:
             ipa_only_image_path = None
+        
+        if instantid_image is not None:
+            hash_value = hashlib.md5(instantid_image.tobytes()).hexdigest()
+            save_path = os.path.join("/tmp", hash_value + ".jpg")
+            instantid_image.save(save_path)
+            instantid_image_path = save_path
+        else:
+            instantid_image_path = None
+
+        if instantid_only_image is not None:
+            hash_value = hashlib.md5(instantid_only_image.tobytes()).hexdigest()
+            save_path = os.path.join("/tmp", hash_value + ".jpg")
+            instantid_only_image.save(save_path)
+            instantid_only_image_path = save_path
+        else:
+            instantid_only_image_path = None
 
         tabs = int(tabs)
         try:
@@ -242,12 +267,20 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
                 makeup_transfer_ratio,
                 face_shape_match,
                 tabs,
-                ipa_control,
+                id_control,
+                id_control_method,
                 ipa_weight,
                 ipa_image_path,
+                instantid_id_weight,
+                instantid_ipa_weight,
+                instantid_image_path,
                 ref_mode_choose,
+                no_user_lora_mode,
                 ipa_only_weight,
                 ipa_only_image_path,
+                instantid_only_id_weight,
+                instantid_only_ipa_weight,
+                instantid_only_image_path,
                 lcm_accelerate,
                 enable_second_diffusion,
                 *user_ids,
