@@ -474,14 +474,15 @@ def easyphoto_infer_forward(
     makeup_transfer_ratio,
     face_shape_match,
     tabs,
-    ipa_control,
+    id_control,
+    id_control_method,
     ipa_weight,
     ipa_image_path,
-    instantid_control,
     instantid_id_weight,
     instantid_ipa_weight,
     instantid_image_path,
     ref_mode_choose,
+    no_user_lora_mode,
     ipa_only_weight,
     ipa_only_image_path,
     instantid_only_id_weight,
@@ -494,20 +495,31 @@ def easyphoto_infer_forward(
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
 
-    # infer with IPA only
-    if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
-        ipa_control = True
-        ipa_weight = ipa_only_weight
-        ipa_image_path = ipa_only_image_path
-        user_ids = ["ipa_control_only", "none", "none", "none", "none"]
-    
-    # infer with InstantID only
-    if ref_mode_choose == "Infer with InstantID only(without Pretraining Lora)":
-        instantid_control = True
-        instantid_id_weight = instantid_only_id_weight
-        instantid_ipa_weight = instantid_only_ipa_weight
-        instantid_image_path = instantid_only_image_path
-        user_ids = ["instantid_control_only", "none", "none", "none", "none"]
+    # Infer without User Lora
+    if ref_mode_choose == "Infer without User Lora":
+        if no_user_lora_mode == "IP-Adapter Face":
+            ipa_control, instantid_control = True, False
+            ipa_weight = ipa_only_weight
+            ipa_image_path = ipa_only_image_path
+            user_ids = ["ipa_control_only", "none", "none", "none", "none"]
+        elif no_user_lora_mode == "InstantID":
+            ipa_control, instantid_control = False, True
+            instantid_id_weight = instantid_only_id_weight
+            instantid_ipa_weight = instantid_only_ipa_weight
+            instantid_image_path = instantid_only_image_path
+            user_ids = ["instantid_control_only", "none", "none", "none", "none"]
+        else:
+            logger.error(f"EasyPhoto does not support no_user_lora_mode: {no_user_lora_mode}.")
+    else:
+        if id_control:
+            if id_control_method == "IP-Adapter Face":
+                ipa_control, instantid_control = True, False
+            elif id_control_method == "InstantID":
+                ipa_control, instantid_control = False, True
+            else:
+                logger.error(f"EasyPhoto does not support id_control_method: {id_control_method}.")
+        else:
+            ipa_control, instantid_control = False, False
 
     # update donot delete but use "none" as placeholder and will pass this face inpaint later
     passed_userid_list = []
@@ -678,7 +690,7 @@ def easyphoto_infer_forward(
         if instantid_control and valid_user_id_num != valid_instantid_image_path_num:
             ep_logger.warning(
                 "Found {} user id(s), but only {} image prompt(s) for InstantID Control. Use the reference image "
-                "corresponding to the user instead.".format(valid_user_id_num, valid_ipa_image_path_num)
+                "corresponding to the user instead.".format(valid_user_id_num, valid_instantid_image_path_num)
             )
         if not display_score:
             display_score = True
@@ -1117,14 +1129,15 @@ def easyphoto_infer_forward(
             makeup_transfer_ratio                   : {str(makeup_transfer_ratio)}
             skin_retouching_bool                    : {str(skin_retouching_bool)}
             face_shape_match                        : {str(face_shape_match)}
-            ipa_control                             : {str(ipa_control)}
+            id_control                              : {str(id_control)}
+            id_control_method                       : {str(id_control_method)}
             ipa_weight                              : {str(ipa_weight)}
-            instantid_control                       : {str(instantid_control)}
             instantid_id_weight                     : {str(instantid_id_weight)}
             instantid_ipa_weight                    : {str(instantid_ipa_weight)}
             instantid_image_path                    : {str(instantid_image_path)}
             ipa_image_path                          : {str(ipa_image_path)}
             ref_mode_choose                         : {str(ref_mode_choose)}
+            no_user_lora_mode                       : {str(no_user_lora_mode)}
             ipa_only_weight                         : {str(ipa_only_weight)}
             ipa_only_image_path                     : {str(ipa_only_image_path)}
             instantid_only_id_weight                : {str(instantid_only_id_weight)}
@@ -1316,8 +1329,6 @@ def easyphoto_infer_forward(
 
                     padded_size = (max(ipa_image_face.size), max(ipa_image_face.size))
                     ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
-
-                    ipa_image_face = copy.deepcopy(instantid_images[index])
                 
                 # We leave the face preprocess to ControlNet.
                 if instantid_control:
