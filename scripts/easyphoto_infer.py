@@ -607,6 +607,8 @@ def easyphoto_infer_forward(
                 )
                 ep_logger.error(error_info)
                 return error_info, [], []
+        else:
+            user_lora_sdxl_flag = None
 
     loractl_flag = False
     if "sliders" in additional_prompt:
@@ -736,7 +738,7 @@ def easyphoto_infer_forward(
                     ep_logger.error(error_info)
                     return error_info, [], []
 
-                if scene_lora_sdxl_flag != user_lora_sdxl_flag:
+                if user_lora_sdxl_flag is not None and scene_lora_sdxl_flag != user_lora_sdxl_flag:
                     scene_lora_type_name = "SDXL" if scene_lora_sdxl_flag else "SD1"
                     user_lora_type_name = "SDXL" if user_lora_sdxl_flag else "SD1"
                     error_info = "The type of the user id {} ({}) and the scene id {} ({}) does not match.".format(
@@ -979,8 +981,12 @@ def easyphoto_infer_forward(
                 input_prompt = f"1person, face, portrait, " + additional_prompt
             if lcm_accelerate:
                 input_prompt += f" <lora:{lcm_lora_name_and_weight}>"
-            ipa_image = Image.open(ipa_image_paths[index])
-            ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
+            if ipa_image_paths[index] != "none":
+                ipa_image = Image.open(ipa_image_paths[index])
+                ipa_image = ImageOps.exif_transpose(ipa_image).convert("RGB")
+            else:
+                ep_logger.error("Please upload the image prompt.")
+                return "Please upload the image prompt.", [], []
 
             roop_image = ipa_image
 
@@ -1012,8 +1018,12 @@ def easyphoto_infer_forward(
             input_prompt = "1person " + additional_prompt
             if lcm_accelerate:
                 input_prompt += f" <lora:{lcm_lora_name_and_weight}>"
-            instantid_image = Image.open(instantid_image_paths[index])
-            instantid_image = ImageOps.exif_transpose(instantid_image).convert("RGB")
+            if instantid_image_paths[index] != "none":
+                instantid_image = Image.open(instantid_image_paths[index])
+                instantid_image = ImageOps.exif_transpose(instantid_image).convert("RGB")
+            else:
+                ep_logger.error("Please upload the image prompt.")
+                return "Please upload the image prompt.", [], []
 
             roop_image = instantid_image
             # We leave the face sanity check to ControlNet.
