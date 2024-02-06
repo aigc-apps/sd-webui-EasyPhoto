@@ -147,7 +147,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         ipa_weight = datas.get("ipa_weight", 0.50)
         ipa_image = datas.get("ipa_image", None)
         instantid_id_weight = datas.get("instantid_id_weight", 0.50)
-        instantid_ipa_weight = = datas.get("instantid_ipa_weight", 0.50)
+        instantid_ipa_weight = datas.get("instantid_ipa_weight", 0.50)
         instantid_image = datas.get("instantid_image", None)
         ref_mode_choose = datas.get("ref_mode_choose", "Infer with User Lora")
         no_user_lora_mode = datas.get("no_user_lora_mode", "IP-Adapter Face")
@@ -181,8 +181,8 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
         selected_template_images = str(_selected_template_images)
 
         if init_image is not None:
-            if init_image.mode in ('P'):
-                init_image = init_image.convert('RGB')
+            if init_image.mode in ("P"):
+                init_image = init_image.convert("RGB")
             init_image = np.array(init_image)
 
         _uploaded_template_images = []
@@ -211,7 +211,7 @@ def easyphoto_infer_forward_api(_: gr.Blocks, app: FastAPI):
             ipa_only_image_path = save_path
         else:
             ipa_only_image_path = None
-        
+
         if instantid_image is not None:
             hash_value = hashlib.md5(instantid_image.tobytes()).hexdigest()
             save_path = os.path.join("/tmp", hash_value + ".jpg")
