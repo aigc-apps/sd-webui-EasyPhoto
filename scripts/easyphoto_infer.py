@@ -276,7 +276,7 @@ def get_controlnet_unit(
             model="ip-adapter_sd15",
         )
 
-    elif unit == "canny_no_pre":  # "Crop and Resize"
+    elif unit == "canny_no_pre":
         control_unit = dict(
             input_image=input_image,
             module=None,
