@@ -89,7 +89,12 @@ def resize_image(input_image, resolution, nearest=False, crop264=True):
 # Add control_mode=1 means Prompt is more important, to better control lips and eyes,
 # this comments will be delete after 10 PR and for those who are not familiar with SDWebUIControlNetAPI
 def get_controlnet_unit(
-    unit: str, input_image: Union[Any, List[Any]], weight: float, is_batch: bool = False, control_mode: int = 1
+    unit: str,
+    input_image: Union[Any, List[Any]],
+    weight: float,
+    control_mode: int = 1,
+    resize_mode: str = "Just Resize",
+    is_batch: bool = False,
 ):  # Any should be replaced with a more specific image type  # Default to False, assuming single image input by default
     if unit == "canny":
         control_unit = dict(
@@ -98,7 +103,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             threshold_a=100,
             threshold_b=200,
             model="control_v11p_sd15_canny",
@@ -112,7 +117,7 @@ def get_controlnet_unit(
             guidance_end=1,
             control_mode=control_mode,
             processor_res=1024,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             threshold_a=100,
             threshold_b=200,
             model="diffusers_xl_canny_mid",
@@ -125,7 +130,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="control_v11p_sd15_openpose",
         )
 
@@ -136,7 +141,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="control_v11p_sd15_openpose",
         )
 
@@ -148,7 +153,7 @@ def get_controlnet_unit(
             guidance_end=1,
             control_mode=control_mode,
             processor_res=1024,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="thibaud_xl_openpose_256lora",
         )
 
@@ -159,7 +164,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="control_sd15_random_color",
         )
 
@@ -201,7 +206,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             threshold_a=1,
             threshold_b=200,
             model="control_v11f1e_sd15_tile",
@@ -214,7 +219,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="ip-adapter-full-face_sd15",
         )
     elif unit == "ipa_sdxl_plus_face":
@@ -224,7 +229,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="ip-adapter-plus-face_sdxl_vit-h",
         )
     elif unit == "instantid_sdxl_face_embedding":
@@ -233,9 +238,9 @@ def get_controlnet_unit(
             module="instant_id_face_embedding",
             weight=weight,
             guidance_end=1,
-            control_mode=2,
+            control_mode=control_mode,
             processor_res=512,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="ip-adapter_instant_id_sdxl",
         )
     elif unit == "instantid_sdxl_face_keypoints":
@@ -244,9 +249,9 @@ def get_controlnet_unit(
             module="instant_id_face_keypoints",
             weight=weight,
             guidance_end=1,
-            control_mode=2,
+            control_mode=control_mode,
             processor_res=512,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="control_instant_id_sdxl",
         )
     elif unit == "depth":
@@ -256,7 +261,7 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="control_v11f1p_sd15_depth",
         )
 
@@ -267,18 +272,18 @@ def get_controlnet_unit(
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Just Resize",
+            resize_mode=resize_mode,
             model="ip-adapter_sd15",
         )
 
-    elif unit == "canny_no_pre":
+    elif unit == "canny_no_pre":  # "Crop and Resize"
         control_unit = dict(
             input_image=input_image,
             module=None,
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
-            resize_mode="Crop and Resize",
+            resize_mode=resize_mode,
             threshold_a=100,
             threshold_b=200,
             model="control_v11p_sd15_canny",
@@ -319,12 +324,7 @@ def txt2img(
     controlnet_units_list = []
 
     for pair in controlnet_pairs:
-        if len(pair) == 4:
-            controlnet_units_list.append(
-                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
-            )
-        else:
-            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
+        controlnet_units_list.append(get_controlnet_unit(*pair, is_batch=False if type(pair[1]) is not list else True))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -381,12 +381,7 @@ def inpaint(
     h = int(input_image.height) if type(input_image) is not list else int(input_image[0].height)
 
     for pair in controlnet_pairs:
-        if len(pair) == 4:
-            controlnet_units_list.append(
-                get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True, pair[3])
-            )
-        else:
-            controlnet_units_list.append(get_controlnet_unit(pair[0], pair[1], pair[2], False if type(pair[1]) is not list else True))
+        controlnet_units_list.append(get_controlnet_unit(*pair, is_batch=False if type(pair[1]) is not list else True))
 
     positive = f"{input_prompt}, {default_positive_prompt}"
     negative = f"{default_negative_prompt}"
@@ -862,19 +857,19 @@ def easyphoto_infer_forward(
             )
             t2i_pose_template = Image.open(np.random.choice(t2i_pose_templates))
             if prompt_generate_sd_model_checkpoint_type != 3:
-                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1, "Crop and Resize"]]
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
-                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
             else:
-                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2]]
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2, "Crop and Resize"]]
         elif t2i_control_way == "Control with uploaded template":
             t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
             if prompt_generate_sd_model_checkpoint_type != 3:
-                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1, "Crop and Resize"]]
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
-                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
             else:
-                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2]]
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2, "Crop and Resize"]]
         else:
             controlnet_pairs = []
 
