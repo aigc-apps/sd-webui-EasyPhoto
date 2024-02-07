@@ -97,7 +97,7 @@ def get_controlnet_unit(
             module="canny",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             threshold_a=100,
             threshold_b=200,
@@ -110,7 +110,7 @@ def get_controlnet_unit(
             module="canny",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             processor_res=1024,
             resize_mode="Just Resize",
             threshold_a=100,
@@ -124,7 +124,7 @@ def get_controlnet_unit(
             module="openpose_full",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
@@ -135,7 +135,7 @@ def get_controlnet_unit(
             module="dw_openpose_full",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="control_v11p_sd15_openpose",
         )
@@ -146,7 +146,7 @@ def get_controlnet_unit(
             module="openpose_full",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             processor_res=1024,
             resize_mode="Just Resize",
             model="thibaud_xl_openpose_256lora",
@@ -158,7 +158,7 @@ def get_controlnet_unit(
             module="none",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="control_sd15_random_color",
         )
@@ -200,7 +200,7 @@ def get_controlnet_unit(
             module="tile_resample",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             threshold_a=1,
             threshold_b=200,
@@ -213,7 +213,7 @@ def get_controlnet_unit(
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="ip-adapter-full-face_sd15",
         )
@@ -223,7 +223,7 @@ def get_controlnet_unit(
             module="ip-adapter_clip_sdxl_plus_vith",
             weight=weight,
             guidance_end=1,
-            control_mode=1,
+            control_mode=control_mode,
             resize_mode="Just Resize",
             model="ip-adapter-plus-face_sdxl_vit-h",
         )
@@ -509,7 +509,7 @@ def easyphoto_infer_forward(
             instantid_image_path = instantid_only_image_path
             user_ids = ["instantid_control_only", "none", "none", "none", "none"]
         else:
-            logger.error(f"EasyPhoto does not support no_user_lora_mode: {no_user_lora_mode}.")
+            ep_logger.error(f"EasyPhoto does not support no_user_lora_mode: {no_user_lora_mode}.")
     else:
         if id_control:
             if id_control_method == "IP-Adapter Face":
@@ -517,7 +517,7 @@ def easyphoto_infer_forward(
             elif id_control_method == "InstantID":
                 ipa_control, instantid_control = False, True
             else:
-                logger.error(f"EasyPhoto does not support id_control_method: {id_control_method}.")
+                ep_logger.error(f"EasyPhoto does not support id_control_method: {id_control_method}.")
         else:
             ipa_control, instantid_control = False, False
 
@@ -553,7 +553,7 @@ def easyphoto_infer_forward(
         ep_logger.error("EasyPhoto does not support the SD2 checkpoint.")
         return "EasyPhoto does not support the SD2 checkpoint.", [], []
     sdxl_pipeline_flag = True if checkpoint_type == 3 else False
-    
+
     if not sdxl_pipeline_flag and instantid_control:
         ep_logger.error("EasyPhoto does not support InstantID Control with the SD1 checkpoint.")
         return "EasyPhoto does not support InstantID Control with the SD1 checkpoint.", [], []
@@ -673,7 +673,7 @@ def easyphoto_infer_forward(
         if not display_score:
             display_score = True
             ep_logger.warning("Display score is forced to be true when IP-Adapter Control is enabled.")
-    
+
     if instantid_control:
         instantid_image_paths = ["none"] * 5  # consistent with user_ids
         instantid_flag = False
@@ -761,7 +761,7 @@ def easyphoto_infer_forward(
         image_face_fusion = pipeline(Tasks.image_face_fusion, model="damo/cv_unet-image-face-fusion_damo", model_revision="v1.3")
     if face_skin is None:
         face_skin = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
-    if skin_retouching is None:
+    if skin_retouching is None and skin_retouching_bool:
         try:
             skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
         except Exception as e:
@@ -848,16 +848,56 @@ def easyphoto_infer_forward(
                 os.path.join(easyphoto_models_path, "pose_templates/*.png")
             )
             t2i_pose_template = Image.open(np.random.choice(t2i_pose_templates))
-            controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
-            if prompt_generate_sd_model_checkpoint_type == 3:
-                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 0.50, 1]]
+            if prompt_generate_sd_model_checkpoint_type != 3:
+                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+            elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
+            else:
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50]]
         elif t2i_control_way == "Control with uploaded template":
             t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
-            controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
-            if prompt_generate_sd_model_checkpoint_type == 3:
-                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 0.50, 1]]
+            if prompt_generate_sd_model_checkpoint_type != 3:
+                controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1]]
+            elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
+            else:
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50]]
         else:
             controlnet_pairs = []
+
+        if user_ids[0] == "ipa_control_only":
+            if ipa_image_paths[0] != "none":
+                _ipa_image = Image.open(ipa_image_paths[0])
+                _ipa_image = ImageOps.exif_transpose(_ipa_image).convert("RGB")
+            else:
+                ep_logger.error("Please upload the image prompt.")
+                return "Please upload the image prompt.", [], []
+            _ipa_retinaface_boxes, _ipa_retinaface_keypoints, _ipa_retinaface_masks = call_face_crop(
+                retinaface_detection, _ipa_image, 1.05, "crop"
+            )
+            if len(_ipa_retinaface_boxes) == 0:
+                ep_logger.error("No face is detected in the uploaded image prompt.")
+                return "Please upload a image prompt with face.", [], []
+            if len(_ipa_retinaface_boxes) > 1:
+                ep_logger.warning(
+                    "{} faces are detected in the uploaded image prompt. "
+                    "Only the left one will be used.".format(len(_ipa_retinaface_boxes))
+                )
+            _ipa_image = _ipa_image.crop(_ipa_retinaface_boxes[0])
+            if prompt_generate_sd_model_checkpoint_type != 3:
+                controlnet_pairs.append(["ipa_full_face", _ipa_image, 0.30])
+            else:
+                controlnet_pairs.append(["ipa_sdxl_plus_face", _ipa_image, 0.30])
+        elif user_ids[0] == "instantid_control_only":
+            if len(controlnet_pairs) != 0:
+                if instantid_image_paths[0] != "none":
+                    instantid_image = Image.open(instantid_image_paths[0])
+                    instantid_image = ImageOps.exif_transpose(instantid_image).convert("RGB")
+                else:
+                    ep_logger.error("Please upload the image prompt.")
+                    return "Please upload the image prompt.", [], []
+
+                controlnet_pairs.insert(0, ["instantid_sdxl_face_embedding", instantid_image, 0.50])
 
         if scene_id != "none":
             # scene lora path
@@ -892,7 +932,6 @@ def easyphoto_infer_forward(
 
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-
             template_images = txt2img(
                 controlnet_pairs,
                 input_prompt=last_scene_lora_prompt_high_weight,
@@ -905,22 +944,23 @@ def easyphoto_infer_forward(
                 seed=seed,
                 sampler="Euler a",
             )
-            ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
-            template_images = inpaint(
-                template_images[0],
-                None,
-                [],
-                input_prompt=last_scene_lora_prompt_low_weight,
-                diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=7 if not lcm_accelerate else 2,
-                denoising_strength=0.20,
-                hr_scale=1.5,
-                default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                default_negative_prompt=DEFAULT_NEGATIVE_T2I,
-                seed=seed,
-                sampler="Euler a",
-            )
-            template_images = [np.uint8(template_images[0])]
+            if prompt_generate_sd_model_checkpoint_type != 3:
+                ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
+                template_images = inpaint(
+                    template_images[0],
+                    None,
+                    [],
+                    input_prompt=last_scene_lora_prompt_low_weight,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=7 if not lcm_accelerate else 2,
+                    denoising_strength=0.20,
+                    hr_scale=1.5,
+                    default_positive_prompt=DEFAULT_POSITIVE_T2I,
+                    default_negative_prompt=DEFAULT_NEGATIVE_T2I,
+                    seed=seed,
+                    sampler="Euler a",
+                )
+                template_images = [np.uint8(template_images[0])]
         else:
             text_to_image_input_prompt += ", look at viewer"
             # get lora scene prompt
@@ -1339,7 +1379,7 @@ def easyphoto_infer_forward(
 
                     padded_size = (max(ipa_image_face.size), max(ipa_image_face.size))
                     ipa_image_face = ImageOps.pad(ipa_image_face, padded_size, color=(255, 255, 255))
-                
+
                 # We leave the face preprocess to ControlNet.
                 if instantid_control:
                     pass
@@ -2161,7 +2201,7 @@ def easyphoto_video_infer_forward(
         image_face_fusion = pipeline(Tasks.image_face_fusion, model="damo/cv_unet-image-face-fusion_damo", model_revision="v1.3")
     if face_skin is None:
         face_skin = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
-    if skin_retouching is None:
+    if skin_retouching is None and skin_retouching_bool:
         try:
             skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
         except Exception as e:
