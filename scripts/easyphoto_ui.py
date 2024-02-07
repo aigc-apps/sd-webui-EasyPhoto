@@ -796,7 +796,7 @@ def on_ui_tabs():
                                 for i in range(int(5)):
                                     refresh.click(fn=select_function, inputs=[], outputs=[uuids[i]])
 
-                            def ref_mode_change(ref_mode_choose):
+                            def ref_mode_change(ref_mode_choose, no_user_lora_mode):
                                 if ref_mode_choose == "Infer with User Lora":
                                     return [
                                         gr.update(visible=False),
@@ -805,13 +805,22 @@ def on_ui_tabs():
                                         gr.update(visible=False),
                                         gr.update(visible=True),
                                     ]
-                                return [
-                                    gr.update(visible=True),
-                                    gr.update(visible=True),
-                                    gr.update(visible=False),
-                                    gr.update(visible=True),
-                                    gr.update(visible=False),
-                                ]
+                                if no_user_lora_mode == "IP-Adapter Face":
+                                    return [
+                                        gr.update(visible=True),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                    ]
+                                else:
+                                    return [
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                    ]
 
                             def no_user_lora_change(no_user_lora_mode):
                                 if no_user_lora_mode == "IP-Adapter Face":
@@ -821,7 +830,7 @@ def on_ui_tabs():
 
                             ref_mode_choose.change(
                                 fn=ref_mode_change,
-                                inputs=ref_mode_choose,
+                                inputs=[ref_mode_choose, no_user_lora_mode],
                                 outputs=[no_user_lora_note, ipa_only_row, instantid_only_row, no_user_lora_mode, uid_and_refresh],
                             )
                             no_user_lora_mode.change(
@@ -1016,7 +1025,7 @@ def on_ui_tabs():
                                             label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath"
                                         )
                                         ipa_weight = gr.Slider(
-                                            minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Control Weight"
+                                            minimum=0.10, maximum=1.00, value=0.30, step=0.05, label="IP-Adapter Control Weight"
                                         )
 
                                 with gr.Row(visible=False) as instantid_row:
@@ -1040,14 +1049,22 @@ def on_ui_tabs():
                                                 label="Image Adapter Weight (for detail)",
                                             )
 
-                                def id_control_change(id_control):
+                                def id_control_change(id_control, id_control_method):
                                     if id_control:
-                                        return [
-                                            gr.update(visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=False),
-                                        ]
+                                        if id_control_method == "IP-Adapter Face":
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                            ]
+                                        else:
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                                gr.update(visible=True),
+                                            ]
                                     else:
                                         return [
                                             gr.update(visible=False),
@@ -1062,7 +1079,7 @@ def on_ui_tabs():
                                     else:
                                         return [gr.update(visible=False), gr.update(visible=True)]
 
-                                def ref_mode_change_id_control(ref_mode_choose):
+                                def ref_mode_change_id_control(ref_mode_choose, id_control, id_control_method):
                                     if ref_mode_choose == "Infer without User Lora":
                                         return [
                                             gr.update(visible=False),
@@ -1072,17 +1089,35 @@ def on_ui_tabs():
                                             gr.update(visible=False),
                                         ]
                                     else:
-                                        return [
-                                            gr.update(visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=False),
-                                        ]
+                                        if id_control:
+                                            if id_control_method == "IP-Adapter Face":
+                                                return [
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=False),
+                                                ]
+                                            else:
+                                                return [
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=False),
+                                                    gr.update(visible=True),
+                                                ]
+                                        else:
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                            ]
 
                                 id_control.change(
                                     fn=id_control_change,
-                                    inputs=[id_control],
+                                    inputs=[id_control, id_control_method],
                                     outputs=[id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
                                 id_control_method.change(
@@ -1090,7 +1125,7 @@ def on_ui_tabs():
                                 )
                                 ref_mode_choose.change(
                                     fn=ref_mode_change_id_control,
-                                    inputs=[ref_mode_choose],
+                                    inputs=[ref_mode_choose, id_control, id_control_method],
                                     outputs=[id_control, id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
 
@@ -1559,7 +1594,7 @@ def on_ui_tabs():
                                         skin_retouching_bool = gr.Checkbox(label="Video Skin Retouching", value=False)
                                     with gr.Row():
                                         display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
+                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=True)
                                         face_shape_match = gr.Checkbox(label="Video Face Shape Match", value=False)
                                     with gr.Row():
                                         makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
@@ -1613,7 +1648,7 @@ def on_ui_tabs():
                                         ipa_weight = gr.Slider(
                                             minimum=0.10,
                                             maximum=1.00,
-                                            value=0.50,
+                                            value=0.30,
                                             step=0.05,
                                             label="Video IP-Adapter Control Weight",
                                             visible=False,
