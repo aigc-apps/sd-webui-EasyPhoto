@@ -866,7 +866,7 @@ def easyphoto_infer_forward(
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
                 controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
             else:
-                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50]]
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2]]
         elif t2i_control_way == "Control with uploaded template":
             t2i_pose_template = Image.fromarray(np.uint8(t2i_pose_template))
             if prompt_generate_sd_model_checkpoint_type != 3:
@@ -874,10 +874,11 @@ def easyphoto_infer_forward(
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
                 controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1]]
             else:
-                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50]]
+                controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2]]
         else:
             controlnet_pairs = []
 
+        t2i_instantid_control = False
         if user_ids[0] == "ipa_control_only":
             if ipa_image_paths[0] != "none":
                 _ipa_image = Image.open(ipa_image_paths[0])
@@ -902,6 +903,7 @@ def easyphoto_infer_forward(
             else:
                 controlnet_pairs.append(["ipa_sdxl_plus_face", _ipa_image, 0.30])
         elif user_ids[0] == "instantid_control_only":
+            t2i_instantid_control = True
             if len(controlnet_pairs) != 0:
                 if instantid_image_paths[0] != "none":
                     instantid_image = Image.open(instantid_image_paths[0])
@@ -910,7 +912,7 @@ def easyphoto_infer_forward(
                     ep_logger.error("Please upload the image prompt.")
                     return "Please upload the image prompt.", [], []
 
-                controlnet_pairs.insert(0, ["instantid_sdxl_face_embedding", instantid_image, 0.50])
+                controlnet_pairs.insert(0, ["instantid_sdxl_face_embedding", instantid_image, 0.50, 2])
 
         if scene_id != "none":
             # scene lora path
@@ -943,19 +945,29 @@ def easyphoto_infer_forward(
                 last_scene_lora_prompt_high_weight += f"<lora:{lcm_lora_name_and_weight}>, "
                 last_scene_lora_prompt_low_weight += f"<lora:{lcm_lora_name_and_weight}>, "
 
+            # define sampler and cfg_scale
+            if lcm_accelerate:
+                cfg_scale = 2
+                sampler = "Euler a"
+            elif t2i_instantid_control:
+                cfg_scale = 5
+                sampler = "Euler"
+            else:
+                cfg_scale = 7
+                sampler = "Euler a"
             # text to image with scene lora
             ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
             template_images = txt2img(
                 controlnet_pairs,
                 input_prompt=last_scene_lora_prompt_high_weight,
                 diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=7 if not lcm_accelerate else 2,
+                cfg_scale=cfg_scale,
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                 seed=seed,
-                sampler="Euler a",
+                sampler=sampler,
             )
             if prompt_generate_sd_model_checkpoint_type != 3:
                 ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
@@ -965,13 +977,13 @@ def easyphoto_infer_forward(
                     [],
                     input_prompt=last_scene_lora_prompt_low_weight,
                     diffusion_steps=30 if not lcm_accelerate else 8,
-                    cfg_scale=7 if not lcm_accelerate else 2,
+                    cfg_scale=cfg_scale,
                     denoising_strength=0.20,
                     hr_scale=1.5,
                     default_positive_prompt=DEFAULT_POSITIVE_T2I,
                     default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                     seed=seed,
-                    sampler="Euler a",
+                    sampler=sampler,
                 )
                 template_images = [np.uint8(template_images[0])]
         else:
@@ -985,17 +997,27 @@ def easyphoto_infer_forward(
                 text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
             ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
 
+            # define sampler and cfg_scale
+            if lcm_accelerate:
+                cfg_scale = 2
+                sampler = "Euler a"
+            elif t2i_instantid_control:
+                cfg_scale = 5
+                sampler = "Euler"
+            else:
+                cfg_scale = 7
+                sampler = "Euler a"
             template_images = txt2img(
                 controlnet_pairs,
                 input_prompt=text_to_image_input_prompt,
                 diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=7 if not lcm_accelerate else 2,
+                cfg_scale=cfg_scale,
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
                 default_negative_prompt=DEFAULT_NEGATIVE_T2I,
                 seed=seed,
-                sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
+                sampler=sampler,
             )
             template_images = [np.uint8(template_images[0])]
 
@@ -1486,13 +1508,19 @@ def easyphoto_infer_forward(
                         if ipa_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
                         if instantid_control:
-                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
-                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
-                    cfg_scale = 7 if not lcm_accelerate else 2
-                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
-                    if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight, 2])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight, 2])
+
+                    # define sampler and cfg_scale
+                    if lcm_accelerate:
+                        cfg_scale = 2
+                        sampler = "Euler a"
+                    elif instantid_control:
                         cfg_scale = 5
                         sampler = "Euler"
+                    else:
+                        cfg_scale = 7
+                        sampler = "DPM++ 2M SDE Karras"
                     first_diffusion_output_image = inpaint(
                         input_image,
                         input_mask,
@@ -1521,13 +1549,19 @@ def easyphoto_infer_forward(
                         if ipa_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
                         if instantid_control:
-                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
-                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
-                    cfg_scale = 7 if not lcm_accelerate else 2
-                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
-                    if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight, 2])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight, 2])
+
+                    # define sampler and cfg_scale
+                    if lcm_accelerate:
+                        cfg_scale = 2
+                        sampler = "Euler a"
+                    elif instantid_control:
                         cfg_scale = 5
                         sampler = "Euler"
+                    else:
+                        cfg_scale = 7
+                        sampler = "DPM++ 2M SDE Karras"
                     first_diffusion_output_image = inpaint(
                         input_image,
                         None,
@@ -1676,13 +1710,19 @@ def easyphoto_infer_forward(
                         if ipa_control:
                             controlnet_pairs.append(["ipa_sdxl_plus_face", ipa_image_face, ipa_weight])
                         if instantid_control:
-                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight])
-                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight])
-                    cfg_scale = 7 if not lcm_accelerate else 2
-                    sampler = "DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a"
-                    if instantid_control:
+                            controlnet_pairs.append(["instantid_sdxl_face_embedding", instantid_image, instantid_id_weight, 2])
+                            controlnet_pairs.append(["instantid_sdxl_face_keypoints", input_image, instantid_ipa_weight, 2])
+
+                    # define sampler and cfg_scale
+                    if lcm_accelerate:
+                        cfg_scale = 2
+                        sampler = "Euler a"
+                    elif instantid_control:
                         cfg_scale = 5
                         sampler = "Euler"
+                    else:
+                        cfg_scale = 7
+                        sampler = "DPM++ 2M SDE Karras"
                     second_diffusion_output_image = inpaint(
                         input_image,
                         input_mask,

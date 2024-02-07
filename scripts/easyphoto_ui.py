@@ -693,7 +693,7 @@ def on_ui_tabs():
                                     value="Infer with User Lora",
                                     show_label=False,
                                 )
-                            
+
                             no_user_lora_note = gr.Markdown(
                                 value="""
                                     Infer without User Lora notes:
@@ -709,7 +709,7 @@ def on_ui_tabs():
                                     label="The Method to Infer without User Lora",
                                     visible=False,
                                 )
-                            
+
                             with gr.Row(visible=False) as ipa_only_row:
                                 with gr.Column():
                                     ipa_only_image_path = gr.Image(
@@ -744,24 +744,6 @@ def on_ui_tabs():
                                             step=0.05,
                                             label="Image Adapter Weight (for detail)",
                                         )
-                            
-                            def ref_mode_change(ref_mode_choose):
-                                if ref_mode_choose == "Infer with User Lora":
-                                    return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)]
-                                return [gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)]
-
-                            def no_user_lora_change(no_user_lora_mode):
-                                if no_user_lora_mode == "IP-Adapter Face":
-                                    return [gr.update(visible=True), gr.update(visible=False)]
-                                else:
-                                    return [gr.update(visible=False), gr.update(visible=True)]
-                            
-                            ref_mode_choose.change(
-                                fn=ref_mode_change,
-                                inputs=ref_mode_choose,
-                                outputs=[no_user_lora_note, ipa_only_row, instantid_only_row, no_user_lora_mode]
-                            )
-                            no_user_lora_mode.change(fn=no_user_lora_change, inputs=no_user_lora_mode, outputs=[ipa_only_row, instantid_only_row])
 
                             with gr.Row() as uid_and_refresh:
 
@@ -813,6 +795,38 @@ def on_ui_tabs():
                                 refresh = ToolButton(value="\U0001f504")
                                 for i in range(int(5)):
                                     refresh.click(fn=select_function, inputs=[], outputs=[uuids[i]])
+
+                            def ref_mode_change(ref_mode_choose):
+                                if ref_mode_choose == "Infer with User Lora":
+                                    return [
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                    ]
+                                return [
+                                    gr.update(visible=True),
+                                    gr.update(visible=True),
+                                    gr.update(visible=False),
+                                    gr.update(visible=True),
+                                    gr.update(visible=False),
+                                ]
+
+                            def no_user_lora_change(no_user_lora_mode):
+                                if no_user_lora_mode == "IP-Adapter Face":
+                                    return [gr.update(visible=True), gr.update(visible=False)]
+                                else:
+                                    return [gr.update(visible=False), gr.update(visible=True)]
+
+                            ref_mode_choose.change(
+                                fn=ref_mode_change,
+                                inputs=ref_mode_choose,
+                                outputs=[no_user_lora_note, ipa_only_row, instantid_only_row, no_user_lora_mode, uid_and_refresh],
+                            )
+                            no_user_lora_mode.change(
+                                fn=no_user_lora_change, inputs=no_user_lora_mode, outputs=[ipa_only_row, instantid_only_row]
+                            )
 
                             with gr.Accordion("Advanced Options", open=False):
                                 additional_prompt = gr.Textbox(
@@ -1025,29 +1039,29 @@ def on_ui_tabs():
                                                 step=0.05,
                                                 label="Image Adapter Weight (for detail)",
                                             )
-                                
+
                                 def id_control_change(id_control):
                                     if id_control:
                                         return [
                                             gr.update(visible=True),
                                             gr.update(visible=True),
                                             gr.update(visible=True),
-                                            gr.update(visible=False)
+                                            gr.update(visible=False),
                                         ]
                                     else:
                                         return [
                                             gr.update(visible=False),
                                             gr.update(visible=False),
                                             gr.update(visible=False),
-                                            gr.update(visible=False)
+                                            gr.update(visible=False),
                                         ]
-                                
+
                                 def id_control_method_change(id_control_method):
                                     if id_control_method == "IP-Adapter Face":
                                         return [gr.update(visible=True), gr.update(visible=False)]
                                     else:
                                         return [gr.update(visible=False), gr.update(visible=True)]
-                                
+
                                 def ref_mode_change_id_control(ref_mode_choose):
                                     if ref_mode_choose == "Infer without User Lora":
                                         return [
@@ -1055,7 +1069,7 @@ def on_ui_tabs():
                                             gr.update(visible=False),
                                             gr.update(visible=False),
                                             gr.update(visible=False),
-                                            gr.update(visible=False)
+                                            gr.update(visible=False),
                                         ]
                                     else:
                                         return [
@@ -1063,19 +1077,21 @@ def on_ui_tabs():
                                             gr.update(visible=True),
                                             gr.update(visible=True),
                                             gr.update(visible=True),
-                                            gr.update(visible=False)
+                                            gr.update(visible=False),
                                         ]
-                                
+
                                 id_control.change(
                                     fn=id_control_change,
                                     inputs=[id_control],
-                                    outputs=[id_control_note, id_control_method, ipa_row, instantid_row]
+                                    outputs=[id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
-                                id_control_method.change(fn=id_control_method_change, inputs=[id_control_method], outputs=[ipa_row, instantid_row])
+                                id_control_method.change(
+                                    fn=id_control_method_change, inputs=[id_control_method], outputs=[ipa_row, instantid_row]
+                                )
                                 ref_mode_choose.change(
                                     fn=ref_mode_change_id_control,
                                     inputs=[ref_mode_choose],
-                                    outputs=[id_control, id_control_note, id_control_method, ipa_row, instantid_row]
+                                    outputs=[id_control, id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
 
                                 with gr.Box():
@@ -1142,9 +1158,7 @@ def on_ui_tabs():
                                 show_label=False,
                                 visible=False,
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                            display_score.change(
-                                update_faceid, inputs=[display_score], outputs=[face_id_text, face_id_outputs]
-                            )
+                            display_score.change(update_faceid, inputs=[display_score], outputs=[face_id_text, face_id_outputs])
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
                             empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
@@ -2327,8 +2341,8 @@ def on_ui_settings():
             "that the required models has been downloaded and checked at least once before turning this option off.)",
             gr.Checkbox,
             {},
-            section=section
-        )
+            section=section,
+        ),
     )
 
 
