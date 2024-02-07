@@ -720,7 +720,7 @@ def easyphoto_infer_forward(
                 )
             # load sd and vae
             prompt_generate_sd_model_checkpoint_type = get_checkpoint_type(prompt_generate_sd_model_checkpoint)
-            prompt_generate_sd_model_sdxl_pipeline_flag = True if checkpoint_type == 3 else False
+            prompt_generate_sd_model_sdxl_pipeline_flag = True if prompt_generate_sd_model_checkpoint_type == 3 else False
             if prompt_generate_sd_model_sdxl_pipeline_flag != sdxl_pipeline_flag:
                 checkpoint_type_name = "SDXL" if sdxl_pipeline_flag else "SD1"
                 prompt_generate_sd_model_checkpoint_type_name = "SDXL" if prompt_generate_sd_model_sdxl_pipeline_flag else "SD1"
