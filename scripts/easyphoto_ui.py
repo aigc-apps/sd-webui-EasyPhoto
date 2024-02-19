@@ -1073,11 +1073,12 @@ def on_ui_tabs():
                                             gr.update(visible=False),
                                         ]
 
-                                def id_control_method_change(id_control_method):
-                                    if id_control_method == "IP-Adapter Face":
-                                        return [gr.update(visible=True), gr.update(visible=False)]
-                                    else:
-                                        return [gr.update(visible=False), gr.update(visible=True)]
+                                def id_control_method_change(id_control, id_control_method):
+                                    if id_control:
+                                        if id_control_method == "IP-Adapter Face":
+                                            return [gr.update(visible=True), gr.update(visible=False)]
+                                        else:
+                                            return [gr.update(visible=False), gr.update(visible=True)]
 
                                 def ref_mode_change_id_control(ref_mode_choose, id_control, id_control_method):
                                     if ref_mode_choose == "Infer without User Lora":
@@ -1121,12 +1122,25 @@ def on_ui_tabs():
                                     outputs=[id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
                                 id_control_method.change(
-                                    fn=id_control_method_change, inputs=[id_control_method], outputs=[ipa_row, instantid_row]
+                                    fn=id_control_method_change, inputs=[id_control, id_control_method], outputs=[ipa_row, instantid_row]
                                 )
                                 ref_mode_choose.change(
                                     fn=ref_mode_change_id_control,
                                     inputs=[ref_mode_choose, id_control, id_control_method],
                                     outputs=[id_control, id_control_note, id_control_method, ipa_row, instantid_row],
+                                )
+
+                                # We will update the default id control method by the checkpoint type.
+                                def update_id_control_method(sd_model_checkpoint):
+                                    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+                                    if checkpoint_type == 3:  # SDXL
+                                        return gr.update(value="InstantID")
+                                    return gr.update(value="IP-Adapter Face")
+
+                                sd_model_checkpoint.change(
+                                    fn=update_id_control_method,
+                                    inputs=[sd_model_checkpoint],
+                                    outputs=[id_control_method],
                                 )
 
                                 with gr.Box():
