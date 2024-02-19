@@ -860,6 +860,8 @@ def easyphoto_infer_forward(
                 controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1, "Crop and Resize"]]
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
                 controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
+            elif prompt_generate_sd_model_checkpoint_type == 3 and instantid_control and user_ids[0] != "instantid_control_only":
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
             else:
                 controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2, "Crop and Resize"]]
         elif t2i_control_way == "Control with uploaded template":
@@ -867,6 +869,8 @@ def easyphoto_infer_forward(
             if prompt_generate_sd_model_checkpoint_type != 3:
                 controlnet_pairs = [["openpose", t2i_pose_template, 0.50, 1, "Crop and Resize"]]
             elif prompt_generate_sd_model_checkpoint_type == 3 and not instantid_control:
+                controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
+            elif prompt_generate_sd_model_checkpoint_type == 3 and instantid_control and user_ids[0] != "instantid_control_only":
                 controlnet_pairs = [["sdxl_openpose_lora", t2i_pose_template, 1.00, 1, "Crop and Resize"]]
             else:
                 controlnet_pairs = [["instantid_sdxl_face_keypoints", t2i_pose_template, 0.50, 2, "Crop and Resize"]]
@@ -1412,7 +1416,7 @@ def easyphoto_infer_forward(
 
                 # We leave the face preprocess to ControlNet.
                 if instantid_control:
-                    pass
+                    instantid_image = instantid_images[index]
 
                 # Fusion of user reference images and input images as canny input
                 if roop_images[index] is not None and apply_face_fusion_before:
