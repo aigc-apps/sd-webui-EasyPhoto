@@ -1079,6 +1079,8 @@ def on_ui_tabs():
                                             return [gr.update(visible=True), gr.update(visible=False)]
                                         else:
                                             return [gr.update(visible=False), gr.update(visible=True)]
+                                    else:
+                                        return [gr.update(visible=False), gr.update(visible=False)]
 
                                 def ref_mode_change_id_control(ref_mode_choose, id_control, id_control_method):
                                     if ref_mode_choose == "Infer without User Lora":
