@@ -102,10 +102,10 @@ If you are using docker, please make sure that the graphics card driver and CUDA
 Then execute the following commands in this way:
 ```
 # pull image
-docker pull mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker pull registry.cn-beijing.aliyuncs.com/mybigpai/sd-webui-easyphoto:0.0.3
 
 # enter image
-docker run -it -p 7860:7860 --network host --gpus all mybigpai-registry.cn-beijing.cr.aliyuncs.com/aigc/sd-webui-easyphoto:0.0.3
+docker run -it -p 7860:7860 --network host --gpus all registry.cn-beijing.aliyuncs.com/mybigpai/sd-webui-easyphoto:0.0.3
 
 # launch webui
 python3 launch.py --port 7860

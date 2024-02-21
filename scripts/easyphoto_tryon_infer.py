@@ -488,7 +488,7 @@ def easyphoto_tryon_infer_forward(
         ep_logger.info("Start First diffusion.")
         # inpaint the main region
         controlnet_pairs = [
-            ["canny_no_pre", res_canny, 1.0, 0],
+            ["canny_no_pre", res_canny, 1.0, 0, "Crop and Resize"],
             ["depth", resize_img_template, 1.0, 0],
             ["color", resize_image_input, 0.5, 0],
         ]

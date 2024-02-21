@@ -689,10 +689,61 @@ def on_ui_tabs():
 
                             with gr.Row():
                                 ref_mode_choose = gr.Radio(
-                                    ["Infer with Pretrained Lora", "Infer with IPA only(without Pretraining Lora)"],
-                                    value="Infer with Pretrained Lora",
+                                    ["Infer with User Lora", "Infer without User Lora"],
+                                    value="Infer with User Lora",
                                     show_label=False,
                                 )
+
+                            no_user_lora_note = gr.Markdown(
+                                value="""
+                                    Infer without User Lora notes:
+                                    1. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
+                                    2. InstantID is recommended for the SDXL checkpoint, while IP-Adapter Face is recommended for the SD1 checkpoint.
+                                """,
+                                visible=False,
+                            )
+                            with gr.Row():
+                                no_user_lora_mode = gr.Dropdown(
+                                    value="IP-Adapter Face",
+                                    choices=list(["IP-Adapter Face", "InstantID"]),
+                                    label="The Method to Infer without User Lora",
+                                    visible=False,
+                                )
+
+                            with gr.Row(visible=False) as ipa_only_row:
+                                with gr.Column():
+                                    ipa_only_image_path = gr.Image(
+                                        label="Image Prompt for IP-Adapter Only", show_label=True, source="upload", type="filepath"
+                                    )
+                                    with gr.Row():
+                                        ipa_only_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.60,
+                                            step=0.05,
+                                            label="IP-Adapter Only Control Weight",
+                                        )
+
+                            with gr.Row(visible=False) as instantid_only_row:
+                                with gr.Column():
+                                    instantid_only_image_path = gr.Image(
+                                        label="Image Prompt for InstantID Only", show_label=True, source="upload", type="filepath"
+                                    )
+                                    with gr.Row():
+                                        instantid_only_id_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="IdentityNet Weight (for fedility)",
+                                        )
+                                        instantid_only_ipa_weight = gr.Slider(
+                                            minimum=0.10,
+                                            maximum=1.00,
+                                            value=0.50,
+                                            step=0.05,
+                                            label="Image Adapter Weight (for detail)",
+                                        )
 
                             with gr.Row() as uid_and_refresh:
 
@@ -745,18 +796,46 @@ def on_ui_tabs():
                                 for i in range(int(5)):
                                     refresh.click(fn=select_function, inputs=[], outputs=[uuids[i]])
 
-                            with gr.Row(visible=False) as ipa_only_row:
-                                with gr.Column():
-                                    ipa_only_image_path = gr.Image(
-                                        label="Image Prompt for IP-Adapter Only", show_label=True, source="upload", type="filepath"
-                                    )
-                                    ipa_only_weight = gr.Slider(
-                                        minimum=0.10,
-                                        maximum=1.00,
-                                        value=0.60,
-                                        step=0.05,
-                                        label="IP-Adapter Only Control Weight",
-                                    )
+                            def ref_mode_change(ref_mode_choose, no_user_lora_mode):
+                                if ref_mode_choose == "Infer with User Lora":
+                                    return [
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                    ]
+                                if no_user_lora_mode == "IP-Adapter Face":
+                                    return [
+                                        gr.update(visible=True),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                    ]
+                                else:
+                                    return [
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                        gr.update(visible=True),
+                                        gr.update(visible=True),
+                                        gr.update(visible=False),
+                                    ]
+
+                            def no_user_lora_change(no_user_lora_mode):
+                                if no_user_lora_mode == "IP-Adapter Face":
+                                    return [gr.update(visible=True), gr.update(visible=False)]
+                                else:
+                                    return [gr.update(visible=False), gr.update(visible=True)]
+
+                            ref_mode_choose.change(
+                                fn=ref_mode_change,
+                                inputs=[ref_mode_choose, no_user_lora_mode],
+                                outputs=[no_user_lora_note, ipa_only_row, instantid_only_row, no_user_lora_mode, uid_and_refresh],
+                            )
+                            no_user_lora_mode.change(
+                                fn=no_user_lora_change, inputs=no_user_lora_mode, outputs=[ipa_only_row, instantid_only_row]
+                            )
 
                             with gr.Accordion("Advanced Options", open=False):
                                 additional_prompt = gr.Textbox(
@@ -829,48 +908,12 @@ def on_ui_tabs():
                                     makeup_transfer = gr.Checkbox(label="MakeUp Transfer", value=False)
                                 with gr.Row():
                                     display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                    ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
-                                    face_shape_match = gr.Checkbox(label="Face Shape Match", value=False)
-
-                                    def ipa_update_score(ipa_control):
-                                        if ipa_control:
-                                            return gr.update(value=True)
-                                        return gr.update(visible=True)
-
-                                    def update_score(ipa_control, ref_mode_choose, display_score):
-                                        if ipa_control or ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
-                                            return gr.update(value=True)
-                                        return gr.update(value=display_score)
-
-                                    def use_ipa_only(ref_mode_choose):
-                                        if ref_mode_choose == "Infer with IPA only(without Pretraining Lora)":
-                                            return (
-                                                gr.update(value=True),
-                                                gr.update(value=False, visible=False),
-                                                gr.update(visible=False),
-                                                gr.update(visible=True),
-                                            )
-                                        return (
-                                            gr.update(visible=True),
-                                            gr.update(value=False, visible=True),
-                                            gr.update(visible=True),
-                                            gr.update(visible=False),
-                                        )
-
-                                    # We need to make sure that Display Similarity Score is mandatory when the user
-                                    # selects IP-Adapter Control. Otherwise, it is not.
-                                    ipa_control.change(ipa_update_score, inputs=[ipa_control], outputs=[display_score])
-                                    display_score.change(
-                                        update_score, inputs=[ipa_control, ref_mode_choose, display_score], outputs=[display_score]
-                                    )
-                                    ref_mode_choose.change(
-                                        use_ipa_only,
-                                        inputs=[ref_mode_choose],
-                                        outputs=[display_score, ipa_control, uid_and_refresh, ipa_only_row],
-                                    )
-                                with gr.Row():
-                                    lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
+                                    id_control = gr.Checkbox(label="ID Control", value=True)
                                     enable_second_diffusion = gr.Checkbox(label="Enable Second Diffusion", value=True)
+
+                                with gr.Row():
+                                    face_shape_match = gr.Checkbox(label="Face Shape Match", value=False)
+                                    lcm_accelerate = gr.Checkbox(label="LCM Accelerate", value=False)
 
                                     def lcm_change(lcm_accelerate):
                                         if lcm_accelerate:
@@ -924,6 +967,13 @@ def on_ui_tabs():
                                         label="The super resolution way you use.",
                                         visible=True,
                                     )
+                                    id_control_method = gr.Dropdown(
+                                        value="IP-Adapter Face",
+                                        choices=list(["IP-Adapter Face", "InstantID"]),
+                                        label="The ID control way you use.",
+                                        visible=True,
+                                    )
+                                with gr.Row():
                                     super_resolution_ratio = gr.Slider(
                                         minimum=0.00,
                                         maximum=1.00,
@@ -943,9 +993,6 @@ def on_ui_tabs():
                                     makeup_transfer_ratio = gr.Slider(
                                         minimum=0.00, maximum=1.00, value=0.50, step=0.05, label="Makeup Transfer Ratio", visible=False
                                     )
-                                    ipa_weight = gr.Slider(
-                                        minimum=0.10, maximum=1.00, value=0.50, step=0.05, label="IP-Adapter Control Weight", visible=False
-                                    )
 
                                     super_resolution.change(
                                         lambda x: (super_resolution_method.update(visible=x), super_resolution_ratio.update(visible=x)),
@@ -962,28 +1009,141 @@ def on_ui_tabs():
                                         inputs=[makeup_transfer],
                                         outputs=[makeup_transfer_ratio],
                                     )
-                                    ipa_control.change(lambda x: ipa_weight.update(visible=x), inputs=[ipa_control], outputs=[ipa_weight])
 
-                                ipa_note = gr.Markdown(
+                                id_control_note = gr.Markdown(
                                     value="""
-                                        IP-Adapter Control notes:
+                                        ID Control notes:
                                         1. If not uploaded, the reference image in the training photos will be used as the image prompt by default.
                                         2. For the best result, please upload a photo with a **frontal face and no occlusions** (bangs, glasses, etc.).
+                                        3. InstantID is recommended for the SDXL checkpoint, while IP-Adapter Face is recommended for the SD1 checkpoint.
                                     """,
-                                    visible=False,
+                                    visible=True,
                                 )
-                                with gr.Row():
-                                    ipa_image_path = gr.Image(
-                                        label="Image Prompt for IP-Adapter Control",
-                                        show_label=True,
-                                        source="upload",
-                                        type="filepath",
-                                        visible=False,
-                                    )
-                                ipa_control.change(
-                                    lambda x: ipa_image_path.update(visible=x), inputs=[ipa_control], outputs=[ipa_image_path]
+                                with gr.Row(visible=True) as ipa_row:
+                                    with gr.Column():
+                                        ipa_image_path = gr.Image(
+                                            label="Image Prompt for IP-Adapter Control", show_label=True, source="upload", type="filepath"
+                                        )
+                                        ipa_weight = gr.Slider(
+                                            minimum=0.10, maximum=1.00, value=0.30, step=0.05, label="IP-Adapter Control Weight"
+                                        )
+
+                                with gr.Row(visible=False) as instantid_row:
+                                    with gr.Column():
+                                        instantid_image_path = gr.Image(
+                                            label="Image Prompt for InstantID Control", show_label=True, source="upload", type="filepath"
+                                        )
+                                        with gr.Row():
+                                            instantid_id_weight = gr.Slider(
+                                                minimum=0.10,
+                                                maximum=1.00,
+                                                value=0.5,
+                                                step=0.05,
+                                                label="IdentityNet Weight (for fedility)",
+                                            )
+                                            instantid_ipa_weight = gr.Slider(
+                                                minimum=0.10,
+                                                maximum=1.00,
+                                                value=0.5,
+                                                step=0.05,
+                                                label="Image Adapter Weight (for detail)",
+                                            )
+
+                                def id_control_change(id_control, id_control_method):
+                                    if id_control:
+                                        if id_control_method == "IP-Adapter Face":
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                            ]
+                                        else:
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                                gr.update(visible=True),
+                                            ]
+                                    else:
+                                        return [
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                        ]
+
+                                def id_control_method_change(id_control, id_control_method):
+                                    if id_control:
+                                        if id_control_method == "IP-Adapter Face":
+                                            return [gr.update(visible=True), gr.update(visible=False)]
+                                        else:
+                                            return [gr.update(visible=False), gr.update(visible=True)]
+                                    else:
+                                        return [gr.update(visible=False), gr.update(visible=False)]
+
+                                def ref_mode_change_id_control(ref_mode_choose, id_control, id_control_method):
+                                    if ref_mode_choose == "Infer without User Lora":
+                                        return [
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                            gr.update(visible=False),
+                                        ]
+                                    else:
+                                        if id_control:
+                                            if id_control_method == "IP-Adapter Face":
+                                                return [
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=False),
+                                                ]
+                                            else:
+                                                return [
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=True),
+                                                    gr.update(visible=False),
+                                                    gr.update(visible=True),
+                                                ]
+                                        else:
+                                            return [
+                                                gr.update(visible=True),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                                gr.update(visible=False),
+                                            ]
+
+                                id_control.change(
+                                    fn=id_control_change,
+                                    inputs=[id_control, id_control_method],
+                                    outputs=[id_control_note, id_control_method, ipa_row, instantid_row],
                                 )
-                                ipa_control.change(lambda x: ipa_note.update(visible=x), inputs=[ipa_control], outputs=[ipa_note])
+                                id_control_method.change(
+                                    fn=id_control_method_change, inputs=[id_control, id_control_method], outputs=[ipa_row, instantid_row]
+                                )
+                                ref_mode_choose.change(
+                                    fn=ref_mode_change_id_control,
+                                    inputs=[ref_mode_choose, id_control, id_control_method],
+                                    outputs=[id_control, id_control_note, id_control_method, ipa_row, instantid_row],
+                                )
+
+                                # We will update the default id control method by the checkpoint type.
+                                def update_id_control_method(sd_model_checkpoint):
+                                    checkpoint_type = get_checkpoint_type(sd_model_checkpoint)
+                                    if checkpoint_type == 3:  # SDXL
+                                        return gr.update(value="InstantID")
+                                    return gr.update(value="IP-Adapter Face")
+
+                                sd_model_checkpoint.change(
+                                    fn=update_id_control_method,
+                                    inputs=[sd_model_checkpoint],
+                                    outputs=[id_control_method],
+                                )
 
                                 with gr.Box():
                                     gr.Markdown(
@@ -1035,8 +1195,8 @@ def on_ui_tabs():
                                     ),
                                 }
 
-                            def update_faceid(display_score, ipa_control):
-                                if display_score or ipa_control:
+                            def update_faceid(display_score):
+                                if display_score:
                                     return [gr.update(visible=True), gr.update(visible=True)]
                                 return [gr.update(visible=False), gr.update(visible=False)]
 
@@ -1049,9 +1209,7 @@ def on_ui_tabs():
                                 show_label=False,
                                 visible=False,
                             ).style(columns=[4], rows=[1], object_fit="contain", height="auto")
-                            display_score.change(
-                                update_faceid, inputs=[display_score, ipa_control], outputs=[face_id_text, face_id_outputs]
-                            )
+                            display_score.change(update_faceid, inputs=[display_score], outputs=[face_id_text, face_id_outputs])
 
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
                             empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
@@ -1095,12 +1253,20 @@ def on_ui_tabs():
                             makeup_transfer_ratio,
                             face_shape_match,
                             state_tab,
-                            ipa_control,
+                            id_control,
+                            id_control_method,
                             ipa_weight,
                             ipa_image_path,
+                            instantid_id_weight,
+                            instantid_ipa_weight,
+                            instantid_image_path,
                             ref_mode_choose,
+                            no_user_lora_mode,
                             ipa_only_weight,
                             ipa_only_image_path,
+                            instantid_only_id_weight,
+                            instantid_only_ipa_weight,
+                            instantid_only_image_path,
                             lcm_accelerate,
                             enable_second_diffusion,
                             *uuids,
@@ -1444,7 +1610,7 @@ def on_ui_tabs():
                                         skin_retouching_bool = gr.Checkbox(label="Video Skin Retouching", value=False)
                                     with gr.Row():
                                         display_score = gr.Checkbox(label="Display Face Similarity Scores", value=False)
-                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=False)
+                                        ipa_control = gr.Checkbox(label="IP-Adapter Control", value=True)
                                         face_shape_match = gr.Checkbox(label="Video Face Shape Match", value=False)
                                     with gr.Row():
                                         makeup_transfer = gr.Checkbox(label="Video MakeUp Transfer", value=False)
@@ -1498,7 +1664,7 @@ def on_ui_tabs():
                                         ipa_weight = gr.Slider(
                                             minimum=0.10,
                                             maximum=1.00,
-                                            value=0.50,
+                                            value=0.30,
                                             step=0.05,
                                             label="Video IP-Adapter Control Weight",
                                             visible=False,
@@ -2226,8 +2392,8 @@ def on_ui_settings():
             "that the required models has been downloaded and checked at least once before turning this option off.)",
             gr.Checkbox,
             {},
-            section=section
-        )
+            section=section,
+        ),
     )
 
 

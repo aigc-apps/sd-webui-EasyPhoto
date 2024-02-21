@@ -52,17 +52,23 @@ if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
+    controlnet_antelopev2_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/insightface/models/antelopev2")
     controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_builtin_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/clip_vision")
+    controlnet_antelopev2_annotator_cache_path = os.path.join(
+        controlnet_extensions_builtin_path, "annotator/downloads/insightface/models/antelopev2"
+    )
     controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/midas")
 else:
     controlnet_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/clip_vision")
+    controlnet_antelopev2_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/insightface/models/antelopev2")
     controlnet_depth_annotator_cache_path = os.path.join(models_annotator_path, "annotator/downloads/midas")
+
 
 # tryon gallery path
 tryon_template_gallery_dir = os.path.join(tryon_gallery_dir, "template")
@@ -127,6 +133,17 @@ download_urls = {
     "add_ipa_sdxl": [
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter-plus-face_sdxl_vit-h.safetensors",
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/clip_g.pth",
+    ],
+    "add_instantid_sdxl": [
+        # Insightface/antelopev2.
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/1k3d68.onnx",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/2d106det.onnx",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/genderage.onnx",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/glintr100.onnx",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scrfd_10g_bnkps.onnx",
+        # ControlNet and IP-Adapter.
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_instant_id_sdxl.safetensors",
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter_instant_id_sdxl.bin"
     ],
     "add_video": [
         # new backbone for video
@@ -322,6 +339,21 @@ save_filenames = {
             os.path.join(controlnet_cache_path, f"models/ip-adapter-plus-face_sdxl_vit-h.safetensors"),
         ],
         os.path.join(controlnet_clip_annotator_cache_path, f"clip_g.pth"),
+    ],
+    "add_instantid_sdxl": [
+        os.path.join(controlnet_antelopev2_annotator_cache_path, "1k3d68.onnx"),
+        os.path.join(controlnet_antelopev2_annotator_cache_path, "2d106det.onnx"),
+        os.path.join(controlnet_antelopev2_annotator_cache_path, "genderage.onnx"),
+        os.path.join(controlnet_antelopev2_annotator_cache_path, "glintr100.onnx"),
+        os.path.join(controlnet_antelopev2_annotator_cache_path, "scrfd_10g_bnkps.onnx"),
+        [
+            os.path.join(models_path, "ControlNet/control_instant_id_sdxl.safetensors"),
+            os.path.join(controlnet_cache_path, "models/control_instant_id_sdxl.safetensors")
+        ],
+        [
+            os.path.join(models_path, "ControlNet/ip-adapter_instant_id_sdxl.bin"),
+            os.path.join(controlnet_cache_path, "models/ip-adapter_instant_id_sdxl.bin"),
+        ]
     ],
     "add_video": [
         # new backbone for video
