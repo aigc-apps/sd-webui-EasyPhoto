@@ -658,6 +658,12 @@ def main():
             unet.set_use_memory_efficient_attention(False, True)
     else:
         unet.set_use_memory_efficient_attention(False, True)
+    
+    if args.gradient_checkpointing:
+        unet.enable_gradient_checkpointing()
+        if args.train_text_encoder:
+            text_encoder_one.gradient_checkpointing_enable()
+            text_encoder_two.gradient_checkpointing_enable()
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -1026,7 +1032,7 @@ def main():
                     prompt=None,
                     text_input_ids_list=[batch["input_ids_one"], batch["input_ids_two"]],
                 )
-                unet_added_conditions = {"time_ids": add_time_ids.repeat(bsz, 1)}
+                unet_added_conditions = {"time_ids": add_time_ids}
                 unet_added_conditions.update({"text_embeds": pooled_prompt_embeds})
 
                 model_pred = unet(noisy_model_input, timesteps, prompt_embeds, unet_added_conditions)
