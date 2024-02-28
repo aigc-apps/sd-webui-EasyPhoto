@@ -272,6 +272,7 @@ def easyphoto_train_forward(
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+            command += ["--gradient_checkpointing"]
         if train_scene_lora_bool:
             command += ["--train_scene_lora_bool"]
             # We do not train the text encoders for SDXL Scene Lora.
@@ -374,6 +375,7 @@ def easyphoto_train_forward(
         if sdxl_pipeline_flag:
             command += [f"--original_config={original_config}"]
             command += [f"--pretrained_vae_model_name_or_path={pretrained_vae_model_name_or_path}"]
+            command += ["--gradient_checkpointing"]
         if train_scene_lora_bool:
             command += ["--train_scene_lora_bool"]
             # We do not train the text encoders for SDXL Scene Lora.
