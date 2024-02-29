@@ -398,6 +398,7 @@ def easyphoto_video_infer_forward_api(_: gr.Blocks, app: FastAPI):
             hash_value = hashlib.md5(base64.b64decode(init_video)).hexdigest()
             save_path = os.path.join("/tmp", hash_value + ".mp4")
             decode_base64_to_video(init_video, save_path)
+            init_video = save_path
 
         if ipa_image is not None:
             hash_value = hashlib.md5(ipa_image.tobytes()).hexdigest()
