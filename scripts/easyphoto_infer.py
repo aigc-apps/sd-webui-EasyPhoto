@@ -984,7 +984,7 @@ def easyphoto_infer_forward(
                     seed=seed,
                     sampler=sampler,
                 )
-                template_images = [np.uint8(template_images[0])]
+            template_images = [np.uint8(template_images[0])]
         else:
             text_to_image_input_prompt += ", look at viewer"
             # get lora scene prompt
