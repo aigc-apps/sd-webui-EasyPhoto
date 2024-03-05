@@ -1392,7 +1392,7 @@ def easyphoto_infer_forward(
                     ipa_retinaface_keypoint[:, 0] -= ipa_retinaface_box[0]
                     ipa_retinaface_keypoint[:, 1] -= ipa_retinaface_box[1]
                     ipa_image_face = Image.fromarray(
-                        np.uint8(alignment_photo(np.array(ipa_image_face), np.array(ipa_retinaface_keypoint, np.int))[0])
+                        np.uint8(alignment_photo(np.array(ipa_image_face), np.array(ipa_retinaface_keypoint, np.int32))[0])
                     )
 
                     # If brow_mask is not None, remove the skin above brows
@@ -1401,7 +1401,7 @@ def easyphoto_infer_forward(
                         brow_mask = brow_mask.crop(ipa_retinaface_box)
                         brow_mask = Image.fromarray(
                             np.uint8(
-                                alignment_photo(np.array(brow_mask), np.array(ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0))[0]
+                                alignment_photo(np.array(brow_mask), np.array(ipa_retinaface_keypoint, np.int32), borderValue=(0, 0, 0))[0]
                             )
                         )
                         y_coords, _, _ = np.where(np.array(brow_mask) > 0)
@@ -2643,7 +2643,7 @@ def easyphoto_video_infer_forward(
                         _ipa_retinaface_keypoint[:, 0] -= _ipa_retinaface_box[0]
                         _ipa_retinaface_keypoint[:, 1] -= _ipa_retinaface_box[1]
                         _ipa_image_face = Image.fromarray(
-                            np.uint8(alignment_photo(np.array(_ipa_image_face), np.array(_ipa_retinaface_keypoint, np.int))[0])
+                            np.uint8(alignment_photo(np.array(_ipa_image_face), np.array(_ipa_retinaface_keypoint, np.int32))[0])
                         )
 
                         # If brow_mask is not None, remove the skin above brows
@@ -2653,7 +2653,7 @@ def easyphoto_video_infer_forward(
                             _brow_mask = Image.fromarray(
                                 np.uint8(
                                     alignment_photo(
-                                        np.array(_brow_mask), np.array(_ipa_retinaface_keypoint, np.int), borderValue=(0, 0, 0)
+                                        np.array(_brow_mask), np.array(_ipa_retinaface_keypoint, np.int32), borderValue=(0, 0, 0)
                                     )[0]
                                 )
                             )
