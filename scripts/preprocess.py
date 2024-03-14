@@ -117,7 +117,10 @@ if __name__ == "__main__":
     salient_detect = pipeline(Tasks.semantic_segmentation, "damo/cv_u2net_salient-detection", model_revision="v1.0.0")
     # skin retouching
     try:
-        skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
+        if skin_retouching_bool:
+            skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
+        else:
+            skin_retouching = None
     except Exception as e:
         skin_retouching = None
         logging.info(f"Skin Retouching model load error, but pass. Error info {e}")

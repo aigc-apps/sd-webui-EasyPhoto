@@ -46,6 +46,7 @@ from .common_utils import (
     encode_video_to_base64,
     decode_base64_to_video,
     cleanup_decorator,
+    auto_to_gpu_model,
 )
 from .loractl_utils import check_loractl_conflict, LoraCtlScript
 from .animatediff_utils import (
