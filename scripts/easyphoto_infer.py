@@ -54,6 +54,7 @@ from scripts.easyphoto_utils import (
     cleanup_decorator,
     unload_models,
     seed_everything,
+    auto_to_gpu_model,
 )
 from scripts.sdwebui import (
     get_checkpoint_type,
@@ -301,7 +302,6 @@ def get_controlnet_unit(
     return control_unit
 
 
-@switch_ms_model_cpu()
 def txt2img(
     controlnet_pairs: list,
     input_prompt="1girl",
@@ -351,7 +351,6 @@ def txt2img(
     return image
 
 
-@switch_ms_model_cpu()
 def inpaint(
     input_image: Image.Image,
     select_mask_input: Image.Image,
@@ -647,19 +646,14 @@ def easyphoto_infer_forward(
 
     if ipa_control:
         ipa_image_paths = ["none"] * 5  # consistent with user_ids
-        ipa_flag = False
         valid_user_id_num, valid_ipa_image_path_num = 0, 0
         for index, user_id in enumerate(user_ids):
-            if not ipa_flag and user_id != "none" and ipa_image_path is not None:
+            if valid_ipa_image_path_num == 0 and user_id != "none" and ipa_image_path is not None:
                 ipa_image_paths[index] = ipa_image_path
-                ipa_flag = True
                 valid_ipa_image_path_num += 1
             if user_id != "none":
                 valid_user_id_num += 1
 
-        if valid_user_id_num > 1:
-            ep_logger.error("EasyPhoto does not support IP-Adapter Control with multiple user ids currently.")
-            return "EasyPhoto does not support IP-Adapter Control with multiple user ids currently.", [], []
         if ipa_control and valid_user_id_num != valid_ipa_image_path_num:
             ep_logger.warning(
                 "Found {} user id(s), but only {} image prompt(s) for IP-Adapter Control. Use the reference image "
@@ -671,19 +665,14 @@ def easyphoto_infer_forward(
 
     if instantid_control:
         instantid_image_paths = ["none"] * 5  # consistent with user_ids
-        instantid_flag = False
         valid_user_id_num, valid_instantid_image_path_num = 0, 0
         for index, user_id in enumerate(user_ids):
-            if not instantid_flag and user_id != "none" and instantid_image_path is not None:
+            if valid_instantid_image_path_num == 0 and user_id != "none" and instantid_image_path is not None:
                 instantid_image_paths[index] = instantid_image_path
-                instantid_flag = True
                 valid_instantid_image_path_num += 1
             if user_id != "none":
                 valid_user_id_num += 1
 
-        if valid_user_id_num > 1:
-            ep_logger.error("EasyPhoto does not support InstantID Control with multiple user ids currently.")
-            return "EasyPhoto does not support InstantID Control with multiple user ids currently.", [], []
         if instantid_control and valid_user_id_num != valid_instantid_image_path_num:
             ep_logger.warning(
                 "Found {} user id(s), but only {} image prompt(s) for InstantID Control. Use the reference image "
@@ -765,13 +754,17 @@ def easyphoto_infer_forward(
     # create modelscope model
     if retinaface_detection is None:
         retinaface_detection = pipeline(Tasks.face_detection, "damo/cv_resnet50_face-detection_retinaface", model_revision="v2.0.2")
+        retinaface_detection = auto_to_gpu_model(retinaface_detection)
     if image_face_fusion is None:
         image_face_fusion = pipeline(Tasks.image_face_fusion, model="damo/cv_unet-image-face-fusion_damo", model_revision="v1.3")
+        image_face_fusion = auto_to_gpu_model(image_face_fusion)
     if face_skin is None:
         face_skin = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
+        face_skin = auto_to_gpu_model(face_skin)
     if skin_retouching is None and skin_retouching_bool:
         try:
             skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
+            skin_retouching = auto_to_gpu_model(skin_retouching)
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -786,6 +779,7 @@ def easyphoto_infer_forward(
                 portrait_enhancement = pipeline(
                     "image-super-resolution-x2", model="bubbliiiing/cv_rrdb_image-super-resolution_x2", model_revision="v1.0.2"
                 )
+            portrait_enhancement = auto_to_gpu_model(portrait_enhancement)
             old_super_resolution_method = super_resolution_method
         except Exception as e:
             torch.cuda.empty_cache()
@@ -795,7 +789,7 @@ def easyphoto_infer_forward(
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
         face_recognition = pipeline("face_recognition", model="bubbliiiing/cv_retinafce_recognition", model_revision="v1.0.3")
-
+        face_recognition = auto_to_gpu_model(face_recognition)
     # psgan for transfer makeup
     if makeup_transfer and psgan_inference is None:
         try:
@@ -804,6 +798,7 @@ def easyphoto_infer_forward(
             psgan_inference = PSGAN_Inference(
                 "cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path
             )
+            psgan_inference = auto_to_gpu_model(psgan_inference)
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -811,7 +806,7 @@ def easyphoto_infer_forward(
 
     # This is to increase the fault tolerance of the code.
     # If the code exits abnormally, it may cause the model to not function properly on the CPU
-    modelscope_models_to_gpu()
+    modelscope_models_to_cpu()
 
     # get random seed
     if int(seed) == -1:
@@ -2191,19 +2186,14 @@ def easyphoto_video_infer_forward(
 
     if ipa_control:
         ipa_image_paths = ["none"] * 5  # consistent with user_ids
-        ipa_flag = False
         valid_user_id_num, valid_ipa_image_path_num = 0, 0
         for index, user_id in enumerate(user_ids):
-            if not ipa_flag and user_id != "none" and ipa_image_path is not None:
+            if valid_ipa_image_path_num == 0 and user_id != "none" and ipa_image_path is not None:
                 ipa_image_paths[index] = ipa_image_path
-                ipa_flag = True
                 valid_ipa_image_path_num += 1
             if user_id != "none":
                 valid_user_id_num += 1
 
-        if valid_user_id_num > 1:
-            ep_logger.error("EasyPhoto does not support IP-Adapter Control with multiple user ids currently.")
-            return "EasyPhoto does not support IP-Adapter Control with multiple user ids currently.", None, None, []
         if ipa_control and valid_user_id_num != valid_ipa_image_path_num:
             ep_logger.warning(
                 "Found {} user id(s), but only {} image prompt(s) for IP-Adapter Control. Use the reference image "
@@ -2249,13 +2239,17 @@ def easyphoto_video_infer_forward(
     # create modelscope model
     if retinaface_detection is None:
         retinaface_detection = pipeline(Tasks.face_detection, "damo/cv_resnet50_face-detection_retinaface", model_revision="v2.0.2")
+        retinaface_detection = auto_to_gpu_model(retinaface_detection)
     if image_face_fusion is None:
         image_face_fusion = pipeline(Tasks.image_face_fusion, model="damo/cv_unet-image-face-fusion_damo", model_revision="v1.3")
+        image_face_fusion = auto_to_gpu_model(image_face_fusion)
     if face_skin is None:
         face_skin = Face_Skin(os.path.join(easyphoto_models_path, "face_skin.pth"))
+        face_skin = auto_to_gpu_model(face_skin)
     if skin_retouching is None and skin_retouching_bool:
         try:
             skin_retouching = pipeline("skin-retouching-torch", model="damo/cv_unet_skin_retouching_torch", model_revision="v1.0.2")
+            skin_retouching = auto_to_gpu_model(skin_retouching)
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -2270,6 +2264,7 @@ def easyphoto_video_infer_forward(
                 portrait_enhancement = pipeline(
                     "image-super-resolution-x2", model="bubbliiiing/cv_rrdb_image-super-resolution_x2", model_revision="v1.0.2"
                 )
+            portrait_enhancement = auto_to_gpu_model(portrait_enhancement)
             old_super_resolution_method = super_resolution_method
         except Exception as e:
             torch.cuda.empty_cache()
@@ -2284,6 +2279,7 @@ def easyphoto_video_infer_forward(
             psgan_inference = PSGAN_Inference(
                 "cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path
             )
+            psgan_inference = auto_to_gpu_model(psgan_inference)
         except Exception as e:
             torch.cuda.empty_cache()
             traceback.print_exc()
@@ -2292,10 +2288,11 @@ def easyphoto_video_infer_forward(
     # To save the GPU memory, create the face recognition model for computing FaceID if the user intend to show it.
     if display_score and face_recognition is None:
         face_recognition = pipeline("face_recognition", model="bubbliiiing/cv_retinafce_recognition", model_revision="v1.0.3")
+        face_recognition = auto_to_gpu_model(face_recognition)
 
     # This is to increase the fault tolerance of the code.
     # If the code exits abnormally, it may cause the model to not function properly on the CPU
-    modelscope_models_to_gpu()
+    modelscope_models_to_cpu()
 
     # get random seed
     if int(seed) == -1:

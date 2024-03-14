@@ -52,7 +52,9 @@ if os.path.exists(controlnet_extensions_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/openpose")
     controlnet_cache_path = controlnet_extensions_path
     controlnet_clip_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/clip_vision")
-    controlnet_antelopev2_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/insightface/models/antelopev2")
+    controlnet_antelopev2_annotator_cache_path = os.path.join(
+        controlnet_extensions_path, "annotator/downloads/insightface/models/antelopev2"
+    )
     controlnet_depth_annotator_cache_path = os.path.join(controlnet_extensions_path, "annotator/downloads/midas")
 elif os.path.exists(controlnet_extensions_builtin_path):
     controlnet_annotator_cache_path = os.path.join(controlnet_extensions_builtin_path, "annotator/downloads/openpose")
@@ -143,7 +145,7 @@ download_urls = {
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/scrfd_10g_bnkps.onnx",
         # ControlNet and IP-Adapter.
         "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/control_instant_id_sdxl.safetensors",
-        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter_instant_id_sdxl.bin"
+        "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/ip-adapter_instant_id_sdxl.bin",
     ],
     "add_video": [
         # new backbone for video
@@ -348,12 +350,12 @@ save_filenames = {
         os.path.join(controlnet_antelopev2_annotator_cache_path, "scrfd_10g_bnkps.onnx"),
         [
             os.path.join(models_path, "ControlNet/control_instant_id_sdxl.safetensors"),
-            os.path.join(controlnet_cache_path, "models/control_instant_id_sdxl.safetensors")
+            os.path.join(controlnet_cache_path, "models/control_instant_id_sdxl.safetensors"),
         ],
         [
             os.path.join(models_path, "ControlNet/ip-adapter_instant_id_sdxl.bin"),
             os.path.join(controlnet_cache_path, "models/ip-adapter_instant_id_sdxl.bin"),
-        ]
+        ],
     ],
     "add_video": [
         # new backbone for video
@@ -462,7 +464,7 @@ save_filenames = {
 
 def check_scene_valid(lora_path, models_path) -> bool:
     from scripts.sdwebui import read_lora_metadata
-    
+
     safetensors_lora_path = os.path.join(models_path, "Lora", lora_path)
     if not safetensors_lora_path.endswith("safetensors"):
         return False
@@ -677,6 +679,30 @@ def convert_to_video(path, frames, fps, prefix=None, mode="gif"):
         return video_path, None, prefix
 
 
+def move_to_cpu(obj, visited=None):
+    if visited is None:
+        visited = set()
+
+    if id(obj) in visited:
+        return
+    visited.add(id(obj))
+
+    if hasattr(obj, "cpu") and callable(getattr(obj, "cpu")):
+        try:
+            obj.cpu()
+        except Exception as e:
+            traceback.print_exc()
+            logging.info(f"Object {obj} could not be moved to CPU, error: {e}")
+
+    if hasattr(obj, "__dict__"):
+        for key, value in obj.__dict__.items():
+            move_to_cpu(value, visited)
+
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            move_to_cpu(item, visited)
+
+
 def modelscope_models_to_cpu():
     """Load models to cpu to free VRAM."""
     ms_models = [
@@ -689,18 +715,43 @@ def modelscope_models_to_cpu():
         scripts.easyphoto_infer.psgan_inference,
     ]
     for ms_model in ms_models:
-        if hasattr(ms_model, "__dict__"):
-            for key in ms_model.__dict__.keys():
-                try:
-                    if hasattr(getattr(ms_model, key), "cpu"):
-                        getattr(ms_model, key).cpu()
-                except Exception as e:
-                    traceback.print_exc()
-                    ep_logger.info(f"{str(ms_model)}.{key} has no cpu(), detailed error infor is {e}")
+        move_to_cpu(ms_model)
+        # if hasattr(ms_model, "__dict__"):
+        #     for key in ms_model.__dict__.keys():
+        #         try:
+        #             if hasattr(getattr(ms_model, key), "cpu"):
+        #                 getattr(ms_model, key).cpu()
+        #         except Exception as e:
+        #             traceback.print_exc()
+        #             ep_logger.info(f"{str(ms_model)}.{key} has no cpu(), detailed error infor is {e}")
 
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
+
+
+def move_to_gpu(obj, visited=None):
+    if visited is None:
+        visited = set()
+
+    if id(obj) in visited:
+        return
+    visited.add(id(obj))
+
+    if hasattr(obj, "cuda") and callable(getattr(obj, "cuda")):
+        try:
+            obj.cuda()
+        except Exception as e:
+            traceback.print_exc()
+            logging.info(f"Object {obj} could not be moved to CUDA, error: {e}")
+
+    if hasattr(obj, "__dict__"):
+        for key, value in obj.__dict__.items():
+            move_to_gpu(value, visited)
+
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            move_to_gpu(item, visited)
 
 
 def modelscope_models_to_gpu():
@@ -715,14 +766,15 @@ def modelscope_models_to_gpu():
         scripts.easyphoto_infer.psgan_inference,
     ]
     for ms_model in ms_models:
-        if hasattr(ms_model, "__dict__"):
-            for key in ms_model.__dict__.keys():
-                try:
-                    if hasattr(getattr(ms_model, key), "cuda"):
-                        getattr(ms_model, key).cuda()
-                except Exception as e:
-                    traceback.print_exc()
-                    ep_logger.info(f"{str(ms_model)}.{key} has no cuda(), detailed error infor is {e}")
+        move_to_gpu(ms_model)
+        # if hasattr(ms_model, "__dict__"):
+        #     for key in ms_model.__dict__.keys():
+        #         try:
+        #             if hasattr(getattr(ms_model, key), "cuda"):
+        #                 getattr(ms_model, key).cuda()
+        #         except Exception as e:
+        #             traceback.print_exc()
+        #             ep_logger.info(f"{str(ms_model)}.{key} has no cuda(), detailed error infor is {e}")
 
     gc.collect()
     torch.cuda.empty_cache()
@@ -737,6 +789,17 @@ class switch_ms_model_cpu(ContextDecorator):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         modelscope_models_to_gpu()
+
+
+class auto_to_gpu_model(object):
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, *args, **kwargs):
+        move_to_gpu(self.model)
+        outputs = self.model(*args, **kwargs)
+        move_to_cpu(self.model)
+        return outputs
 
 
 def unload_models():

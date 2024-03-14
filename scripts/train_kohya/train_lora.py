@@ -1329,7 +1329,14 @@ def main():
                 torch.cuda.ipc_collect()
                 logger.info(f"Running validation error, skip it." f"Error info: {e}.")
 
-        if args.merge_best_lora_based_face_id and args.validation:
+        img_list = (
+            glob(os.path.join(os.path.join(args.output_dir, "validation"), "*.jpg"))
+            + glob(os.path.join(os.path.join(args.output_dir, "validation"), "*.JPG"))
+            + glob(os.path.join(os.path.join(args.output_dir, "validation"), "*.png"))
+            + glob(os.path.join(os.path.join(args.output_dir, "validation"), "*.PNG"))
+        )
+
+        if args.merge_best_lora_based_face_id and args.validation and len(img_list) != 0:
             pivot_dir = os.path.join(args.train_data_dir, "train")
             merge_best_lora_name = args.train_data_dir.split("/")[-1] if args.merge_best_lora_name is None else args.merge_best_lora_name
             t_result_list, tlist, scores = eval_jpg_with_faceid(pivot_dir, os.path.join(args.output_dir, "validation"))
