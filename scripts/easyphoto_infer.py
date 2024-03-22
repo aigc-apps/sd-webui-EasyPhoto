@@ -796,7 +796,11 @@ def easyphoto_infer_forward(
             makeup_transfer_model_path = os.path.join(easyphoto_models_path, "makeup_transfer.pth")
             face_landmarks_model_path = os.path.join(easyphoto_models_path, "face_landmarks.pth")
             psgan_inference = PSGAN_Inference(
-                "cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path
+                "cuda",
+                makeup_transfer_model_path,
+                retinaface_detection,
+                face_skin.model if type(face_skin) is auto_to_gpu_model else face_skin,
+                face_landmarks_model_path,
             )
             psgan_inference = auto_to_gpu_model(psgan_inference)
         except Exception as e:
@@ -1779,7 +1783,7 @@ def easyphoto_infer_forward(
                     # makeup transfer
                     second_diffusion_output_image_crop_makeup_transfer = second_diffusion_output_image_crop.resize([256, 256])
                     template_image_original_face_area = Image.fromarray(np.uint8(template_image_original_face_area)).resize([256, 256])
-                    second_diffusion_output_image_crop_makeup_transfer = psgan_inference.transfer(
+                    second_diffusion_output_image_crop_makeup_transfer = psgan_inference(
                         second_diffusion_output_image_crop_makeup_transfer, template_image_original_face_area
                     )
                     second_diffusion_output_image_crop_makeup_transfer = second_diffusion_output_image_crop_makeup_transfer.resize(
@@ -2277,7 +2281,11 @@ def easyphoto_video_infer_forward(
             makeup_transfer_model_path = os.path.join(easyphoto_models_path, "makeup_transfer.pth")
             face_landmarks_model_path = os.path.join(easyphoto_models_path, "face_landmarks.pth")
             psgan_inference = PSGAN_Inference(
-                "cuda", makeup_transfer_model_path, retinaface_detection, face_skin, face_landmarks_model_path
+                "cuda",
+                makeup_transfer_model_path,
+                retinaface_detection,
+                face_skin.model if type(face_skin) is auto_to_gpu_model else face_skin,
+                face_landmarks_model_path,
             )
             psgan_inference = auto_to_gpu_model(psgan_inference)
         except Exception as e:
@@ -2962,7 +2970,7 @@ def easyphoto_video_infer_forward(
                             _template_image_original_face_area = Image.fromarray(np.uint8(_template_image_original_face_area)).resize(
                                 [256, 256]
                             )
-                            _input_image_crop_makeup_transfer = psgan_inference.transfer(
+                            _input_image_crop_makeup_transfer = psgan_inference(
                                 _input_image_crop_makeup_transfer, _template_image_original_face_area
                             )
                             _input_image_crop_makeup_transfer = _input_image_crop_makeup_transfer.resize(

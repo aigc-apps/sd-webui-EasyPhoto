@@ -854,7 +854,7 @@ class PSGAN_Inference:
         self.preprocess = PreProcess(device, retinaface_detection=retinaface_detection, face_skin=face_skin, landmark_path=landmark_path)
         self.postprocess = PostProcess()
 
-    def transfer(self, source: Image, reference: Image):
+    def __call__(self, source: Image, reference: Image):
         """
         Args:
             source (Image): The image where makeup will be transferred to.
