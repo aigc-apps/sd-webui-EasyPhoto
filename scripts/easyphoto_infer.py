@@ -444,6 +444,7 @@ def easyphoto_infer_forward(
     scene_id,
     prompt_generate_sd_model_checkpoint,
     additional_prompt,
+    additional_neg_prompt,
     lora_weights,
     before_face_fusion_ratio,
     after_face_fusion_ratio,
@@ -963,7 +964,7 @@ def easyphoto_infer_forward(
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                default_negative_prompt=DEFAULT_NEGATIVE_T2I,
+                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
                 seed=seed,
                 sampler=sampler,
             )
@@ -979,7 +980,7 @@ def easyphoto_infer_forward(
                     denoising_strength=0.20,
                     hr_scale=1.5,
                     default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                    default_negative_prompt=DEFAULT_NEGATIVE_T2I,
+                    default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
                     seed=seed,
                     sampler=sampler,
                 )
@@ -1013,7 +1014,7 @@ def easyphoto_infer_forward(
                 width=text_to_image_width,
                 height=text_to_image_height,
                 default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                default_negative_prompt=DEFAULT_NEGATIVE_T2I,
+                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
                 seed=seed,
                 sampler=sampler,
             )
@@ -1529,6 +1530,7 @@ def easyphoto_infer_forward(
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
+                        default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE,
                         sampler=sampler,
                         loractl_flag=loractl_flag,
                     )
@@ -1570,6 +1572,7 @@ def easyphoto_infer_forward(
                         input_prompt=input_prompts[index],
                         hr_scale=1.0,
                         seed=seed,
+                        default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE,
                         sampler=sampler,
                     )
                     if loractl_flag:
@@ -1731,6 +1734,7 @@ def easyphoto_infer_forward(
                         denoising_strength=second_denoising_strength,
                         hr_scale=default_hr_scale,
                         seed=seed,
+                        default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE,
                         sampler=sampler,
                     )
                     second_diffusion_output_image = second_diffusion_output_image[0]
@@ -1941,6 +1945,7 @@ def easyphoto_infer_forward(
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=seed,
+                            default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
                         sub_output_image = sub_output_image[0]
@@ -1975,6 +1980,7 @@ def easyphoto_infer_forward(
                             denoising_strength=denoising_strength,
                             hr_scale=1,
                             seed=seed,
+                            default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE,
                             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                         )
                         output_image = output_image[0]
@@ -2077,6 +2083,7 @@ def easyphoto_video_infer_forward(
     i2v_denoising_strength,
     init_video,
     additional_prompt,
+    additional_neg_prompt,
     lora_weights,
     max_frames,
     max_fps,
@@ -2367,7 +2374,7 @@ def easyphoto_video_infer_forward(
                 width=new_size[0],
                 height=new_size[1],
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
-                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_AD,
                 seed=seed,
                 sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 animatediff_flag=True,
@@ -2383,7 +2390,7 @@ def easyphoto_video_infer_forward(
                 width=t2v_input_width,
                 height=t2v_input_height,
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
-                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_AD,
                 seed=seed,
                 sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 animatediff_flag=True,
@@ -2418,7 +2425,7 @@ def easyphoto_video_infer_forward(
             denoising_strength=i2v_denoising_strength,
             hr_scale=1,
             default_positive_prompt=DEFAULT_POSITIVE_AD,
-            default_negative_prompt=DEFAULT_NEGATIVE_AD,
+            default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_AD,
             seed=seed,
             sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
             animatediff_flag=True,
@@ -2821,7 +2828,7 @@ def easyphoto_video_infer_forward(
                 seed=seed,
                 sd_model_checkpoint=sd_model_checkpoint,
                 default_positive_prompt=DEFAULT_POSITIVE_AD,
-                default_negative_prompt=DEFAULT_NEGATIVE_AD,
+                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_AD,
                 sampler="DPM++ 2M SDE Karras" if not lcm_accelerate else "Euler a",
                 animatediff_flag=True,
                 animatediff_fps=int(actual_fps),
