@@ -144,15 +144,22 @@ if video_visible:
                 from scripts.adapter import (Adapter, Adapter_light,
                                              StyleAdapter)
                 from scripts.batch_hijack import InputMode
-                from scripts.controlmodel_ipadapter import (
-                    PlugableIPAdapter, clear_all_ip_adapter)
+                try:
+                    from scripts.controlmodel_ipadapter import (
+                        PlugableIPAdapter, clear_all_ip_adapter)
+                except:
+                    from scripts.ipadapter.plugable_ipadapter import (
+                        PlugableIPAdapter, clear_all_ip_adapter)
                 from scripts.controlnet_lllite import (PlugableControlLLLite,
                                                        clear_all_lllite)
                 from scripts.controlnet_lora import bind_control_lora
                 from scripts.hook import (ControlModelType, ControlParams,
                                           UnetHook)
                 from scripts.logging import logger
-                from scripts.processor import model_free_preprocessors
+                try:
+                    from scripts.processor import model_free_preprocessors
+                except:
+                    from scripts.preprocessor import model_free_preprocessors
 
                 # TODO: i2i-batch mode, what should I change?
                 def image_has_mask(input_image: np.ndarray) -> bool:

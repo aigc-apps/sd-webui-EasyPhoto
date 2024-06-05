@@ -64,6 +64,7 @@ from scripts.sdwebui import (
     reload_sd_model_vae,
     switch_sd_model_vae,
     t2i_call,
+    get_control_mode,
 )
 
 
@@ -97,9 +98,11 @@ def get_controlnet_unit(
     resize_mode: str = "Just Resize",
     is_batch: bool = False,
 ):  # Any should be replaced with a more specific image type  # Default to False, assuming single image input by default
+    control_mode = get_control_mode(control_mode)
+
     if unit == "canny":
         control_unit = dict(
-            input_image=None,
+            image=None,
             module="canny",
             weight=weight,
             guidance_end=1,
@@ -112,7 +115,7 @@ def get_controlnet_unit(
 
     elif unit == "sdxl_canny_mid":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            image=None,
             module="canny",
             weight=weight,
             guidance_end=1,
@@ -148,7 +151,7 @@ def get_controlnet_unit(
 
     elif unit == "sdxl_openpose_lora":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            image=None,
             module="openpose_full",
             weight=weight,
             guidance_end=1,
@@ -160,7 +163,7 @@ def get_controlnet_unit(
 
     elif unit == "color":
         control_unit = dict(
-            input_image=None,
+            image=None,
             module="none",
             weight=weight,
             guidance_end=1,
@@ -198,11 +201,12 @@ def get_controlnet_unit(
             color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
             color_image = Image.fromarray(np.uint8(color_image))
 
-            control_unit["input_image"] = {"image": np.asarray(color_image), "mask": None}
+            control_unit["image"] = np.asarray(color_image)
+            control_unit["mask"] = None
 
     elif unit == "tile":
         control_unit = dict(
-            input_image=None,
+            image=None,
             module="tile_resample",
             weight=weight,
             guidance_end=1,
@@ -215,7 +219,7 @@ def get_controlnet_unit(
 
     elif unit == "ipa_full_face":
         control_unit = dict(
-            input_image=None,
+            image=None,
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
@@ -225,7 +229,7 @@ def get_controlnet_unit(
         )
     elif unit == "ipa_sdxl_plus_face":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            image=None,
             module="ip-adapter_clip_sdxl_plus_vith",
             weight=weight,
             guidance_end=1,
@@ -235,7 +239,7 @@ def get_controlnet_unit(
         )
     elif unit == "instantid_sdxl_face_embedding":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            image=None,
             module="instant_id_face_embedding",
             weight=weight,
             guidance_end=1,
@@ -246,7 +250,7 @@ def get_controlnet_unit(
         )
     elif unit == "instantid_sdxl_face_keypoints":
         control_unit = dict(
-            input_image={"image": np.asarray(input_image), "mask": None},
+            image=None,
             module="instant_id_face_keypoints",
             weight=weight,
             guidance_end=1,
@@ -257,7 +261,7 @@ def get_controlnet_unit(
         )
     elif unit == "depth":
         control_unit = dict(
-            input_image=input_image,
+            image=None,
             module="depth_midas",
             weight=weight,
             guidance_end=1,
@@ -268,7 +272,7 @@ def get_controlnet_unit(
 
     elif unit == "ipa":
         control_unit = dict(
-            input_image=input_image,
+            image=None,
             module="ip-adapter_clip_sd15",
             weight=weight,
             guidance_end=1,
@@ -279,7 +283,7 @@ def get_controlnet_unit(
 
     elif unit == "canny_no_pre":
         control_unit = dict(
-            input_image=input_image,
+            image=None,
             module=None,
             weight=weight,
             guidance_end=1,
@@ -290,14 +294,12 @@ def get_controlnet_unit(
             model="control_v11p_sd15_canny",
         )
 
-    if unit != "color" and not unit.startswith("sdxl"):
+    if unit != "color":
         if is_batch:
             control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         else:
-            control_unit["input_image"] = {
-                "image": np.asarray(input_image),
-                "mask": None,
-            }
+            control_unit["image"] = np.asarray(input_image)
+            control_unit["mask"] = None
 
     return control_unit
 
