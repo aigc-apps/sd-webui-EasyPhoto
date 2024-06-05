@@ -201,8 +201,7 @@ def get_controlnet_unit(
             color_image = cv2.resize(color_image, (w, h), interpolation=cv2.INTER_CUBIC)
             color_image = Image.fromarray(np.uint8(color_image))
 
-            control_unit["image"] = np.asarray(color_image)
-            control_unit["mask"] = None
+            control_unit["image"] = np.uint8(color_image)
 
     elif unit == "tile":
         control_unit = dict(
@@ -298,8 +297,7 @@ def get_controlnet_unit(
         if is_batch:
             control_unit["batch_images"] = [np.array(_input_image, np.uint8) for _input_image in input_image]
         else:
-            control_unit["image"] = np.asarray(input_image)
-            control_unit["mask"] = None
+            control_unit["image"] = np.array(input_image, np.uint8)
 
     return control_unit
 

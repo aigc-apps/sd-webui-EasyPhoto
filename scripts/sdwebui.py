@@ -385,7 +385,10 @@ def t2i_call(
         animate_diff_process = AnimateDiffProcess(enable=True, video_length=animatediff_video_length, fps=animatediff_fps)
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
+        from scripts import external_code
+
         animate_diff_process = None
+        controlnet_units = [external_code.ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
 
     for alwayson_scripts in modules.scripts.scripts_txt2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
@@ -593,7 +596,10 @@ def i2i_inpaint_call(
         )
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
+        from scripts import external_code
+
         animate_diff_process = None
+        controlnet_units = [external_code.ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
