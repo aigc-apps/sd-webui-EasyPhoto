@@ -3,8 +3,7 @@ import os
 import random
 import re
 from contextlib import ContextDecorator
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import gradio as gr
 import modules
@@ -85,35 +84,6 @@ class switch_return_opt(ContextDecorator):
             shared.opts.data["control_net_no_detectmap"] = self.origin_control_net_no_detectmap
 
 
-class ControlMode(Enum):
-    """
-    The improved guess mode.
-    """
-
-    BALANCED = "Balanced"
-    PROMPT = "My prompt is more important"
-    CONTROL = "ControlNet is more important"
-
-
-class ResizeMode(Enum):
-    """
-    Resize modes for ControlNet input images.
-    """
-
-    RESIZE = "Just Resize"
-    INNER_FIT = "Crop and Resize"
-    OUTER_FIT = "Resize and Fill"
-
-    def int_value(self):
-        if self == ResizeMode.RESIZE:
-            return 0
-        elif self == ResizeMode.INNER_FIT:
-            return 1
-        elif self == ResizeMode.OUTER_FIT:
-            return 2
-        assert False, "NOTREACHED"
-
-
 class ControlNetUnit:
     """
     Represents an entire ControlNet processing unit.
@@ -161,81 +131,6 @@ class ControlNetUnit:
             return False
 
         return vars(self) == vars(other)
-
-
-def find_cn_script(script_runner: scripts.ScriptRunner) -> Optional[scripts.Script]:
-    """
-    Find the ControlNet script in `script_runner`. Returns `None` if `script_runner` does not contain a ControlNet script.
-    """
-
-    if script_runner is None:
-        return None
-
-    for script in script_runner.alwayson_scripts:
-        if is_cn_script(script):
-            return script
-
-
-def update_cn_script_in_place(
-    script_runner: scripts.ScriptRunner,
-    script_args: List[Any],
-    cn_units: List[ControlNetUnit],
-    **_kwargs,  # for backwards compatibility
-):
-    """
-    Update the arguments of the ControlNet script in `script_args` in place, reading from `cn_units`.
-    `cn_units` and its elements are not modified. You can call this function repeatedly, as many times as you want.
-
-    Does not update `script_args` if any of the folling is true:
-    - ControlNet is not present in `script_runner`
-    - `script_args` is not filled with script arguments for scripts that are processed before ControlNet
-    """
-
-    cn_script = find_cn_script(script_runner)
-    if cn_script is None or len(script_args) < cn_script.args_from:
-        return
-
-    # fill in remaining parameters to satisfy max models, just in case script needs it.
-    max_models = shared.opts.data.get("control_net_max_models_num", 1)
-    cn_units = cn_units + [ControlNetUnit(enabled=False)] * max(max_models - len(cn_units), 0)
-
-    cn_script_args_diff = 0
-    for script in script_runner.alwayson_scripts:
-        if script is cn_script:
-            cn_script_args_diff = len(cn_units) - (cn_script.args_to - cn_script.args_from)
-            script_args[script.args_from : script.args_to] = cn_units
-            script.args_to = script.args_from + len(cn_units)
-        else:
-            script.args_from += cn_script_args_diff
-            script.args_to += cn_script_args_diff
-
-
-def update_cn_script_in_processing(
-    p: processing.StableDiffusionProcessing,
-    cn_units: List[ControlNetUnit],
-    **_kwargs,  # for backwards compatibility
-):
-    """
-    Update the arguments of the ControlNet script in `p.script_args` in place, reading from `cn_units`.
-    `cn_units` and its elements are not modified. You can call this function repeatedly, as many times as you want.
-
-    Does not update `p.script_args` if any of the folling is true:
-    - ControlNet is not present in `p.scripts`
-    - `p.script_args` is not filled with script arguments for scripts that are processed before ControlNet
-    """
-
-    cn_units_type = type(cn_units) if type(cn_units) in (list, tuple) else list
-    script_args = list(p.script_args)
-    update_cn_script_in_place(p.scripts, script_args, cn_units)
-    p.script_args = cn_units_type(script_args)
-
-
-def is_cn_script(script: scripts.Script) -> bool:
-    """
-    Determine whether `script` is a ControlNet script.
-    """
-
-    return script.title().lower() == "controlnet"
 
 
 def init_default_script_args(script_runner):
@@ -329,6 +224,14 @@ if video_visible:
                 self.hacked = False
                 AnimateDiffOutput().output(p, res, params)
                 ep_logger.info("AnimateDiff process end.")
+
+
+def get_control_mode(control_mode):
+    """Get control mode from controlnet code"""
+    from scripts import external_code
+
+    control_mode = [external_code.ControlMode.BALANCED, external_code.ControlMode.PROMPT, external_code.ControlMode.CONTROL][control_mode]
+    return control_mode
 
 
 def reload_sd_model_vae(sd_model, vae):
@@ -467,7 +370,6 @@ def t2i_call(
         tiling=tiling,
         override_settings=override_settings,
     )
-
     p_txt2img.scripts = scripts.scripts_txt2img
     p_txt2img.script_args = init_default_script_args(p_txt2img.scripts)
 
@@ -483,9 +385,12 @@ def t2i_call(
         animate_diff_process = AnimateDiffProcess(enable=True, video_length=animatediff_video_length, fps=animatediff_fps)
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
-        animate_diff_process = None
+        from scripts import external_code
 
-    for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
+        animate_diff_process = None
+        controlnet_units = [external_code.ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
+
+    for alwayson_scripts in modules.scripts.scripts_txt2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):
             if alwayson_scripts.name is None:
                 continue
@@ -691,7 +596,10 @@ def i2i_inpaint_call(
         )
         controlnet_units = [ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
     else:
+        from scripts import external_code
+
         animate_diff_process = None
+        controlnet_units = [external_code.ControlNetUnit(**controlnet_unit) for controlnet_unit in controlnet_units]
 
     for alwayson_scripts in modules.scripts.scripts_img2img.alwayson_scripts:
         if hasattr(alwayson_scripts, "name"):

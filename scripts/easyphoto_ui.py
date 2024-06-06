@@ -654,27 +654,6 @@ def on_ui_tabs():
                                             visible=True,
                                         )
 
-                            def generate_tabs(model_selected_tab, upload_way):
-                                if model_selected_tab == 0:
-                                    tabs = {
-                                        "Template Gallery": 0,
-                                        "Single Image Upload": 1,
-                                        "Batch Images Upload": 2,
-                                    }[upload_way]
-                                else:
-                                    tabs = 3
-                                return tabs
-
-                            # get tabs
-                            state_tab = gr.State(0)
-                            model_selected_tab = gr.State(0)
-                            model_selected_tabs = [template_images_tab, text2photo_tab]
-                            for i, tab in enumerate(model_selected_tabs):
-                                tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
-                                tab.select(generate_tabs, [model_selected_tab, upload_way], state_tab)
-
-                            upload_way.change(generate_tabs, [model_selected_tab, upload_way], state_tab)
-
                             with gr.Row():
                                 sd_model_checkpoint = gr.Dropdown(
                                     value="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
@@ -839,8 +818,9 @@ def on_ui_tabs():
 
                             with gr.Accordion("Advanced Options", open=False):
                                 additional_prompt = gr.Textbox(
-                                    label="Additional Prompt", lines=3, value="masterpiece, beauty", interactive=True
+                                    label="Additional Prompt", lines=2, value="masterpiece, beauty", interactive=True
                                 )
+                                additional_neg_prompt = gr.Textbox(label="Additional Neg Prompt", lines=2, value="", interactive=True)
                                 seed = gr.Textbox(label="Seed", value=-1)
 
                                 with gr.Row():
@@ -856,6 +836,8 @@ def on_ui_tabs():
                                     attribute_edit_id.select(
                                         fn=lambda additional_prompt, attribute_edit_id: gr.update(
                                             value=additional_prompt + f" <lora:{attribute_edit_id}:0@0, 0@0.2, 2@0.2, 2@1>"
+                                            if attribute_edit_id != "none"
+                                            else additional_prompt
                                         ),
                                         inputs=[additional_prompt, attribute_edit_id],
                                         outputs=[additional_prompt],
@@ -1200,7 +1182,11 @@ def on_ui_tabs():
                                     return [gr.update(visible=True), gr.update(visible=True)]
                                 return [gr.update(visible=False), gr.update(visible=False)]
 
-                            display_button = gr.Button("Start Generation", variant="primary")
+                            display_button_tg = gr.Button("Start Generation Template Gallery", variant="primary")
+                            display_button_si = gr.Button("Start Generation Single Image Upload", variant="primary", visible=False)
+                            display_button_bi = gr.Button("Start Generation Batch Images Upload", variant="primary", visible=False)
+                            display_button_ti = gr.Button("Start Generation Text to Image", variant="primary", visible=False)
+
                             empty_cache = gr.Button("Empty Cache of Preprocess Model in EasyPhoto", elem_id=f"empty_cache")
 
                             face_id_text = gr.Markdown("Face Similarity Scores", visible=False)
@@ -1214,65 +1200,112 @@ def on_ui_tabs():
                             infer_progress = gr.Textbox(label="Generation Progress", value="No task currently", interactive=False)
                             empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
-                    display_button.click(
-                        fn=easyphoto_infer_forward,
-                        inputs=[
-                            sd_model_checkpoint,
-                            selected_template_images,
-                            init_image_photo_inference,
-                            uploaded_template_images,
-                            text_to_image_input_prompt,
-                            text_to_image_width,
-                            text_to_image_height,
-                            t2i_control_way,
-                            t2i_pose_template,
-                            scene_id,
-                            prompt_generate_sd_model_checkpoint,
-                            additional_prompt,
-                            lora_weights,
-                            before_face_fusion_ratio,
-                            after_face_fusion_ratio,
-                            first_diffusion_steps,
-                            first_denoising_strength,
-                            second_diffusion_steps,
-                            second_denoising_strength,
-                            seed,
-                            crop_face_preprocess,
-                            apply_face_fusion_before,
-                            apply_face_fusion_after,
-                            color_shift_middle,
-                            color_shift_last,
-                            super_resolution,
-                            super_resolution_method,
-                            super_resolution_ratio,
-                            skin_retouching_bool,
-                            display_score,
-                            background_restore,
-                            background_restore_denoising_strength,
-                            makeup_transfer,
-                            makeup_transfer_ratio,
-                            face_shape_match,
-                            state_tab,
-                            id_control,
-                            id_control_method,
-                            ipa_weight,
-                            ipa_image_path,
-                            instantid_id_weight,
-                            instantid_ipa_weight,
-                            instantid_image_path,
-                            ref_mode_choose,
-                            no_user_lora_mode,
-                            ipa_only_weight,
-                            ipa_only_image_path,
-                            instantid_only_id_weight,
-                            instantid_only_ipa_weight,
-                            instantid_only_image_path,
-                            lcm_accelerate,
-                            enable_second_diffusion,
-                            *uuids,
-                        ],
-                        outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
-                    )
+                    # Judge what's the tab
+                    def generate_tabs(model_selected_tab, upload_way):
+                        if model_selected_tab == 0:
+                            tabs = {
+                                "Template Gallery": [
+                                    gr.update(visible=True),
+                                    gr.update(visible=False),
+                                    gr.update(visible=False),
+                                    gr.update(visible=False),
+                                ],
+                                "Single Image Upload": [
+                                    gr.update(visible=False),
+                                    gr.update(visible=True),
+                                    gr.update(visible=False),
+                                    gr.update(visible=False),
+                                ],
+                                "Batch Images Upload": [
+                                    gr.update(visible=False),
+                                    gr.update(visible=False),
+                                    gr.update(visible=True),
+                                    gr.update(visible=False),
+                                ],
+                            }[upload_way]
+                        else:
+                            tabs = [gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+                        return tabs
+
+                    # Get Display Button
+                    display_button = [display_button_tg, display_button_si, display_button_bi, display_button_ti]
+
+                    # Get tabs
+                    state_tab_tg = gr.State(0)
+                    state_tab_si = gr.State(1)
+                    state_tab_bi = gr.State(2)
+                    state_tab_ti = gr.State(3)
+                    state_tab = [state_tab_tg, state_tab_si, state_tab_bi, state_tab_ti]
+
+                    model_selected_tab = gr.State(0)
+                    model_selected_tabs = [template_images_tab, text2photo_tab]
+                    for i, tab in enumerate(model_selected_tabs):
+                        tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
+                        tab.select(generate_tabs, [model_selected_tab, upload_way], display_button)
+
+                    upload_way.change(generate_tabs, [model_selected_tab, upload_way], display_button)
+
+                    for _display_button, _state_tab in zip(display_button, state_tab):
+                        _display_button.click(
+                            fn=easyphoto_infer_forward,
+                            inputs=[
+                                sd_model_checkpoint,
+                                selected_template_images,
+                                init_image_photo_inference,
+                                uploaded_template_images,
+                                text_to_image_input_prompt,
+                                text_to_image_width,
+                                text_to_image_height,
+                                t2i_control_way,
+                                t2i_pose_template,
+                                scene_id,
+                                prompt_generate_sd_model_checkpoint,
+                                additional_prompt,
+                                additional_neg_prompt,
+                                lora_weights,
+                                before_face_fusion_ratio,
+                                after_face_fusion_ratio,
+                                first_diffusion_steps,
+                                first_denoising_strength,
+                                second_diffusion_steps,
+                                second_denoising_strength,
+                                seed,
+                                crop_face_preprocess,
+                                apply_face_fusion_before,
+                                apply_face_fusion_after,
+                                color_shift_middle,
+                                color_shift_last,
+                                super_resolution,
+                                super_resolution_method,
+                                super_resolution_ratio,
+                                skin_retouching_bool,
+                                display_score,
+                                background_restore,
+                                background_restore_denoising_strength,
+                                makeup_transfer,
+                                makeup_transfer_ratio,
+                                face_shape_match,
+                                _state_tab,
+                                id_control,
+                                id_control_method,
+                                ipa_weight,
+                                ipa_image_path,
+                                instantid_id_weight,
+                                instantid_ipa_weight,
+                                instantid_image_path,
+                                ref_mode_choose,
+                                no_user_lora_mode,
+                                ipa_only_weight,
+                                ipa_only_image_path,
+                                instantid_only_id_weight,
+                                instantid_only_ipa_weight,
+                                instantid_only_image_path,
+                                lcm_accelerate,
+                                enable_second_diffusion,
+                                *uuids,
+                            ],
+                            outputs=[infer_progress, photo_infer_output_images, face_id_outputs],
+                        )
 
             with gr.TabItem("Video Inference"):
                 if not video_visible:
@@ -1289,8 +1322,6 @@ def on_ui_tabs():
                     with gr.Blocks():
                         with gr.Row():
                             with gr.Column():
-                                video_model_selected_tab = gr.State(0)
-
                                 with gr.TabItem("Text2Video") as video_template_images_tab:
                                     t2v_input_prompt = gr.Textbox(
                                         label="Text2Video Input Prompt",
@@ -1482,10 +1513,6 @@ def on_ui_tabs():
                                         label="Video for easyphoto to V2V", show_label=True, elem_id="{id_part}_video", source="upload"
                                     )
 
-                                model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
-                                for i, tab in enumerate(model_selected_tabs):
-                                    tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[video_model_selected_tab])
-
                                 with gr.Row():
                                     sd_model_checkpoint = gr.Dropdown(
                                         value="Chilloutmix-Ni-pruned-fp16-fix.safetensors",
@@ -1552,8 +1579,9 @@ def on_ui_tabs():
 
                                 with gr.Accordion("Advanced Options", open=False):
                                     additional_prompt = gr.Textbox(
-                                        label="Video Additional Prompt", lines=3, value="masterpiece, beauty", interactive=True
+                                        label="Video Additional Prompt", lines=2, value="masterpiece, beauty", interactive=True
                                     )
+                                    additional_neg_prompt = gr.Textbox(label="Additional Neg Prompt", lines=2, value="", interactive=True)
                                     seed = gr.Textbox(
                                         label="Video Seed",
                                         value=-1,
@@ -1749,7 +1777,10 @@ def on_ui_tabs():
 
                                 save_as.change(update_save_as_mode, [save_as], [output_video, output_gif])
 
-                                display_button = gr.Button("Start Generation", variant="primary")
+                                display_button_t2v = gr.Button("Start Generation Text to Video", variant="primary")
+                                display_button_i2v = gr.Button("Start Generation Image to Video", variant="primary", visible=False)
+                                display_button_v2v = gr.Button("Start Generation Video to Video", variant="primary", visible=False)
+
                                 with gr.Row():
                                     save = gr.Button("List Recent Conversion Results", elem_id=f"save")
                                     download_origin_files = gr.File(
@@ -1814,57 +1845,83 @@ def on_ui_tabs():
 
                                 empty_cache.click(fn=unload_models, inputs=[], outputs=infer_progress)
 
-                        display_button.click(
-                            fn=easyphoto_video_infer_forward,
-                            inputs=[
-                                sd_model_checkpoint,
-                                sd_model_checkpoint_for_animatediff_text2video,
-                                sd_model_checkpoint_for_animatediff_image2video,
-                                t2v_input_prompt,
-                                t2v_input_width,
-                                t2v_input_height,
-                                scene_id,
-                                upload_control_video,
-                                upload_control_video_type,
-                                control_video,
-                                init_image,
-                                init_image_prompt,
-                                last_image,
-                                i2v_denoising_strength,
-                                init_video,
-                                additional_prompt,
-                                lora_weights,
-                                max_frames,
-                                max_fps,
-                                save_as,
-                                before_face_fusion_ratio,
-                                after_face_fusion_ratio,
-                                first_diffusion_steps,
-                                first_denoising_strength,
-                                seed,
-                                crop_face_preprocess,
-                                apply_face_fusion_before,
-                                apply_face_fusion_after,
-                                color_shift_middle,
-                                super_resolution,
-                                super_resolution_method,
-                                super_resolution_ratio,
-                                skin_retouching_bool,
-                                display_score,
-                                makeup_transfer,
-                                makeup_transfer_ratio,
-                                face_shape_match,
-                                video_interpolation,
-                                video_interpolation_ext,
-                                video_model_selected_tab,
-                                ipa_control,
-                                ipa_weight,
-                                ipa_image_path,
-                                lcm_accelerate,
-                                *uuids,
-                            ],
-                            outputs=[infer_progress, output_video, output_gif, output_images],
-                        )
+                        # Judge what's the tab
+                        def generate_tabs(model_selected_tab):
+                            if model_selected_tab == 0:
+                                return [gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)]
+                            elif model_selected_tab == 1:
+                                return [gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)]
+                            else:
+                                return [gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)]
+
+                        # Get Display Button
+                        display_button = [display_button_t2v, display_button_i2v, display_button_v2v]
+
+                        # Get tabs
+                        state_tab_t2v = gr.State(0)
+                        state_tab_i2v = gr.State(1)
+                        state_tab_v2v = gr.State(2)
+                        video_model_selected_tab = [state_tab_t2v, state_tab_i2v, state_tab_v2v]
+
+                        model_selected_tab = gr.State(0)
+                        model_selected_tabs = [video_template_images_tab, video_upload_image_tab, video_upload_video_tab]
+                        for i, tab in enumerate(model_selected_tabs):
+                            tab.select(fn=lambda tabnum=i: tabnum, inputs=[], outputs=[model_selected_tab])
+                            tab.select(generate_tabs, [model_selected_tab], display_button)
+
+                        for _display_button, _video_model_selected_tab in zip(display_button, video_model_selected_tab):
+                            _display_button.click(
+                                fn=easyphoto_video_infer_forward,
+                                inputs=[
+                                    sd_model_checkpoint,
+                                    sd_model_checkpoint_for_animatediff_text2video,
+                                    sd_model_checkpoint_for_animatediff_image2video,
+                                    t2v_input_prompt,
+                                    t2v_input_width,
+                                    t2v_input_height,
+                                    scene_id,
+                                    upload_control_video,
+                                    upload_control_video_type,
+                                    control_video,
+                                    init_image,
+                                    init_image_prompt,
+                                    last_image,
+                                    i2v_denoising_strength,
+                                    init_video,
+                                    additional_prompt,
+                                    additional_neg_prompt,
+                                    lora_weights,
+                                    max_frames,
+                                    max_fps,
+                                    save_as,
+                                    before_face_fusion_ratio,
+                                    after_face_fusion_ratio,
+                                    first_diffusion_steps,
+                                    first_denoising_strength,
+                                    seed,
+                                    crop_face_preprocess,
+                                    apply_face_fusion_before,
+                                    apply_face_fusion_after,
+                                    color_shift_middle,
+                                    super_resolution,
+                                    super_resolution_method,
+                                    super_resolution_ratio,
+                                    skin_retouching_bool,
+                                    display_score,
+                                    makeup_transfer,
+                                    makeup_transfer_ratio,
+                                    face_shape_match,
+                                    video_interpolation,
+                                    video_interpolation_ext,
+                                    _video_model_selected_tab,
+                                    ipa_control,
+                                    ipa_weight,
+                                    ipa_image_path,
+                                    lcm_accelerate,
+                                    *uuids,
+                                ],
+                                outputs=[infer_progress, output_video, output_gif, output_images],
+                            )
 
             with gr.TabItem("Virtual Try On"):
                 dummy_component = gr.Label(visible=False)
