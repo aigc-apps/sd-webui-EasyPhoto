@@ -821,7 +821,10 @@ def on_ui_tabs():
                                     label="Additional Prompt", lines=2, value="masterpiece, beauty", interactive=True
                                 )
                                 additional_neg_prompt = gr.Textbox(label="Additional Neg Prompt", lines=2, value="", interactive=True)
-                                seed = gr.Textbox(label="Seed", value=-1)
+
+                                with gr.Row():
+                                    seed = gr.Textbox(label="Seed", value=-1)
+                                    batch_size = gr.Slider(minimum=1, maximum=32, value=1, step=1, label="Batch size of each image")
 
                                 with gr.Row():
                                     attribute_edit_id = gr.Dropdown(
@@ -1270,6 +1273,7 @@ def on_ui_tabs():
                                 second_diffusion_steps,
                                 second_denoising_strength,
                                 seed,
+                                batch_size,
                                 crop_face_preprocess,
                                 apply_face_fusion_before,
                                 apply_face_fusion_after,
