@@ -37,13 +37,13 @@ Please read our Contributor Covenant [covenant](./COVENANT.md) | [简体中文](
 If you meet some problems in the training, please refer to the [VQA](https://github.com/aigc-apps/sd-webui-EasyPhoto/wiki).
 
 These are our generated results:
-![results_1](images/results.png)
+![results_1](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/result.png)
 
 Our ui interface is as follows:
 **train part:**
-![train_ui](images/train_ui.png)
+![train_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/train_ui.png)
 **inference part:**
-![infer_ui](images/infer_ui.png)
+![infer_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/infer_ui.png)
 
 
 # Quick Start
@@ -117,9 +117,6 @@ python -m pip install -e .
 ### c. Plug-in Installation
 Now we support installing EasyPhoto from git. The url of our Repository is https://github.com/aigc-apps/sd-webui-EasyPhoto.
 
-![install](images/install.png)
-
-
 # How to use
 
 The process closely resembles the EasyPhoto master pipeline, with the additional steps of selecting a main image and specifying the target region during inference.
@@ -127,12 +124,13 @@ The process closely resembles the EasyPhoto master pipeline, with the additional
 ### 1. Model Training
 The EasyPhoto training interface is as follows:
 
+![train_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/train_ui.png)
+
 - On the left is the training image. First upload a main image, and click Upload Photos to upload the image.
 - On the right are the training parameters, which shares the same meaning as the master pipeline.
 
 The main image is used to match the ROI in the training image that is used to segment the target id. Therefore, please choose a clean front image as the main image. Then, click the Upload Photos button to upload training images, the training images will be processed by LightGlue and SAM to obtain the main target. Then we click on "Start Training" below, and at this point, we need to fill in the User ID above, such as the user's name, to start training.
 
-![train_1](images/train_1.png)
 
 If you want to set parameters, the parsing of each parameter is as follows:
 
@@ -155,10 +153,6 @@ If you want to set parameters, the parsing of each parameter is as follows:
 - Step 3: Select the template and mask the target region that needs to be generated.
 - Step 4: Click the Generate button to generate the results.
 
-![infer](images/infer_1.png)
-
-# Algorithm Detailed
-TBD
 
 # Reference
 - insightface：https://github.com/deepinsight/insightface
