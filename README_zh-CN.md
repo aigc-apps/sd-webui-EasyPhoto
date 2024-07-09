@@ -42,9 +42,13 @@ EasyPhoto是一款Webui UI插件，用于生成AI肖像画，该代码可用于�
 ![results_1](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/result.png)
 
 我们的ui界面如下:
+
 **训练部分:**
+
 ![train_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/train_ui.png)
+
 **预测部分:**
+
 ![infer_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/infer_ui.png)
 
 

@@ -40,9 +40,13 @@ These are our generated results:
 ![results_1](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/result.png)
 
 Our ui interface is as follows:
+
 **train part:**
+
 ![train_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/train_ui.png)
+
 **inference part:**
+
 ![infer_ui](https://pai-vision-data-sh.oss-cn-shanghai.aliyuncs.com/xinyi.zxy/anyid/infer_ui.png)
 
 
