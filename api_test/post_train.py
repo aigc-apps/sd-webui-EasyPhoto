@@ -47,10 +47,10 @@ if __name__ == "__main__":
     # When there is no parameter input.
     if len(sys.argv) == 1:
         img_list = [
-            "http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t1.jpg",
-            "http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t2.jpg",
-            "http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t3.jpg",
-            "http://pai-vision-data-inner.oss-cn-zhangjiakou.aliyuncs.com/data/easyphoto/train_data/test_face_1/t4.jpg",
+            "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/api/t1.jpg",
+            "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/api/t2.jpg",
+            "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/api/t3.jpg",
+            "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/api/t4.jpg",
         ]
         encoded_images = []
         for idx, img_path in enumerate(img_list):
