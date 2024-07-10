@@ -91,7 +91,7 @@ if __name__ == "__main__":
     # -------------------test infer------------------- #
     # When there is no parameter input.
     if template_dir == "":
-        encoded_image = "https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/template/template1.jpeg"
+        encoded_image = "https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/webui/api/template1.jpeg"
         encoded_image = requests.get(encoded_image)
         encoded_image = base64.b64encode(BytesIO(encoded_image.content).read()).decode("utf-8")
 

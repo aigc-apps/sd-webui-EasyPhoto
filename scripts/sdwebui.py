@@ -414,6 +414,7 @@ def t2i_call(
                 p_txt2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_txt2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
     p_txt2img.seed = int(seed)
+    p_txt2img.steps = steps
 
     processed = processing.process_images(p_txt2img)
 
@@ -571,7 +572,6 @@ def i2i_inpaint_call(
         override_settings=override_settings,
         initial_noise_multiplier=initial_noise_multiplier,
     )
-
     p_img2img.scripts = scripts.scripts_img2img
     p_img2img.extra_generation_params["Mask blur"] = mask_blur
     p_img2img.script_args = init_default_script_args(p_img2img.scripts)
@@ -625,6 +625,7 @@ def i2i_inpaint_call(
                 p_img2img.script_args[alwayson_scripts.args_from] = True  # Enable Dynamic Lora Weights
                 p_img2img.script_args[alwayson_scripts.args_from + 1] = loractl_flag  # Plot the LoRA weight in all steps
     p_img2img.seed = int(seed)
+    p_img2img.steps = steps
 
     processed = processing.process_images(p_img2img)
 

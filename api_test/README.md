@@ -8,22 +8,7 @@
 - **post_infer.py** 支持公网URL图片/本地图片读取
 代码提供了默认URL，可修改，本地图片通过命令行参数输入。
 
-
-## 测试平均耗时 32G-V100
-### 训练
-**初始模型下载完成后**，avg_time ~= 7mins， **max_train_steps**=100，参考下图
-
-
-![train](https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/reademe/train.png)
-
-### 推理
-**初始模型下载完成后** avg_infer_time(10次) ~= 20s
-
-
-![infer](https://pai-vision-data-inner.oss-accelerate.aliyuncs.com/data/easyphoto/reademe/infer.png)
-
-
-### 双盲测试
+## 双盲测试
 基于上述的推理代码，我们可以实现预定模板和预定人物的Lora的批量测试图片生成，形成某个版本的记录。并基于此对两个版本的代码的生成结果进行双盲测试，下面，我们简单的使用一个例子进行双盲测试。打开后的UI 如下图
 
 ![overview](../images/double_blindui.jpg)

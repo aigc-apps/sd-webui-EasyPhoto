@@ -283,7 +283,7 @@ def get_controlnet_unit(
     elif unit == "canny_no_pre":
         control_unit = dict(
             image=None,
-            module=None,
+            module="none",
             weight=weight,
             guidance_end=1,
             control_mode=control_mode,
@@ -453,6 +453,7 @@ def easyphoto_infer_forward(
     second_diffusion_steps,
     second_denoising_strength,
     seed,
+    batch_size,
     crop_face_preprocess,
     apply_face_fusion_before,
     apply_face_fusion_after,
@@ -489,6 +490,8 @@ def easyphoto_infer_forward(
 ):
     # global
     global retinaface_detection, image_face_fusion, skin_retouching, portrait_enhancement, old_super_resolution_method, face_skin, face_recognition, psgan_inference, check_hash, sdxl_txt2img_flag
+
+    origin_seed = copy.deepcopy(seed)
 
     # Infer without User Lora
     if ref_mode_choose == "Infer without User Lora":
@@ -690,10 +693,13 @@ def easyphoto_infer_forward(
         # choose tabs select
         if tabs == 0:
             template_images = eval(selected_template_images)
+            template_images = template_images * int(batch_size)
         elif tabs == 1:
             template_images = [init_image]
+            template_images = template_images * int(batch_size)
         elif tabs == 2:
             template_images = [file_d["name"] for file_d in uploaded_template_images]
+            template_images = template_images * int(batch_size)
         elif tabs == 3:
             if user_id[0] == "none":
                 ep_logger.error("Found none in User_0 id with scene lora. Please choose a user id.")
@@ -813,12 +819,6 @@ def easyphoto_infer_forward(
     # If the code exits abnormally, it may cause the model to not function properly on the CPU
     modelscope_models_to_cpu()
 
-    # get random seed
-    if int(seed) == -1:
-        seed = np.random.randint(0, 65536)
-
-    seed_everything(int(seed))
-
     # params init
     input_prompts = []
     face_id_images = []
@@ -913,112 +913,118 @@ def easyphoto_infer_forward(
 
                 controlnet_pairs.insert(0, ["instantid_sdxl_face_embedding", instantid_image, 0.50, 2])
 
-        if scene_id != "none":
-            # scene lora path
-            scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
-            if not os.path.exists(scene_lora_model_path):
-                ep_logger.error("Please check scene lora is exist or not.")
-                return "Please check scene lora is exist or not.", [], []
-            if not check_scene_valid(f"{scene_id}.safetensors", models_path):
-                ep_logger.error("Please use the lora trained by ep.")
-                return "Please use the lora trained by ep.", [], []
+        template_images = []
+        for _idx in range(int(batch_size)):
+            if int(origin_seed) == -1:
+                seed = np.random.randint(0, 65536)
 
-            # get lora scene prompt
-            # add user lora for kind of WARMUP, better result in t2i final result
-            if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
-                last_scene_lora_prompt_high_weight = (
-                    text_to_image_input_prompt
-                    + f", <lora:{scene_id}:0.80>, look at viewer, "
-                    + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-                )
-                last_scene_lora_prompt_low_weight = (
-                    text_to_image_input_prompt
-                    + f", <lora:{scene_id}:0.40>, look at viewer, "
-                    + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-                )
-            else:
-                last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, "
-                last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, "
+            seed_everything(int(seed))
+            if scene_id != "none":
+                # scene lora path
+                scene_lora_model_path = os.path.join(models_path, "Lora", f"{scene_id}.safetensors")
+                if not os.path.exists(scene_lora_model_path):
+                    ep_logger.error("Please check scene lora is exist or not.")
+                    return "Please check scene lora is exist or not.", [], []
+                if not check_scene_valid(f"{scene_id}.safetensors", models_path):
+                    ep_logger.error("Please use the lora trained by ep.")
+                    return "Please use the lora trained by ep.", [], []
 
-            if lcm_accelerate:
-                last_scene_lora_prompt_high_weight += f"<lora:{lcm_lora_name_and_weight}>, "
-                last_scene_lora_prompt_low_weight += f"<lora:{lcm_lora_name_and_weight}>, "
+                # get lora scene prompt
+                # add user lora for kind of WARMUP, better result in t2i final result
+                if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
+                    last_scene_lora_prompt_high_weight = (
+                        text_to_image_input_prompt
+                        + f", <lora:{scene_id}:0.80>, look at viewer, "
+                        + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+                    )
+                    last_scene_lora_prompt_low_weight = (
+                        text_to_image_input_prompt
+                        + f", <lora:{scene_id}:0.40>, look at viewer, "
+                        + f"{validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+                    )
+                else:
+                    last_scene_lora_prompt_high_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.80>, look at viewer, "
+                    last_scene_lora_prompt_low_weight = text_to_image_input_prompt + f", <lora:{scene_id}:0.40>, look at viewer, "
 
-            # define sampler and cfg_scale
-            if lcm_accelerate:
-                cfg_scale = 2
-                sampler = "Euler a"
-            elif t2i_instantid_control:
-                cfg_scale = 5
-                sampler = "Euler"
-            else:
-                cfg_scale = 7
-                sampler = "Euler a"
-            # text to image with scene lora
-            ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
-            template_images = txt2img(
-                controlnet_pairs,
-                input_prompt=last_scene_lora_prompt_high_weight,
-                diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=cfg_scale,
-                width=text_to_image_width,
-                height=text_to_image_height,
-                default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
-                seed=seed,
-                sampler=sampler,
-            )
-            if prompt_generate_sd_model_checkpoint_type != 3:
-                ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
-                template_images = inpaint(
-                    template_images[0],
-                    None,
-                    [],
-                    input_prompt=last_scene_lora_prompt_low_weight,
+                if lcm_accelerate:
+                    last_scene_lora_prompt_high_weight += f"<lora:{lcm_lora_name_and_weight}>, "
+                    last_scene_lora_prompt_low_weight += f"<lora:{lcm_lora_name_and_weight}>, "
+
+                # define sampler and cfg_scale
+                if lcm_accelerate:
+                    cfg_scale = 2
+                    sampler = "Euler a"
+                elif t2i_instantid_control:
+                    cfg_scale = 5
+                    sampler = "Euler"
+                else:
+                    cfg_scale = 7
+                    sampler = "Euler a"
+                # text to image with scene lora
+                ep_logger.info(f"Text to Image with prompt: {last_scene_lora_prompt_high_weight} and lora: {scene_lora_model_path}")
+                generated_images = txt2img(
+                    controlnet_pairs,
+                    input_prompt=last_scene_lora_prompt_high_weight,
                     diffusion_steps=30 if not lcm_accelerate else 8,
                     cfg_scale=cfg_scale,
-                    denoising_strength=0.20,
-                    hr_scale=1.5,
+                    width=text_to_image_width,
+                    height=text_to_image_height,
                     default_positive_prompt=DEFAULT_POSITIVE_T2I,
                     default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
                     seed=seed,
                     sampler=sampler,
                 )
-            template_images = [np.uint8(template_images[0])]
-        else:
-            text_to_image_input_prompt += ", look at viewer"
-            # get lora scene prompt
-            if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
-                text_to_image_input_prompt = text_to_image_input_prompt + f", {validation_prompt}, <lora:{user_ids[0]}:0.25>, "
-
-            # text to image for template
-            if lcm_accelerate:
-                text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
-            ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
-
-            # define sampler and cfg_scale
-            if lcm_accelerate:
-                cfg_scale = 2
-                sampler = "Euler a"
-            elif t2i_instantid_control:
-                cfg_scale = 5
-                sampler = "Euler"
+                if prompt_generate_sd_model_checkpoint_type != 3:
+                    ep_logger.info(f"Hire Fix with prompt: {last_scene_lora_prompt_low_weight} and lora: {scene_lora_model_path}")
+                    generated_images = inpaint(
+                        generated_images[0],
+                        None,
+                        [],
+                        input_prompt=last_scene_lora_prompt_low_weight,
+                        diffusion_steps=30 if not lcm_accelerate else 8,
+                        cfg_scale=cfg_scale,
+                        denoising_strength=0.20,
+                        hr_scale=1.5,
+                        default_positive_prompt=DEFAULT_POSITIVE_T2I,
+                        default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
+                        seed=seed,
+                        sampler=sampler,
+                    )
+                template_images.append(np.uint8(generated_images[0]))
             else:
-                cfg_scale = 7
-                sampler = "Euler a"
-            template_images = txt2img(
-                controlnet_pairs,
-                input_prompt=text_to_image_input_prompt,
-                diffusion_steps=30 if not lcm_accelerate else 8,
-                cfg_scale=cfg_scale,
-                width=text_to_image_width,
-                height=text_to_image_height,
-                default_positive_prompt=DEFAULT_POSITIVE_T2I,
-                default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
-                seed=seed,
-                sampler=sampler,
-            )
-            template_images = [np.uint8(template_images[0])]
+                text_to_image_input_prompt += ", look at viewer"
+                # get lora scene prompt
+                if user_ids[0] != "ipa_control_only" and user_ids[0] != "instantid_control_only":
+                    text_to_image_input_prompt = text_to_image_input_prompt + f", {validation_prompt}, <lora:{user_ids[0]}:0.25>, "
+
+                # text to image for template
+                if lcm_accelerate:
+                    text_to_image_input_prompt += f"<lora:{lcm_lora_name_and_weight}>, "
+                ep_logger.info(f"Text to Image with prompt: {text_to_image_input_prompt}")
+
+                # define sampler and cfg_scale
+                if lcm_accelerate:
+                    cfg_scale = 2
+                    sampler = "Euler a"
+                elif t2i_instantid_control:
+                    cfg_scale = 5
+                    sampler = "Euler"
+                else:
+                    cfg_scale = 7
+                    sampler = "Euler a"
+                generated_images = txt2img(
+                    controlnet_pairs,
+                    input_prompt=text_to_image_input_prompt,
+                    diffusion_steps=30 if not lcm_accelerate else 8,
+                    cfg_scale=cfg_scale,
+                    width=text_to_image_width,
+                    height=text_to_image_height,
+                    default_positive_prompt=DEFAULT_POSITIVE_T2I,
+                    default_negative_prompt=additional_neg_prompt + ", " + DEFAULT_NEGATIVE_T2I,
+                    seed=seed,
+                    sampler=sampler,
+                )
+                template_images.append(np.uint8(generated_images[0]))
 
     if not sdxl_pipeline_flag:
         reload_sd_model_vae(sd_model_checkpoint, "vae-ft-mse-840000-ema-pruned.ckpt")
@@ -1187,6 +1193,12 @@ def easyphoto_infer_forward(
     outputs, face_id_outputs = [], []
     loop_message = ""
     for template_idx, template_image in enumerate(template_images):
+        # get random seed
+        if int(origin_seed) == -1:
+            seed = np.random.randint(0, 65536)
+
+        seed_everything(int(seed))
+
         template_idx_info = f"""
             Start Generate template                 : {str(template_idx + 1)};
             user_ids                                : {str(user_ids)};
